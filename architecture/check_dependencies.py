@@ -104,6 +104,9 @@ def check(
 
     for profile in sorted(set(declared) & set(expected_profiles)):
         expected = expected_profiles[profile]
+        allowed_forbidden = {
+            canonical_name(name) for name in expected.get("allowed_forbidden_dependencies", [])
+        }
         resolved = resolved_dependencies(profile)
         distribution_count = len(resolved) + 1
         profile_result = {
@@ -114,6 +117,15 @@ def check(
             "wheel_bytes": None,
         }
         profiles[profile] = profile_result
+
+        for dependency in sorted(allowed_forbidden - forbidden):
+            violations.append(
+                {
+                    "dependency": dependency,
+                    "profile": profile,
+                    "reason": "profile allowlist names a dependency that is not forbidden",
+                }
+            )
 
         if declared[profile] != expected["declared_dependencies"]:
             violations.append(
@@ -143,7 +155,9 @@ def check(
                 }
             )
 
-        for dependency in sorted({canonical_name(item) for item in resolved} & forbidden):
+        for dependency in sorted(
+            ({canonical_name(item) for item in resolved} & forbidden) - allowed_forbidden
+        ):
             violations.append(
                 {
                     "dependency": dependency,

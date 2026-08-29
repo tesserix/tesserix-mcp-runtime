@@ -24,7 +24,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | Explicit application composition, in-process transport, signals, and bounded drain | Implemented in source; pre-release |
 | Typed callable authoring, schema fingerprints, compatibility classification, and handler-free metadata export | Implemented in source; pre-release |
 | MCP v2 Streamable HTTP serving, compatibility matrix, and bounded sessions | Implemented in source; pre-release |
-| ADK `ToolRegistry` bridge | Planned; not implemented |
+| ADK `AgentToolView` and `McpServer` bridge | Implemented as an exact optional profile |
 | Registry manifest compilation, signing, publication, and verification | Planned; not implemented |
 | Registry-backed semantic discovery and progressive disclosure | Planned; not implemented |
 | Automatic Gateway route pickup and activation status | Planned; not implemented |
@@ -193,6 +193,20 @@ limits, gateway routing, failure responses, and verification commands.
 [ADR-0008](docs/adr/0008-streamable-http-and-bounded-sessions.md) records the
 protocol authority, session model, cancellation ordering, SDK upgrade risk,
 alternatives, rollout, and rollback.
+
+## ADK bridge
+
+An optional adapter now binds an existing ADK `AgentToolView` and explicit
+export allowlist to the Streamable HTTP transport. It delegates descriptors,
+fingerprints, validation, approvals, tenant lanes, ceilings, redaction, and
+result codes to the exact attested ADK 0.53.1 release. Core installation and
+tests remain ADK-free.
+
+See the [ADK bridge guide](docs/adk-bridge.md) for composition, trusted context
+mapping, exact dependency and image choices, and the isolated compatibility
+command. [ADR-0009](docs/adr/0009-adk-exported-session-bridge.md) records the
+SDK-neutral session boundary, security behavior, measured size tradeoff,
+release verification, rollout, and rollback.
 
 ## License
 

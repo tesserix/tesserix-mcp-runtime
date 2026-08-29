@@ -24,6 +24,7 @@ from mcp.types import (
     PARSE_ERROR,
     UNSUPPORTED_PROTOCOL_VERSION,
     PaginatedRequestParams,
+    RequestParamsMeta,
 )
 
 from tesserix_mcp_runtime import (
@@ -42,7 +43,9 @@ from tesserix_mcp_runtime import (
 from tesserix_mcp_runtime.adapters.streamable_http import (
     HTTPCallContextProvider,
     HTTPRequestMetadata,
+    ProtocolCallResult,
     ProtocolTelemetryEvent,
+    ProtocolToolDescriptor,
     StreamableHTTPConfig,
     StreamableHTTPConfigurationError,
     StreamableHTTPLimits,
@@ -101,6 +104,108 @@ class FakeEndpoint:
         if name not in self.list_tools():
             raise AssertionError("transport invoked an unknown fixture tool")
         return InvocationResult.success({"text": str(arguments.get("text", ""))})
+
+
+class FakeProtocolSession:
+    def __init__(
+        self,
+        endpoint: FakeProtocolEndpoint,
+        protocol_version: str,
+    ) -> None:
+        self._endpoint = endpoint
+        self._protocol_version = protocol_version
+
+    async def initialize(self) -> None:
+        self._endpoint.events.append(f"initialize:{self._protocol_version}")
+
+    async def list_tools(self) -> tuple[ProtocolToolDescriptor, ...]:
+        self._endpoint.events.append("list_tools")
+        return self._endpoint.protocol_tools()
+
+    async def call_tool(
+        self,
+        name: str,
+        arguments: Mapping[str, JsonValue],
+        *,
+        meta: Mapping[str, JsonValue],
+    ) -> ProtocolCallResult:
+        self._endpoint.metas.append(dict(meta))
+        self._endpoint.events.append(f"call_tool:{name}")
+        if self._endpoint.call_error is not None:
+            raise self._endpoint.call_error
+        return ProtocolCallResult(
+            content=(
+                self._endpoint.content
+                if self._endpoint.content is not None
+                else ({"type": "text", "text": str(arguments.get("text", ""))},)
+            ),
+            structured_content={"text": str(arguments.get("text", ""))},
+            is_error=False,
+        )
+
+    async def close(self) -> None:
+        self._endpoint.events.append("close")
+
+
+class FakeProtocolEndpoint:
+    def __init__(
+        self,
+        *,
+        call_error: Exception | None = None,
+        content: tuple[Mapping[str, JsonValue], ...] | None = None,
+    ) -> None:
+        self.events: list[str] = []
+        self.contexts: list[CallContext] = []
+        self.metas: list[dict[str, JsonValue]] = []
+        self.call_error = call_error
+        self.content = content
+        self._tools: tuple[ProtocolToolDescriptor, ...] = (
+            ProtocolToolDescriptor(
+                name="native_echo",
+                description="Return one native result.",
+                input_schema={
+                    "type": "object",
+                    "properties": {"text": {"type": "string"}},
+                    "required": ["text"],
+                    "additionalProperties": False,
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {"text": {"type": "string"}},
+                    "required": ["text"],
+                    "additionalProperties": False,
+                },
+                fingerprint="native-fingerprint",
+            ),
+        )
+
+    def protocol_tools(self) -> tuple[ProtocolToolDescriptor, ...]:
+        return self._tools
+
+    def widen(self) -> None:
+        self._tools = (
+            *self._tools,
+            ProtocolToolDescriptor(
+                name="unexpected",
+                description="A tool added after startup.",
+                input_schema={"type": "object"},
+                output_schema=None,
+                fingerprint="unexpected-fingerprint",
+            ),
+        )
+
+    def replace_tools(self, tools: tuple[ProtocolToolDescriptor, ...]) -> None:
+        self._tools = tools
+
+    def connect(
+        self,
+        *,
+        context: CallContext,
+        protocol_version: str,
+    ) -> FakeProtocolSession:
+        self.contexts.append(context)
+        self.events.append("connect")
+        return FakeProtocolSession(self, protocol_version)
 
 
 class LargeEndpoint(FakeEndpoint):
@@ -1063,6 +1168,272 @@ def test_official_client_initializes_lists_pings_and_calls_without_a_socket() ->
         assert all(event.sdk_version == "2.1.1" for event in telemetry.events)
 
         await transport.drain(deadline=100.0)
+        await transport.stop()
+
+    asyncio.run(exercise())
+
+
+def test_protocol_endpoint_translates_initialize_list_call_and_close() -> None:
+    async def exercise() -> None:
+        listener = LifespanListener()
+        endpoint = FakeProtocolEndpoint()
+        transport = StreamableHTTPTransport(
+            config=StreamableHTTPConfig(),
+            limits=StreamableHTTPLimits(),
+            context_provider=StaticContextProvider(),
+            telemetry=RecordingProtocolTelemetry(),
+            listener=listener,
+        )
+        await transport.start(endpoint)
+        assert listener.app is not None
+
+        async with (
+            httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=listener.app),
+                base_url="http://127.0.0.1:8000",
+            ) as http_client,
+            streamable_http_client(
+                "http://127.0.0.1:8000/mcp",
+                http_client=http_client,
+                terminate_on_close=False,
+            ) as streams,
+            ClientSession(streams[0], streams[1]) as session,
+        ):
+            initialized = await session.initialize()
+            listed = await session.list_tools()
+            called = await session.call_tool(
+                "native_echo",
+                {"text": "hello"},
+                meta=cast(RequestParamsMeta, {"fixture": "value"}),
+            )
+
+        assert str(initialized.protocol_version) == "2025-11-25"
+        assert [tool.name for tool in listed.tools] == ["native_echo"]
+        assert called.is_error is False
+        assert called.structured_content == {"text": "hello"}
+        assert endpoint.events == [
+            "connect",
+            "initialize:2025-03-26",
+            "close",
+            "connect",
+            "initialize:2025-11-25",
+            "list_tools",
+            "close",
+            "connect",
+            "initialize:2025-11-25",
+            "call_tool:native_echo",
+            "close",
+        ]
+        assert len(endpoint.contexts) == 3
+        assert endpoint.metas == [{"fixture": "value"}]
+        await transport.stop()
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("name", "", "name"),
+        ("description", " leading", "description"),
+        ("fingerprint", "bad\nvalue", "fingerprint"),
+        ("input_schema", [], "input_schema"),
+        ("output_schema", [], "output_schema"),
+    ],
+)
+def test_protocol_tool_descriptor_rejects_invalid_boundaries(
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    values: dict[str, object] = {
+        "name": "native_echo",
+        "description": "Return one value.",
+        "input_schema": {"type": "object"},
+        "output_schema": None,
+        "fingerprint": "fingerprint",
+    }
+    values[field] = value
+
+    with pytest.raises(ValueError, match=message):
+        ProtocolToolDescriptor(
+            name=cast(str, values["name"]),
+            description=cast(str, values["description"]),
+            input_schema=cast(Mapping[str, JsonValue], values["input_schema"]),
+            output_schema=cast(Mapping[str, JsonValue] | None, values["output_schema"]),
+            fingerprint=cast(str, values["fingerprint"]),
+        )
+
+
+_INVALID_PROTOCOL_RESULTS: tuple[tuple[object, object, object, str], ...] = (
+    (list[object](), None, False, "content"),
+    ((list[object](),), None, False, "content items"),
+    ((), list[object](), False, "structured_content"),
+    ((), None, "false", "is_error"),
+)
+
+
+@pytest.mark.parametrize(
+    ("content", "structured_content", "is_error", "message"),
+    _INVALID_PROTOCOL_RESULTS,
+)
+def test_protocol_call_result_rejects_invalid_boundaries(
+    content: object,
+    structured_content: object,
+    is_error: object,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        ProtocolCallResult(
+            content=cast(tuple[Mapping[str, JsonValue], ...], content),
+            structured_content=cast(dict[str, JsonValue] | None, structured_content),
+            is_error=cast(bool, is_error),
+        )
+
+
+def test_protocol_endpoint_rejects_non_json_schema_before_binding() -> None:
+    async def exercise() -> None:
+        listener = FakeListener()
+        endpoint = FakeProtocolEndpoint()
+        endpoint.replace_tools(
+            (
+                ProtocolToolDescriptor(
+                    name="native_echo",
+                    description="Return one value.",
+                    input_schema={"invalid": cast(Any, {"not-json"})},
+                    output_schema=None,
+                    fingerprint="fingerprint",
+                ),
+            )
+        )
+        transport = StreamableHTTPTransport(
+            config=StreamableHTTPConfig(),
+            limits=StreamableHTTPLimits(),
+            context_provider=StaticContextProvider(),
+            telemetry=RecordingProtocolTelemetry(),
+            listener=listener,
+        )
+
+        with pytest.raises(StreamableHTTPConfigurationError) as raised:
+            await transport.start(endpoint)
+
+        assert raised.value.code == "invalid_protocol_tools"
+        assert listener.app is None
+
+    asyncio.run(exercise())
+
+
+def test_protocol_session_failure_is_closed_and_returned_without_private_text() -> None:
+    async def exercise() -> None:
+        listener = LifespanListener()
+        endpoint = FakeProtocolEndpoint(
+            call_error=RuntimeError("private-session-failure"),
+        )
+        transport = StreamableHTTPTransport(
+            config=StreamableHTTPConfig(),
+            limits=StreamableHTTPLimits(),
+            context_provider=StaticContextProvider(),
+            telemetry=RecordingProtocolTelemetry(),
+            listener=listener,
+        )
+        await transport.start(endpoint)
+        assert listener.app is not None
+
+        async with (
+            httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=listener.app),
+                base_url="http://127.0.0.1:8000",
+            ) as http_client,
+            streamable_http_client(
+                "http://127.0.0.1:8000/mcp",
+                http_client=http_client,
+                terminate_on_close=False,
+            ) as streams,
+            ClientSession(streams[0], streams[1]) as session,
+        ):
+            await session.initialize()
+            with pytest.raises(MCPError) as raised:
+                await session.call_tool("native_echo", {"text": "hello"})
+
+        assert "private-session-failure" not in str(raised.value)
+        assert endpoint.events[-3:] == [
+            "initialize:2025-11-25",
+            "call_tool:native_echo",
+            "close",
+        ]
+        await transport.stop()
+
+    asyncio.run(exercise())
+
+
+def test_protocol_session_rejects_descriptor_widening_after_startup() -> None:
+    async def exercise() -> None:
+        listener = LifespanListener()
+        endpoint = FakeProtocolEndpoint()
+        transport = StreamableHTTPTransport(
+            config=StreamableHTTPConfig(),
+            limits=StreamableHTTPLimits(),
+            context_provider=StaticContextProvider(),
+            telemetry=RecordingProtocolTelemetry(),
+            listener=listener,
+        )
+        await transport.start(endpoint)
+        endpoint.widen()
+        assert listener.app is not None
+
+        async with (
+            httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=listener.app),
+                base_url="http://127.0.0.1:8000",
+            ) as http_client,
+            streamable_http_client(
+                "http://127.0.0.1:8000/mcp",
+                http_client=http_client,
+                terminate_on_close=False,
+            ) as streams,
+            ClientSession(streams[0], streams[1]) as session,
+        ):
+            await session.initialize()
+            with pytest.raises(MCPError, match="Internal error"):
+                await session.list_tools()
+
+        assert endpoint.events[-2:] == ["list_tools", "close"]
+        await transport.stop()
+
+    asyncio.run(exercise())
+
+
+def test_protocol_session_rejects_invalid_content_after_closing() -> None:
+    async def exercise() -> None:
+        listener = LifespanListener()
+        endpoint = FakeProtocolEndpoint(content=({"type": "text"},))
+        transport = StreamableHTTPTransport(
+            config=StreamableHTTPConfig(),
+            limits=StreamableHTTPLimits(),
+            context_provider=StaticContextProvider(),
+            telemetry=RecordingProtocolTelemetry(),
+            listener=listener,
+        )
+        await transport.start(endpoint)
+        assert listener.app is not None
+
+        async with (
+            httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=listener.app),
+                base_url="http://127.0.0.1:8000",
+            ) as http_client,
+            streamable_http_client(
+                "http://127.0.0.1:8000/mcp",
+                http_client=http_client,
+                terminate_on_close=False,
+            ) as streams,
+            ClientSession(streams[0], streams[1]) as session,
+        ):
+            await session.initialize()
+            with pytest.raises(MCPError, match="Internal error"):
+                await session.call_tool("native_echo", {"text": "hello"})
+
+        assert endpoint.events[-1] == "close"
         await transport.stop()
 
     asyncio.run(exercise())

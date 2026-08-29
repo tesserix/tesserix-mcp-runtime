@@ -43,6 +43,27 @@ def test_core_dependency_report_matches_frozen_resolution() -> None:
         "uvicorn>=0.52.4,<1",
     ]
     assert result["profiles"]["core"]["distribution_count"] == 31
+    assert result["profiles"]["adk"]["declared_dependencies"][-2].startswith(
+        "tesserix-adk @ https://github.com/tesserix/agent-development-kit/releases/"
+    )
+    assert result["profiles"]["adk"]["distribution_count"] == 35
+
+
+def test_adk_is_forbidden_outside_its_explicit_dependency_profile(tmp_path: Path) -> None:
+    policy = json.loads(REPORT.read_text(encoding="utf-8"))
+    policy["profiles"]["adk"]["allowed_forbidden_dependencies"] = []
+    drifted_report = tmp_path / "dependency-report.json"
+    drifted_report.write_text(json.dumps(policy), encoding="utf-8")
+
+    completed = run_checker(drifted_report)
+
+    assert completed.returncode == 1
+    result = json.loads(completed.stdout)
+    assert {
+        "dependency": "tesserix-adk",
+        "profile": "adk",
+        "reason": "forbidden dependency resolved",
+    } in result["violations"]
 
 
 def test_dependency_report_rejects_a_forbidden_resolved_package(
