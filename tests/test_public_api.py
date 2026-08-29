@@ -40,6 +40,7 @@ def test_public_api_exports_only_the_stable_contract_surface() -> None:
         "Clock",
         "ContractViolation",
         "CredentialProvider",
+        "DuplicateToolName",
         "ErrorCode",
         "ErrorResponse",
         "IdempotencyRequirement",
@@ -52,9 +53,12 @@ def test_public_api_exports_only_the_stable_contract_surface() -> None:
         "LifecycleState",
         "LifecycleTransitionError",
         "MappedError",
+        "MetadataPolicy",
         "Retryability",
         "RuntimeFailure",
         "SchemaPolicy",
+        "SchemaChange",
+        "SchemaDirection",
         "ScrubbedError",
         "ShutdownSignal",
         "ShutdownSignalSource",
@@ -63,12 +67,17 @@ def test_public_api_exports_only_the_stable_contract_surface() -> None:
         "TerminalEmitter",
         "ToolCatalog",
         "ToolDefinition",
+        "ToolDiscoveryMetadata",
         "ToolEffect",
         "ToolHandler",
         "ToolMetadata",
+        "ToolManifest",
         "TraceContext",
         "__version__",
+        "classify_schema_change",
         "map_exception",
+        "normalize_tool_name",
+        "schema_fingerprint",
     }
     for name in tesserix_mcp_runtime.__all__:
         assert getattr(tesserix_mcp_runtime, name) is not None
@@ -78,7 +87,7 @@ def test_checked_in_public_api_snapshot_matches_exports() -> None:
     completed = run_snapshot_check(SNAPSHOT)
 
     assert completed.returncode == 0
-    assert completed.stdout == "Public API snapshot matches (46 exports).\n"
+    assert completed.stdout == "Public API snapshot matches (55 exports).\n"
     assert completed.stderr == ""
 
 

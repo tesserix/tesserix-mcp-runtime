@@ -6,9 +6,11 @@ Tesserix platform.
 The repository is in its pre-release runtime phase. The checked-in package
 provides typed contracts, an explicit application composition root,
 deterministic bounded lifecycle, stable safe errors, a validated tool catalog,
+typed-callable schema generation, handler-free manifest snapshots,
 process-signal handling, and reusable in-process conformance support. It does
-not yet start a network listener or serve MCP over HTTP. No stable package
-release is implied by interfaces described as planned below.
+not yet start a network listener, publish Registry versions, or serve MCP over
+HTTP. No stable package release is implied by interfaces described as planned
+below.
 
 The accepted ownership boundary and measurable design envelope are recorded
 in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
@@ -20,9 +22,10 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | Importable typed package and VCS-derived version command | Implemented in source; pre-release |
 | Runtime contracts, lifecycle, tool schema policy, and conformance helpers | Implemented in source; pre-release |
 | Explicit application composition, in-process transport, signals, and bounded drain | Implemented in source; pre-release |
+| Typed callable authoring, schema fingerprints, compatibility classification, and handler-free metadata export | Implemented in source; pre-release |
 | MCP v2 Streamable HTTP serving and bounded sessions | Planned; not implemented |
 | ADK `ToolRegistry` bridge | Planned; not implemented |
-| Registry manifests, signing, publication, and verification | Planned; not implemented |
+| Registry manifest compilation, signing, publication, and verification | Planned; not implemented |
 | Registry-backed semantic discovery and progressive disclosure | Planned; not implemented |
 | Automatic Gateway route pickup and activation status | Planned; not implemented |
 
@@ -154,6 +157,22 @@ targets:
 
     uv run --frozen python benchmarks/measure_application.py \
       /path/to/installed/python tests/fixtures/application_smoke.py
+
+## Typed callable authoring
+
+The runtime can now adapt an explicitly registered typed Python callable using
+the official MCP SDK as the single schema and validation authority. Registration
+enforces closed and bounded schemas, rejects model-controlled identity fields,
+attaches immutable semantic metadata, and emits handler-free schema snapshots
+with deterministic fingerprints. Directional compatibility classification
+provides evidence for later Registry publication without publishing or
+activating anything itself.
+
+See the [typed callable guide](docs/authoring.md) for a complete authoring
+example, semantic metadata rules, schema limits, manifest shape, and change
+classification. [ADR-0007](docs/adr/0007-typed-callable-authority-and-manifests.md)
+records the schema authority, trust boundary, dependency failures, quantitative
+ceilings, alternatives, rollout, and rollback.
 
 ## License
 

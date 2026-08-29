@@ -385,7 +385,7 @@ def test_tool_catalog_recursively_rejects_open_or_unbounded_schemas(
                 "type": "object",
                 "properties": {
                     "value": {
-                        "anyOf": [
+                        "oneOf": [
                             {"type": "string", "maxLength": 8},
                             {"type": "string"},
                         ]
@@ -394,7 +394,7 @@ def test_tool_catalog_recursively_rejects_open_or_unbounded_schemas(
                 "additionalProperties": False,
             },
             "unsupported_schema_keyword",
-            "tools[0].input_schema.properties.value.anyOf",
+            "tools[0].input_schema.properties.value.oneOf",
         ),
     ],
     ids=[

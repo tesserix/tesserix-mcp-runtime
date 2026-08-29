@@ -15,7 +15,9 @@ CORE_MODULE_PREFIXES = (
     "tesserix_mcp_runtime.errors",
     "tesserix_mcp_runtime.lifecycle",
     "tesserix_mcp_runtime.policy",
+    "tesserix_mcp_runtime.schema_compatibility",
     "tesserix_mcp_runtime.tool",
+    "tesserix_mcp_runtime.tool_manifest",
 )
 IMPORT_CONTRACT_ID = "core-does-not-depend-on-adapters"
 

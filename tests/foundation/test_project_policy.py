@@ -54,6 +54,7 @@ def test_project_declares_the_hermetic_quality_policy() -> None:
     assert set(development_dependencies) == {
         "hypothesis==6.165.10",
         "import-linter==2.14",
+        "jsonschema==4.26.0",
         "mypy==2.3.1",
         "pip-audit==2.10.1",
         "pyright==1.1.411",
@@ -62,6 +63,7 @@ def test_project_declares_the_hermetic_quality_policy() -> None:
         "pytest-socket==0.8.1",
         "ruff==0.16.5",
         "twine==7.0.0",
+        "types-jsonschema==4.26.0.20260518",
     }
 
     tool = table(document["tool"])
