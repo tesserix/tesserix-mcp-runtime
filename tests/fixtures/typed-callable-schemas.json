@@ -1,0 +1,132 @@
+{
+  "input_schema": {
+    "$defs": {
+      "MediaKind": {
+        "enum": [
+          "book",
+          "video"
+        ],
+        "title": "MediaKind",
+        "type": "string"
+      },
+      "SearchFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/MediaKind"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "phrase": {
+            "maxLength": 64,
+            "title": "Phrase",
+            "type": "string"
+          }
+        },
+        "required": [
+          "phrase"
+        ],
+        "title": "SearchFilter",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "criteria": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/SearchFilter"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      },
+      "query": {
+        "maxLength": 64,
+        "title": "Query",
+        "type": "string"
+      },
+      "selector": {
+        "anyOf": [
+          {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "integer"
+          },
+          {
+            "maxLength": 64,
+            "type": "string"
+          }
+        ],
+        "title": "Selector"
+      },
+      "tags": {
+        "items": {
+          "maxLength": 64,
+          "type": "string"
+        },
+        "maxItems": 8,
+        "title": "Tags",
+        "type": "array"
+      },
+      "weights": {
+        "additionalProperties": {
+          "type": "number"
+        },
+        "maxProperties": 8,
+        "propertyNames": {
+          "maxLength": 32
+        },
+        "title": "Weights",
+        "type": "object"
+      }
+    },
+    "required": [
+      "query",
+      "tags",
+      "weights",
+      "selector"
+    ],
+    "title": "discoverArguments",
+    "type": "object"
+  },
+  "output_schema": {
+    "additionalProperties": false,
+    "properties": {
+      "labels": {
+        "items": {
+          "maxLength": 64,
+          "type": "string"
+        },
+        "maxItems": 4,
+        "title": "Labels",
+        "type": "array"
+      },
+      "scores": {
+        "additionalProperties": {
+          "type": "number"
+        },
+        "maxProperties": 8,
+        "propertyNames": {
+          "maxLength": 32
+        },
+        "title": "Scores",
+        "type": "object"
+      }
+    },
+    "required": [
+      "labels",
+      "scores"
+    ],
+    "title": "SearchResult",
+    "type": "object"
+  }
+}

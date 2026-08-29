@@ -36,6 +36,9 @@ class _NeverCancelled:
 _NEVER_CANCELLED = _NeverCancelled()
 _TOOL_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{0,127}\Z")
 _SCOPE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9:._/-]{0,255}\Z")
+_CAPABILITY_NAME = re.compile(r"cap/[a-z0-9][a-z0-9._/-]{0,127}\Z")
+_METADATA_CLASS = re.compile(r"[a-z][a-z0-9._-]{0,63}\Z")
+_MAX_METADATA_LABELS = 32
 _TRACEPARENT_V00 = re.compile(r"00-([0-9a-f]{32})-([0-9a-f]{16})-[0-9a-f]{2}\Z")
 _TRACESTATE_KEY = re.compile(
     r"(?:[a-z][a-z0-9_*/-]{0,255}|"
@@ -331,6 +334,53 @@ class InvocationResult:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class ToolDiscoveryMetadata:
+    """Bounded, immutable routing metadata that never grants authority."""
+
+    summary: str
+    when_to_use: str
+    capabilities: tuple[str, ...]
+    rate_class: str
+    lifecycle: str
+    examples: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        _require_text("summary", self.summary, maximum=200)
+        _require_text("when_to_use", self.when_to_use, maximum=1024)
+        if (
+            not _is_runtime_instance(self.capabilities, tuple)
+            or len(self.capabilities) > _MAX_METADATA_LABELS
+        ):
+            raise ValueError("capabilities must be a bounded immutable tuple")
+        for capability in self.capabilities:
+            _require_text("capability", capability, maximum=132)
+            if _CAPABILITY_NAME.fullmatch(capability) is None:
+                raise ValueError("capability contains unsupported characters")
+        if len(set(self.capabilities)) != len(self.capabilities):
+            raise ValueError("capabilities must not contain duplicates")
+        for name, value in (("rate_class", self.rate_class), ("lifecycle", self.lifecycle)):
+            _require_text(name, value, maximum=64)
+            if _METADATA_CLASS.fullmatch(value) is None:
+                raise ValueError(f"{name} contains unsupported characters")
+        if not _is_runtime_instance(self.examples, tuple) or len(self.examples) > 16:
+            raise ValueError("examples must be a bounded immutable tuple")
+        for example in self.examples:
+            _require_text("example", example, maximum=1024)
+        if len(set(self.examples)) != len(self.examples):
+            raise ValueError("examples must not contain duplicates")
+
+    def to_dict(self) -> dict[str, JsonValue]:
+        return {
+            "summary": self.summary,
+            "when_to_use": self.when_to_use,
+            "capabilities": list(self.capabilities),
+            "rate_class": self.rate_class,
+            "lifecycle": self.lifecycle,
+            "examples": list(self.examples),
+        }
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ToolMetadata:
     """Bounded policy metadata reviewed with one tool definition."""
 
@@ -341,6 +391,7 @@ class ToolMetadata:
     approval: ApprovalRequirement
     idempotency: IdempotencyRequirement
     required_scopes: tuple[str, ...]
+    discovery: ToolDiscoveryMetadata | None = None
 
     def __post_init__(self) -> None:
         _require_text("name", self.name, maximum=128)
@@ -354,14 +405,22 @@ class ToolMetadata:
             raise ValueError("approval must be explicit")
         if not _is_runtime_instance(self.idempotency, IdempotencyRequirement):
             raise ValueError("idempotency must be explicit")
-        if not _is_runtime_instance(self.required_scopes, tuple):
-            raise ValueError("required_scopes must be an immutable tuple")
+        if (
+            not _is_runtime_instance(self.required_scopes, tuple)
+            or len(self.required_scopes) > _MAX_METADATA_LABELS
+        ):
+            raise ValueError("required_scopes must be a bounded immutable tuple")
         for scope in self.required_scopes:
             _require_text("scope", scope, maximum=256)
             if _SCOPE_NAME.fullmatch(scope) is None:
                 raise ValueError("scope contains unsupported characters")
         if len(set(self.required_scopes)) != len(self.required_scopes):
             raise ValueError("required_scopes must not contain duplicates")
+        if self.discovery is not None and not _is_runtime_instance(
+            self.discovery,
+            ToolDiscoveryMetadata,
+        ):
+            raise ValueError("discovery must be typed discovery metadata")
         if (
             self.effect is not ToolEffect.READ
             and self.idempotency is not IdempotencyRequirement.REQUIRED
@@ -369,7 +428,7 @@ class ToolMetadata:
             raise ValueError("write and external effects require idempotency")
 
     def to_dict(self) -> dict[str, JsonValue]:
-        return {
+        document: dict[str, JsonValue] = {
             "name": self.name,
             "title": self.title,
             "description": self.description,
@@ -378,6 +437,9 @@ class ToolMetadata:
             "idempotency": self.idempotency.value,
             "required_scopes": list(self.required_scopes),
         }
+        if self.discovery is not None:
+            document["discovery"] = self.discovery.to_dict()
+        return document
 
 
 @runtime_checkable
@@ -488,6 +550,7 @@ __all__ = [
     "Retryability",
     "Telemetry",
     "ToolDefinition",
+    "ToolDiscoveryMetadata",
     "ToolEffect",
     "ToolHandler",
     "ToolMetadata",

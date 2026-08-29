@@ -25,6 +25,7 @@ tesserix-mcp-runtime = "tesserix_mcp_runtime.__main__:main"
 dev = [
   "hypothesis==6.165.10",
   "import-linter==2.14",
+  "jsonschema==4.26.0",
   "mypy==2.3.1",
   "pip-audit==2.10.1",
   "pyright==1.1.411",
@@ -33,6 +34,7 @@ dev = [
   "pytest-socket==0.8.1",
   "ruff==0.16.5",
   "twine==7.0.0",
+  "types-jsonschema==4.26.0.20260518",
 ]
 
 [project.urls]

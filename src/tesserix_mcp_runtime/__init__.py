@@ -35,6 +35,7 @@ from tesserix_mcp_runtime.contracts import (
     Retryability,
     Telemetry,
     ToolDefinition,
+    ToolDiscoveryMetadata,
     ToolEffect,
     ToolHandler,
     ToolMetadata,
@@ -52,7 +53,20 @@ from tesserix_mcp_runtime.lifecycle import (
     LifecycleFailure,
     LifecycleTransitionError,
 )
-from tesserix_mcp_runtime.tool import ContractViolation, SchemaPolicy, ToolCatalog
+from tesserix_mcp_runtime.schema_compatibility import (
+    SchemaChange,
+    SchemaDirection,
+    classify_schema_change,
+)
+from tesserix_mcp_runtime.tool import (
+    ContractViolation,
+    DuplicateToolName,
+    MetadataPolicy,
+    SchemaPolicy,
+    ToolCatalog,
+    normalize_tool_name,
+)
+from tesserix_mcp_runtime.tool_manifest import ToolManifest, schema_fingerprint
 
 __version__ = _distribution_version("tesserix-mcp-runtime")
 
@@ -74,6 +88,7 @@ __all__ = [
     "Clock",
     "ContractViolation",
     "CredentialProvider",
+    "DuplicateToolName",
     "ErrorCode",
     "ErrorResponse",
     "IdempotencyRequirement",
@@ -86,8 +101,11 @@ __all__ = [
     "LifecycleState",
     "LifecycleTransitionError",
     "MappedError",
+    "MetadataPolicy",
     "Retryability",
     "RuntimeFailure",
+    "SchemaChange",
+    "SchemaDirection",
     "SchemaPolicy",
     "ScrubbedError",
     "ShutdownSignal",
@@ -97,10 +115,15 @@ __all__ = [
     "TerminalEmitter",
     "ToolCatalog",
     "ToolDefinition",
+    "ToolDiscoveryMetadata",
     "ToolEffect",
     "ToolHandler",
+    "ToolManifest",
     "ToolMetadata",
     "TraceContext",
     "__version__",
+    "classify_schema_change",
     "map_exception",
+    "normalize_tool_name",
+    "schema_fingerprint",
 ]
