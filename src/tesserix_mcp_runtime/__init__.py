@@ -2,6 +2,20 @@
 
 from importlib.metadata import version as _distribution_version
 
+from tesserix_mcp_runtime.application import (
+    Application,
+    ApplicationConfigurationError,
+    ApplicationDeadlineExceeded,
+    ApplicationDiagnostic,
+    ApplicationDiagnosticCode,
+    ApplicationEndpoint,
+    ApplicationLimits,
+    ApplicationRunResult,
+    ApplicationTransport,
+    ShutdownSignal,
+    ShutdownSignalSource,
+)
+from tesserix_mcp_runtime.clock import SystemClock
 from tesserix_mcp_runtime.contracts import (
     ApprovalRequirement,
     AuthenticatedIdentity,
@@ -43,6 +57,15 @@ from tesserix_mcp_runtime.tool import ContractViolation, SchemaPolicy, ToolCatal
 __version__ = _distribution_version("tesserix-mcp-runtime")
 
 __all__ = [
+    "Application",
+    "ApplicationConfigurationError",
+    "ApplicationDeadlineExceeded",
+    "ApplicationDiagnostic",
+    "ApplicationDiagnosticCode",
+    "ApplicationEndpoint",
+    "ApplicationLimits",
+    "ApplicationRunResult",
+    "ApplicationTransport",
     "ApprovalRequirement",
     "AuthenticatedIdentity",
     "Authorizer",
@@ -67,6 +90,9 @@ __all__ = [
     "RuntimeFailure",
     "SchemaPolicy",
     "ScrubbedError",
+    "ShutdownSignal",
+    "ShutdownSignalSource",
+    "SystemClock",
     "Telemetry",
     "TerminalEmitter",
     "ToolCatalog",

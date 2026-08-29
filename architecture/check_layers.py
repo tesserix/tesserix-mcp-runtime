@@ -9,6 +9,7 @@ from typing import TypedDict
 
 CORE_MODULE_PREFIXES = (
     "tesserix_mcp_runtime.application",
+    "tesserix_mcp_runtime.clock",
     "tesserix_mcp_runtime.context",
     "tesserix_mcp_runtime.contracts",
     "tesserix_mcp_runtime.errors",
