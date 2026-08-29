@@ -57,8 +57,17 @@ class ReadySignalSource:
         self._signals = ProcessSignalSource()
 
     async def wait(self) -> ShutdownSignal:
+        loop = asyncio.get_running_loop()
+        ready = loop.call_soon(self._report_ready)
+        try:
+            return await self._signals.wait()
+        except BaseException:
+            ready.cancel()
+            raise
+
+    @staticmethod
+    def _report_ready() -> None:
         print(json.dumps({"state": "ready"}), flush=True)
-        return await self._signals.wait()
 
 
 async def run(mode: str) -> int:
