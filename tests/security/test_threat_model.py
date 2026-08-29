@@ -1,16 +1,22 @@
 from __future__ import annotations
 
 import json
+import runpy
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
 ROOT = Path(__file__).parents[2]
 CHECKER = ROOT / "security" / "check_threat_model.py"
 MODEL = ROOT / "security" / "threat-model.json"
+check = cast(
+    Callable[[Path], dict[str, Any]],
+    runpy.run_path(str(CHECKER))["check"],
+)
 REQUIRED_THREAT_CATEGORIES = {
     "audit_tampering",
     "authentication",
@@ -227,6 +233,16 @@ def incident_scenarios() -> list[dict[str, Any]]:
 
 
 def run_checker(model: Path) -> subprocess.CompletedProcess[str]:
+    result = check(model)
+    return subprocess.CompletedProcess(
+        args=[str(CHECKER), "--model", str(model)],
+        returncode=0 if result["passed"] else 1,
+        stdout=json.dumps(result, sort_keys=True),
+        stderr="",
+    )
+
+
+def run_checker_cli(model: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(CHECKER), "--model", str(model)],
         cwd=ROOT,
@@ -245,11 +261,38 @@ def test_checked_in_threat_model_is_complete_and_traceable() -> None:
     assert result["violations"] == []
     assert result["summary"]["trust_boundaries"] >= 20
     assert result["summary"]["threats"] >= len(REQUIRED_THREAT_CATEGORIES)
-    assert result["summary"]["compromise_scenarios"] == len(
-        REQUIRED_COMPROMISE_SCENARIOS
-    )
+    assert result["summary"]["compromise_scenarios"] == len(REQUIRED_COMPROMISE_SCENARIOS)
     assert result["summary"]["negative_tests"] >= 30
     assert result["summary"]["review_examples"] >= 5
+
+
+def test_cli_reports_only_safe_validation_primitives() -> None:
+    completed = run_checker_cli(MODEL)
+
+    assert completed.returncode == 0
+    assert json.loads(completed.stdout) == {
+        "passed": True,
+        "violation_count": 0,
+    }
+
+
+def test_cli_never_echoes_model_content(tmp_path: Path) -> None:
+    secret_shaped_id = "ghp_DO_NOT_ECHO_THIS_SECRET_SHAPED_VALUE"
+    document = json.loads(MODEL.read_text(encoding="utf-8"))
+    document["trust_boundaries"][0]["id"] = secret_shaped_id
+    document["trust_boundaries"][0].pop("audit")
+    model = tmp_path / "threat-model.json"
+    model.write_text(json.dumps(document), encoding="utf-8")
+
+    completed = run_checker_cli(model)
+
+    assert completed.returncode == 1
+    report = json.loads(completed.stdout)
+    assert report["passed"] is False
+    assert report["violation_count"] > 0
+    assert set(report) == {"passed", "violation_count"}
+    assert secret_shaped_id not in completed.stdout
+    assert secret_shaped_id not in completed.stderr
 
 
 def test_rejects_a_trust_boundary_without_audit_behavior(tmp_path: Path) -> None:
@@ -767,9 +810,7 @@ def test_rejects_an_unreferenced_negative_test(tmp_path: Path) -> None:
             "expected": "fail closed",
             "owner": {
                 "repository": "tesserix/tesserix-mcp-runtime",
-                "tracking_issue": (
-                    "https://github.com/tesserix/tesserix-mcp-runtime/issues/30"
-                ),
+                "tracking_issue": ("https://github.com/tesserix/tesserix-mcp-runtime/issues/30"),
             },
         }
     )

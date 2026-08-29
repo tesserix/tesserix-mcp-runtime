@@ -60,9 +60,7 @@ def resolved_dependencies(profile: str) -> list[str]:
 def file_bytes(path: Path) -> int:
     if path.is_file():
         return path.stat().st_size
-    return sum(
-        candidate.stat().st_size for candidate in path.rglob("*") if candidate.is_file()
-    )
+    return sum(candidate.stat().st_size for candidate in path.rglob("*") if candidate.is_file())
 
 
 def check(
@@ -145,9 +143,7 @@ def check(
                 }
             )
 
-        for dependency in sorted(
-            {canonical_name(item) for item in resolved} & forbidden
-        ):
+        for dependency in sorted({canonical_name(item) for item in resolved} & forbidden):
             violations.append(
                 {
                     "dependency": dependency,

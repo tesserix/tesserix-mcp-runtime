@@ -3,10 +3,30 @@
 Reusable, policy-aware hosting for Model Context Protocol servers on the
 Tesserix platform.
 
-The repository is in its pre-release foundation phase. It does not yet contain
-a released runtime package. The accepted ownership boundary and measurable
-design envelope are recorded in
-[ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
+The repository is in its pre-release foundation phase. The checked-in package
+provides typed contracts, deterministic lifecycle primitives, stable safe
+errors, a validated tool catalog, and reusable adapter conformance tests. It
+does not yet start a network listener or serve MCP requests. No stable package
+release is implied by interfaces described as planned below.
+
+The accepted ownership boundary and measurable design envelope are recorded
+in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
+
+## Current versus planned behavior
+
+| Capability | Status |
+| --- | --- |
+| Importable typed package and VCS-derived version command | Implemented in source; pre-release |
+| Runtime contracts, lifecycle, tool schema policy, and conformance helpers | Implemented in source; pre-release |
+| MCP v2 Streamable HTTP serving and bounded sessions | Planned; not implemented |
+| ADK `ToolRegistry` bridge | Planned; not implemented |
+| Registry manifests, signing, publication, and verification | Planned; not implemented |
+| Registry-backed semantic discovery and progressive disclosure | Planned; not implemented |
+| Automatic Gateway route pickup and activation status | Planned; not implemented |
+
+The version can be inspected without starting runtime behavior:
+
+    uv run --frozen tesserix-mcp-runtime --version
 
 ## Design intent
 
@@ -36,6 +56,37 @@ contract without rewriting thresholds in each test.
 
 These targets are assumptions to validate before GA, not claims about current
 production performance.
+
+## Reproducible development
+
+Use Python 3.14 and uv 0.12.x. The default tests deny network sockets while
+allowing the Unix socket pairs required by asyncio.
+
+    uv sync --frozen
+    uv run --frozen ruff format --check .
+    uv run --frozen ruff check .
+    uv run --frozen mypy --strict src tests
+    uv run --frozen pyright src tests
+    uv run --frozen pytest
+    uv run --frozen lint-imports --config pyproject.toml --no-cache --no-logo
+    uv run --frozen python architecture/check_layers.py
+    uv run --frozen python architecture/check_public_api.py
+    uv run --frozen python architecture/check_dependencies.py
+    uv run --frozen python security/check_licenses.py
+
+Build validation is also offline after the frozen environment has been
+installed. The artifact smoke step installs only the distribution itself;
+`uv sync --frozen` and the dependency checks above verify its locked closure.
+
+    uv build --clear --offline
+    uv run --frozen twine check --strict dist/*
+    uv run --frozen python architecture/check_artifacts.py dist
+    uv run --frozen python architecture/smoke_install_artifacts.py --offline --no-deps dist
+
+The security workflow exports hash-pinned runtime requirements from `uv.lock`
+for `pip-audit`, verifies the license path of every reachable runtime
+dependency, scans Git history with a checksum-verified Gitleaks binary, and
+runs CodeQL and dependency review with least-privilege tokens.
 
 ## Compatibility baseline
 

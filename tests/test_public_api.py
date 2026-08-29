@@ -83,11 +83,5 @@ def test_public_api_snapshot_reports_owner_drift(tmp_path: Path) -> None:
     completed = run_snapshot_check(drifted_snapshot)
 
     assert completed.returncode == 1
-    assert (
-        "-ToolDefinition = tesserix_mcp_runtime.adapters.ToolDefinition"
-        in completed.stderr
-    )
-    assert (
-        "+ToolDefinition = tesserix_mcp_runtime.contracts.ToolDefinition"
-        in completed.stderr
-    )
+    assert "-ToolDefinition = tesserix_mcp_runtime.adapters.ToolDefinition" in completed.stderr
+    assert "+ToolDefinition = tesserix_mcp_runtime.contracts.ToolDefinition" in completed.stderr

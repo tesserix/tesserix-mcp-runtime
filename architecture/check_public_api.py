@@ -12,9 +12,7 @@ PACKAGE = "tesserix_mcp_runtime"
 def exported_owner(module: ModuleType, name: str) -> str:
     value = getattr(module, name)
     owner_module = getattr(value, "__module__", None)
-    owner_name = getattr(value, "__qualname__", None) or getattr(
-        value, "__name__", None
-    )
+    owner_name = getattr(value, "__qualname__", None) or getattr(value, "__name__", None)
     if not owner_module or not owner_name:
         owner_module = module.__name__
         owner_name = name
@@ -28,9 +26,7 @@ def current_snapshot(module: ModuleType) -> str:
 
 def main() -> int:
     snapshot_path = (
-        Path(sys.argv[1])
-        if len(sys.argv) > 1
-        else Path(__file__).with_name("public-api.txt")
+        Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).with_name("public-api.txt")
     )
     module = importlib.import_module(PACKAGE)
     expected = snapshot_path.read_text(encoding="utf-8")

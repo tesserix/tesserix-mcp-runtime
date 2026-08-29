@@ -45,8 +45,7 @@ def imported_modules(tree: ast.AST) -> set[str]:
 
 def is_core(module: str) -> bool:
     return any(
-        module == prefix or module.startswith(f"{prefix}.")
-        for prefix in CORE_MODULE_PREFIXES
+        module == prefix or module.startswith(f"{prefix}.") for prefix in CORE_MODULE_PREFIXES
     )
 
 
@@ -59,9 +58,7 @@ def forbidden_dependencies() -> tuple[str, ...]:
 
 
 def is_adapter_dependency(imported: str, forbidden: tuple[str, ...]) -> bool:
-    return any(
-        imported == prefix or imported.startswith(f"{prefix}.") for prefix in forbidden
-    )
+    return any(imported == prefix or imported.startswith(f"{prefix}.") for prefix in forbidden)
 
 
 def check(source: Path) -> list[Violation]:
@@ -88,9 +85,7 @@ def check(source: Path) -> list[Violation]:
 def main() -> int:
     source = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("src")
     violations = check(source)
-    print(
-        json.dumps({"passed": not violations, "violations": violations}, sort_keys=True)
-    )
+    print(json.dumps({"passed": not violations, "violations": violations}, sort_keys=True))
     return 1 if violations else 0
 
 

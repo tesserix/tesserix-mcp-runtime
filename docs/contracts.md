@@ -72,11 +72,7 @@ class EchoTool:
 
     def parse_input(self, arguments: Mapping[str, JsonValue]) -> EchoInput:
         text = arguments.get("text")
-        if (
-            set(arguments) != {"text"}
-            or not isinstance(text, str)
-            or len(text) > 128
-        ):
+        if set(arguments) != {"text"} or not isinstance(text, str) or len(text) > 128:
             raise RuntimeFailure(ErrorCode.INVALID_INPUT)
         return EchoInput(text=text)
 

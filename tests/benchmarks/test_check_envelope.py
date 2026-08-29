@@ -1,20 +1,17 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
-
 
 ROOT = Path(__file__).parents[2]
 CHECKER = ROOT / "benchmarks" / "check_envelope.py"
 
 
-def run_checker(
-    tmp_path: Path, observed: dict[str, object]
-) -> subprocess.CompletedProcess[str]:
+def run_checker(tmp_path: Path, observed: dict[str, object]) -> subprocess.CompletedProcess[str]:
     results_path = tmp_path / "observed.json"
     results_path.write_text(json.dumps({"observed": observed}), encoding="utf-8")
     return run_raw_checker(results_path)

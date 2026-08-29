@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import socket
 import subprocess
 import time
-
+from pathlib import Path
 
 ROOT = Path(__file__).parent
 LANES = (
@@ -56,9 +55,7 @@ def run_lane(script: Path, endpoint: str) -> dict[str, object]:
         timeout=60,
     )
     if completed.returncode != 0:
-        raise RuntimeError(
-            f"{script.name} failed with {completed.returncode}: {completed.stderr}"
-        )
+        raise RuntimeError(f"{script.name} failed with {completed.returncode}: {completed.stderr}")
     report = json.loads(completed.stdout)
     if not isinstance(report, dict):
         raise RuntimeError(f"{script.name} returned a non-object report")

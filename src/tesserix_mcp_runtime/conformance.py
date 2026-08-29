@@ -56,10 +56,7 @@ async def assert_adapter_conforms(
         raise ConformanceFailure("tool_listing_mismatch")
 
     succeeded = await adapter.invoke(case.tool_name, case.valid_arguments)
-    if (
-        succeeded.status is not InvocationStatus.SUCCESS
-        or succeeded.value != case.expected_value
-    ):
+    if succeeded.status is not InvocationStatus.SUCCESS or succeeded.value != case.expected_value:
         raise ConformanceFailure("valid_invocation_mismatch")
 
     invalid = await adapter.invoke(case.tool_name, case.invalid_arguments)
