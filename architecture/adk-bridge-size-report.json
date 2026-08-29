@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "measured_at": "2026-08-30",
+  "adk_release": {
+    "version": "0.53.1",
+    "wheel_bytes": 1136375,
+    "wheel_sha256": "eec6afc695518971f44723e520cf43f0997110d013ce4733f8d6d30ec96b8bdb",
+    "attestation_verified": true
+  },
+  "dependency_profiles": {
+    "method": "Clean uv pip install --target of . and .[adk]; sum of installed file bytes.",
+    "environment": {
+      "os": "Darwin",
+      "architecture": "arm64",
+      "python": "3.14.7",
+      "uv": "0.12.7"
+    },
+    "core": {
+      "installed_file_bytes": 26371197,
+      "active_distribution_count": 29,
+      "locked_distribution_count": 31
+    },
+    "adk": {
+      "installed_file_bytes": 30760274,
+      "active_distribution_count": 33,
+      "locked_distribution_count": 35
+    },
+    "delta": {
+      "installed_file_bytes": 4389077,
+      "active_distribution_count": 4,
+      "percent": 16.64
+    }
+  },
+  "base_images": {
+    "method": "crane digest plus OCI config and compressed layer byte sums from each platform manifest.",
+    "crane": "0.21.3",
+    "tag": "20260829",
+    "core": {
+      "reference": "ghcr.io/tesserix/base-python-runtime-3.14:20260829",
+      "index_digest": "sha256:3854f5d9d00705b14077bf6715feb9c3bd6d1ad2e41d5594b3c09c0a74c22add",
+      "platforms": {
+        "amd64": {
+          "manifest_digest": "sha256:cbade1e3e2c70bb2ad94ff9260d28f1dff1958419487fe243b66e0bd67e796c9",
+          "config_bytes": 7462,
+          "layer_count": 6,
+          "layer_bytes": 52287847,
+          "compressed_bytes": 52295309
+        },
+        "arm64": {
+          "manifest_digest": "sha256:81d85de08281c5683a428f016dd13db448fbe5ed5806d84bf47ab7cb8d1128b2",
+          "config_bytes": 7463,
+          "layer_count": 6,
+          "layer_bytes": 52779970,
+          "compressed_bytes": 52787433
+        }
+      }
+    },
+    "adk": {
+      "reference": "ghcr.io/tesserix/base-python-adk-3.14:20260829",
+      "index_digest": "sha256:5a6fd1863ed7f37f3929cc596d0ec063c3077c11713cd334f14d1df2b30ef386",
+      "platforms": {
+        "amd64": {
+          "manifest_digest": "sha256:96c820dbbfe459eec1903c3d4e4e196d36468419c7bb297861da1452f09871b8",
+          "config_bytes": 9315,
+          "layer_count": 8,
+          "layer_bytes": 144401054,
+          "compressed_bytes": 144410369
+        },
+        "arm64": {
+          "manifest_digest": "sha256:0622f1b0455596386577036b048afe6c9e3ea959d7a76485facba938be509c27",
+          "config_bytes": 9312,
+          "layer_count": 8,
+          "layer_bytes": 145645009,
+          "compressed_bytes": 145654321
+        }
+      }
+    },
+    "delta": {
+      "platforms": {
+        "amd64": {
+          "compressed_bytes": 92115060,
+          "percent": 176.14
+        },
+        "arm64": {
+          "compressed_bytes": 92866888,
+          "percent": 175.93
+        }
+      }
+    }
+  }
+}

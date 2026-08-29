@@ -5,12 +5,15 @@ on:
   push:
     branches:
       - main
+  repository_dispatch:
+    types: [adk-release]
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
 
 permissions:
   contents: read
+  attestations: read
 
 jobs:
   compatibility:
@@ -68,3 +71,58 @@ jobs:
           uv run --frozen python architecture/check_dependencies.py --wheel dist/*.whl --site-packages "$site_packages"
       - name: Exercise the exact client matrix
         run: uv run --frozen python compatibility/run_matrix.py
+
+  adk-compatibility:
+    name: Attested ADK bridge
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      ADK_RELEASE: v0.53.1
+      ADK_WHEEL: tesserix_adk-0.53.1-py3-none-any.whl
+      ADK_SHA256: eec6afc695518971f44723e520cf43f0997110d013ce4733f8d6d30ec96b8bdb
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install Python 3.14
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.7"
+          enable-cache: true
+      - name: Require review for a newly dispatched ADK release
+        if: github.event_name == 'repository_dispatch'
+        env:
+          DISPATCHED_RELEASE: ${{ github.event.client_payload.release }}
+        run: |
+          if [ "$DISPATCHED_RELEASE" != "$ADK_RELEASE" ]; then
+            echo "The dispatched ADK release is not the reviewed compatibility pin." >&2
+            exit 1
+          fi
+      - name: Verify the exact ADK release attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          verified_dir=$(mktemp -d)
+          gh release download "$ADK_RELEASE" \
+            --repo tesserix/agent-development-kit \
+            --pattern "$ADK_WHEEL" \
+            --dir "$verified_dir"
+          printf '%s  %s\n' "$ADK_SHA256" "$verified_dir/$ADK_WHEEL" \
+            | sha256sum --check --strict
+          gh attestation verify "$verified_dir/$ADK_WHEEL" \
+            --repo tesserix/agent-development-kit
+      - name: Prove the core environment remains ADK-free
+        run: |
+          uv lock --check
+          uv sync --frozen
+          uv run --frozen python -c "from importlib.util import find_spec; assert find_spec('tesserix_adk') is None"
+      - name: Exercise the exact optional ADK bridge
+        run: >-
+          uv run --isolated --frozen --extra adk pytest -q -o addopts=''
+          compatibility/adk/test_bridge.py

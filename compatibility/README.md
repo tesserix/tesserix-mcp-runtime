@@ -11,6 +11,8 @@ Run it from the repository root:
     uv lock --check --script compatibility/client_2_1.py
     uv run --frozen python compatibility/run_matrix.py
     uv run --frozen python compatibility/run_inspector.py
+    uv run --isolated --frozen --extra adk pytest -q -o addopts='' \
+      compatibility/adk/test_bridge.py
 
 The runner starts one loopback-only `tesserix-mcp-runtime` server process,
 executes every client lane against its endpoint, repeats the v2 lane through a
@@ -40,6 +42,13 @@ network access; the default pytest suite does not invoke it.
 This fixture is intentionally unauthenticated and must never be deployed.
 It is not a production identity fixture. Production gateway identity
 verification is implemented by issue #12's context provider.
+
+The separate ADK lane downloads only the exact optional release pinned in
+`pyproject.toml`. CI verifies that wheel's checksum and GitHub artifact
+attestation before creating the isolated extra environment. It ports ADK's
+same-tool local-versus-MCP behavior through the actual runtime transport and
+also covers export narrowing, tenant mismatch, approvals, redaction, and the
+modern protocol revision.
 
 ## Updating a lane
 

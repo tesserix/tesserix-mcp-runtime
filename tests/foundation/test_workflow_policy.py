@@ -33,3 +33,17 @@ def test_workflows_are_pinned_and_least_privilege() -> None:
 
         if "actions/checkout@" in document:
             assert "persist-credentials: false" in document, name
+
+
+def test_adk_compatibility_verifies_provenance_before_the_optional_install() -> None:
+    workflow = (WORKFLOW_ROOT / "compatibility.yml").read_text(encoding="utf-8")
+
+    assert "repository_dispatch:\n    types: [adk-release]" in workflow
+    assert "attestations: read" in workflow
+    attestation = workflow.index("gh attestation verify")
+    compatibility = workflow.index(
+        "uv run --isolated --frozen --extra adk pytest",
+    )
+    assert attestation < compatibility
+    assert "eec6afc695518971f44723e520cf43f0997110d013ce4733f8d6d30ec96b8bdb" in workflow
+    assert "find_spec('tesserix_adk') is None" in workflow

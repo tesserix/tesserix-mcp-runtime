@@ -21,6 +21,7 @@ from mcp.server.context import CallNext, HandlerResult, ServerMiddleware, Server
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.shared.exceptions import MCPError
 from mcp_types.version import HANDSHAKE_PROTOCOL_VERSIONS
+from pydantic import TypeAdapter, ValidationError
 
 from tesserix_mcp_runtime.application import ApplicationEndpoint
 from tesserix_mcp_runtime.contracts import (
@@ -42,6 +43,7 @@ _CALL_CONTEXT_SCOPE_KEY = "tesserix_mcp_runtime.call_context"
 _MCP_PROTOCOL_VERSION_HEADER = "mcp-protocol-version"
 _MCP_SESSION_ID_HEADER = "mcp-session-id"
 _HTTP_HEADER_NAME_BYTES = frozenset(b"!#$%&'*+-.^_`|~0123456789abcdefghijklmnopqrstuvwxyz")
+_CONTENT_BLOCK_ADAPTER: TypeAdapter[types.ContentBlock] = TypeAdapter(types.ContentBlock)
 
 
 @runtime_checkable
@@ -155,6 +157,90 @@ class ProtocolTelemetryEvent:
                 or any(ord(character) < 32 for character in value)
             ):
                 raise ValueError(f"{name} must be bounded visible text")
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ProtocolToolDescriptor:
+    """One SDK-neutral tool descriptor supplied by a protocol-native endpoint."""
+
+    name: str
+    description: str
+    input_schema: Mapping[str, JsonValue]
+    output_schema: Mapping[str, JsonValue] | None
+    fingerprint: str
+
+    def __post_init__(self) -> None:
+        for name, value, maximum in (
+            ("name", self.name, 128),
+            ("description", self.description, 4_096),
+            ("fingerprint", self.fingerprint, 128),
+        ):
+            if (
+                not _is_runtime_instance(value, str)
+                or not value
+                or value != value.strip()
+                or len(value) > maximum
+                or any(ord(character) < 32 for character in value)
+            ):
+                raise ValueError(f"{name} must be bounded visible text")
+        if not _is_runtime_instance(self.input_schema, Mapping):
+            raise ValueError("input_schema must be a mapping")
+        if self.output_schema is not None and not _is_runtime_instance(self.output_schema, Mapping):
+            raise ValueError("output_schema must be a mapping or None")
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ProtocolCallResult:
+    """One protocol-native result preserved without core error remapping."""
+
+    content: tuple[Mapping[str, JsonValue], ...]
+    structured_content: dict[str, JsonValue] | None
+    is_error: bool
+
+    def __post_init__(self) -> None:
+        if not _is_runtime_instance(self.content, tuple) or len(self.content) > 64:
+            raise ValueError("content must be a bounded immutable tuple")
+        if any(not _is_runtime_instance(item, Mapping) for item in self.content):
+            raise ValueError("content items must be mappings")
+        if self.structured_content is not None and not _is_runtime_instance(
+            self.structured_content, dict
+        ):
+            raise ValueError("structured_content must be an object or None")
+        if not _is_runtime_instance(self.is_error, bool):
+            raise ValueError("is_error must be a boolean")
+
+
+@runtime_checkable
+class StreamableHTTPProtocolSession(Protocol):
+    """Translate one HTTP protocol operation through a native session contract."""
+
+    async def initialize(self) -> None: ...
+
+    async def list_tools(self) -> tuple[ProtocolToolDescriptor, ...]: ...
+
+    async def call_tool(
+        self,
+        name: str,
+        arguments: Mapping[str, JsonValue],
+        *,
+        meta: Mapping[str, JsonValue],
+    ) -> ProtocolCallResult: ...
+
+    async def close(self) -> None: ...
+
+
+@runtime_checkable
+class StreamableHTTPProtocolEndpoint(Protocol):
+    """Expose a prepared protocol-native surface without entering the core contract."""
+
+    def protocol_tools(self) -> tuple[ProtocolToolDescriptor, ...]: ...
+
+    def connect(
+        self,
+        *,
+        context: CallContext,
+        protocol_version: str,
+    ) -> StreamableHTTPProtocolSession: ...
 
 
 @runtime_checkable
@@ -608,6 +694,8 @@ class _ProtocolTelemetryMiddleware:
         if context.method == "notifications/cancelled":
             self._transport.cancel_protocol_request(context)
         try:
+            if context.method in {"initialize", "server/discover"}:
+                await self._transport.initialize_protocol(context)
             result = await call_next(context)
         except BaseException:
             self._transport.emit_protocol_event(context, outcome="failed")
@@ -791,6 +879,25 @@ def _mcp_tool(manifest: ToolManifest) -> types.Tool:
     )
 
 
+def _mcp_protocol_tool(descriptor: ProtocolToolDescriptor) -> types.Tool:
+    return types.Tool(
+        name=descriptor.name,
+        description=descriptor.description,
+        input_schema=dict(descriptor.input_schema),
+        output_schema=(
+            dict(descriptor.output_schema) if descriptor.output_schema is not None else None
+        ),
+        _meta={"com.tesserix/contract-fingerprint": descriptor.fingerprint},
+    )
+
+
+def _mcp_content_block(content: Mapping[str, JsonValue]) -> types.ContentBlock:
+    try:
+        return _CONTENT_BLOCK_ADAPTER.validate_python(dict(content))
+    except ValidationError as error:
+        raise MCPError(types.INTERNAL_ERROR, "Internal error") from error
+
+
 class StreamableHTTPTransport:
     """Bind core application behavior to the official MCP HTTP server surface."""
 
@@ -827,7 +934,9 @@ class StreamableHTTPTransport:
         self._telemetry = telemetry
         self._listener = resolved_listener
         self._endpoint: ApplicationEndpoint | None = None
+        self._protocol_endpoint: StreamableHTTPProtocolEndpoint | None = None
         self._manifests: tuple[ToolManifest, ...] = ()
+        self._protocol_tools: tuple[ProtocolToolDescriptor, ...] = ()
         self._catalog_token = ""
         self._accepting = False
         self._session_lock = asyncio.Lock()
@@ -1222,20 +1331,79 @@ class StreamableHTTPTransport:
             raise MCPError(types.INVALID_PARAMS, "Invalid cursor")
         return page
 
+    def _connect_protocol_session(
+        self,
+        context: ServerRequestContext[Any, Any],
+    ) -> StreamableHTTPProtocolSession:
+        endpoint = self._protocol_endpoint
+        if endpoint is None:
+            raise MCPError(types.INTERNAL_ERROR, "Internal error")
+        protocol_version = _safe_observation(
+            context.protocol_version,
+            maximum=64,
+            fallback="unknown",
+        )
+        session = endpoint.connect(
+            context=self._call_context(context),
+            protocol_version=protocol_version,
+        )
+        if not _is_runtime_instance(session, StreamableHTTPProtocolSession):
+            raise MCPError(types.INTERNAL_ERROR, "Internal error")
+        return session
+
+    async def initialize_protocol(self, context: ServerRequestContext[Any, Any]) -> None:
+        if self._protocol_endpoint is None:
+            return
+        try:
+            session = self._connect_protocol_session(context)
+            try:
+                await session.initialize()
+            finally:
+                await session.close()
+        except asyncio.CancelledError:
+            raise
+        except MCPError:
+            raise
+        except Exception:
+            raise MCPError(types.INTERNAL_ERROR, "Internal error") from None
+
     async def _list_tools(
         self,
         context: ServerRequestContext[Any, Any],
         params: types.PaginatedRequestParams | None,
     ) -> types.ListToolsResult:
-        del context
+        protocol_tools = self._protocol_tools
+        if self._protocol_endpoint is not None:
+            try:
+                session = self._connect_protocol_session(context)
+                try:
+                    await session.initialize()
+                    listed = await session.list_tools()
+                finally:
+                    await session.close()
+            except asyncio.CancelledError:
+                raise
+            except MCPError:
+                raise
+            except Exception:
+                raise MCPError(types.INTERNAL_ERROR, "Internal error") from None
+            if listed != protocol_tools:
+                raise MCPError(types.INTERNAL_ERROR, "Internal error")
         page = 0 if params is None or params.cursor is None else self._decode_cursor(params.cursor)
         start = page * self._limits.tool_page_size
-        if start >= len(self._manifests) and start != 0:
+        tool_count = (
+            len(protocol_tools) if self._protocol_endpoint is not None else len(self._manifests)
+        )
+        if start >= tool_count and start != 0:
             raise MCPError(types.INVALID_PARAMS, "Invalid cursor")
-        end = min(start + self._limits.tool_page_size, len(self._manifests))
-        next_cursor = self._encode_cursor(page + 1) if end < len(self._manifests) else None
+        end = min(start + self._limits.tool_page_size, tool_count)
+        next_cursor = self._encode_cursor(page + 1) if end < tool_count else None
+        if self._protocol_endpoint is not None:
+            tools = [_mcp_protocol_tool(descriptor) for descriptor in protocol_tools[start:end]]
+        else:
+            tools = [_mcp_tool(manifest) for manifest in self._manifests[start:end]]
         return types.ListToolsResult(
-            tools=[_mcp_tool(manifest) for manifest in self._manifests[start:end]],
+            tools=tools,
             next_cursor=next_cursor,
         )
 
@@ -1257,11 +1425,14 @@ class StreamableHTTPTransport:
         params: types.CallToolRequestParams,
     ) -> types.CallToolResult:
         endpoint = self._endpoint
-        if endpoint is None:
+        protocol_endpoint = self._protocol_endpoint
+        if endpoint is None and protocol_endpoint is None:
             raise MCPError(types.INTERNAL_ERROR, "Internal error")
         call_context = self._call_context(request_context)
         arguments: dict[str, JsonValue] = dict((params.arguments or {}).items())
+        request_meta = {} if params.meta is None else cast(dict[str, JsonValue], dict(params.meta))
         cancellation = call_context.cancellation
+        protocol_result: ProtocolCallResult | None = None
         request_key = self._protocol_request_key(
             request_context,
             request_context.request_id,
@@ -1272,10 +1443,33 @@ class StreamableHTTPTransport:
                 previous.cancel()
             self._active_protocol_requests[request_key] = cancellation
         try:
-            result = await endpoint.invoke(params.name, arguments, context=call_context)
+            if protocol_endpoint is not None:
+                session = self._connect_protocol_session(request_context)
+                try:
+                    await session.initialize()
+                    protocol_result = await session.call_tool(
+                        params.name,
+                        arguments,
+                        meta=request_meta,
+                    )
+                finally:
+                    await session.close()
+                if not _is_runtime_instance(protocol_result, ProtocolCallResult):
+                    raise MCPError(types.INTERNAL_ERROR, "Internal error")
+                result = None
+            else:
+                if endpoint is None:
+                    raise MCPError(types.INTERNAL_ERROR, "Internal error")
+                result = await endpoint.invoke(params.name, arguments, context=call_context)
         except asyncio.CancelledError:
             if isinstance(cancellation, _RequestCancellation):
                 cancellation.cancel()
+            raise
+        except MCPError:
+            raise
+        except Exception:
+            if protocol_endpoint is not None:
+                raise MCPError(types.INTERNAL_ERROR, "Internal error") from None
             raise
         finally:
             if (
@@ -1293,6 +1487,16 @@ class StreamableHTTPTransport:
             )
         ):
             call_context.cancellation.cancel()
+        if protocol_endpoint is not None and protocol_result is not None:
+            return types.CallToolResult(
+                content=[_mcp_content_block(item) for item in protocol_result.content],
+                structured_content=protocol_result.structured_content,
+                is_error=protocol_result.is_error,
+            )
+        if protocol_endpoint is not None:
+            raise MCPError(types.INTERNAL_ERROR, "Internal error")
+        if result is None:
+            raise MCPError(types.INTERNAL_ERROR, "Internal error")
         if result.status is InvocationStatus.FAILURE:
             error = result.error
             if error is None:
@@ -1326,36 +1530,74 @@ class StreamableHTTPTransport:
             is_error=False,
         )
 
-    async def start(self, endpoint: ApplicationEndpoint) -> None:
-        manifests = endpoint.list_tool_manifests()
-        if len(manifests) > self._limits.max_tools:
+    async def start(
+        self,
+        endpoint: ApplicationEndpoint | StreamableHTTPProtocolEndpoint,
+    ) -> None:
+        if isinstance(endpoint, StreamableHTTPProtocolEndpoint):
+            protocol_endpoint = endpoint
+            protocol_tools = protocol_endpoint.protocol_tools()
+            if not _is_runtime_instance(protocol_tools, tuple) or any(
+                not _is_runtime_instance(tool, ProtocolToolDescriptor) for tool in protocol_tools
+            ):
+                raise StreamableHTTPConfigurationError(
+                    "invalid_protocol_tools",
+                    "endpoint.protocol_tools",
+                )
+            manifests: tuple[ToolManifest, ...] = ()
+            tools_path = "endpoint.protocol_tools"
+        else:
+            protocol_endpoint = None
+            protocol_tools = ()
+            manifests = endpoint.list_tool_manifests()
+            tools_path = "endpoint.manifests"
+        tool_count = len(protocol_tools) if protocol_endpoint is not None else len(manifests)
+        if tool_count > self._limits.max_tools:
             raise StreamableHTTPConfigurationError(
                 "tool_limit_exceeded",
-                "endpoint.manifests",
+                tools_path,
             )
-        schema_bytes = sum(
-            len(
-                json.dumps(
-                    [manifest.input_schema, manifest.output_schema],
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                    sort_keys=True,
-                ).encode("utf-8")
-            )
-            for manifest in manifests
+        schemas = (
+            ((tool.input_schema, tool.output_schema) for tool in protocol_tools)
+            if protocol_endpoint is not None
+            else ((manifest.input_schema, manifest.output_schema) for manifest in manifests)
         )
+        try:
+            schema_bytes = sum(
+                len(
+                    json.dumps(
+                        schema,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    ).encode("utf-8")
+                )
+                for schema in schemas
+            )
+        except (TypeError, ValueError) as error:
+            raise StreamableHTTPConfigurationError(
+                "invalid_protocol_tools",
+                tools_path,
+            ) from error
         if schema_bytes > self._limits.max_schema_bytes:
             raise StreamableHTTPConfigurationError(
                 "schema_limit_exceeded",
-                "endpoint.manifests",
+                tools_path,
             )
-        self._endpoint = endpoint
+        self._endpoint = cast(ApplicationEndpoint, endpoint) if protocol_endpoint is None else None
+        self._protocol_endpoint = protocol_endpoint
         self._manifests = manifests
-        self._catalog_token = hashlib.sha256(
-            "\0".join(
+        self._protocol_tools = protocol_tools
+        catalog_entries = (
+            (f"{tool.name}:{tool.fingerprint}" for tool in protocol_tools)
+            if protocol_endpoint is not None
+            else (
                 f"{manifest.normalized_name}:{manifest.contract_fingerprint}"
                 for manifest in manifests
-            ).encode("utf-8")
+            )
+        )
+        self._catalog_token = hashlib.sha256(
+            "\0".join(catalog_entries).encode("utf-8")
         ).hexdigest()[:24]
         await self._listener.start(
             self._app,
@@ -1375,7 +1617,9 @@ class StreamableHTTPTransport:
             self._pending_sessions = 0
         self._active_protocol_requests.clear()
         self._endpoint = None
+        self._protocol_endpoint = None
         self._manifests = ()
+        self._protocol_tools = ()
         self._catalog_token = ""
 
 
@@ -1383,11 +1627,15 @@ __all__ = [
     "ASGIApplication",
     "HTTPCallContextProvider",
     "HTTPRequestMetadata",
+    "ProtocolCallResult",
     "ProtocolTelemetryEvent",
+    "ProtocolToolDescriptor",
     "StreamableHTTPConfig",
     "StreamableHTTPConfigurationError",
     "StreamableHTTPLimits",
     "StreamableHTTPListener",
+    "StreamableHTTPProtocolEndpoint",
+    "StreamableHTTPProtocolSession",
     "StreamableHTTPTransport",
     "UvicornStreamableHTTPListener",
 ]
