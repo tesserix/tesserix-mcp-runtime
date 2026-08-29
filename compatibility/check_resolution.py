@@ -24,7 +24,7 @@ def resolves(sdk: str) -> bool:
         )
         (consumer / "pyproject.toml").write_text(document, encoding="utf-8")
         completed = subprocess.run(
-            ["uv", "lock", "--directory", str(consumer), "--offline"],
+            ["uv", "lock", "--directory", str(consumer)],
             capture_output=True,
             check=False,
             text=True,
