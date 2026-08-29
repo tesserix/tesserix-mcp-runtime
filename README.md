@@ -77,7 +77,7 @@ allowing the Unix socket pairs required by asyncio.
 Build validation is also offline after the frozen environment has been
 installed:
 
-    uv build --offline
+    uv build --clear --offline
     uv run --frozen twine check --strict dist/*
     uv run --frozen python architecture/check_artifacts.py dist
     uv run --frozen python architecture/smoke_install_artifacts.py --offline dist

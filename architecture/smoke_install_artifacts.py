@@ -73,6 +73,7 @@ def _install_and_probe(
 
 
 def check(directory: Path, *, offline: bool) -> dict[str, dict[str, Any]]:
+    directory = directory.resolve(strict=True)
     uv = shutil.which("uv")
     if uv is None:
         raise SmokeInstallError("uv is not installed")

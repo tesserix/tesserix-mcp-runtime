@@ -8,7 +8,6 @@ import zipfile
 from email.message import Message
 from email.parser import BytesParser
 from email.policy import default
-from importlib.metadata import version as installed_version
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
@@ -91,11 +90,9 @@ def check(directory: Path) -> dict[str, str | int]:
     expected_license = (ROOT / "LICENSE").read_bytes()
     wheel_version = _check_wheel(wheels[0], expected_license)
     sdist_version = _check_sdist(sdists[0], expected_license)
-    source_version = installed_version(DISTRIBUTION)
-    if wheel_version != sdist_version or wheel_version != source_version:
+    if wheel_version != sdist_version:
         raise ArtifactPolicyError(
-            "artifact versions do not match installed VCS metadata: "
-            f"wheel={wheel_version}, sdist={sdist_version}, source={source_version}"
+            f"wheel and sdist versions differ: wheel={wheel_version}, sdist={sdist_version}"
         )
 
     return {

@@ -73,7 +73,7 @@ jobs:
       - name: Build and validate distributions
         run: |
           uv sync --frozen
-          uv build --offline
+          uv build --clear --offline
           uv run --frozen twine check --strict dist/*
           uv run --frozen python architecture/check_artifacts.py dist
           uv run --frozen python architecture/smoke_install_artifacts.py --offline dist
