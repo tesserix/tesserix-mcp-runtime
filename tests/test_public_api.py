@@ -23,6 +23,15 @@ def run_snapshot_check(snapshot: Path) -> subprocess.CompletedProcess[str]:
 
 def test_public_api_exports_only_the_stable_contract_surface() -> None:
     assert set(tesserix_mcp_runtime.__all__) == {
+        "Application",
+        "ApplicationConfigurationError",
+        "ApplicationDeadlineExceeded",
+        "ApplicationDiagnostic",
+        "ApplicationDiagnosticCode",
+        "ApplicationEndpoint",
+        "ApplicationLimits",
+        "ApplicationRunResult",
+        "ApplicationTransport",
         "ApprovalRequirement",
         "AuthenticatedIdentity",
         "Authorizer",
@@ -47,6 +56,9 @@ def test_public_api_exports_only_the_stable_contract_surface() -> None:
         "RuntimeFailure",
         "SchemaPolicy",
         "ScrubbedError",
+        "ShutdownSignal",
+        "ShutdownSignalSource",
+        "SystemClock",
         "Telemetry",
         "TerminalEmitter",
         "ToolCatalog",
@@ -66,7 +78,7 @@ def test_checked_in_public_api_snapshot_matches_exports() -> None:
     completed = run_snapshot_check(SNAPSHOT)
 
     assert completed.returncode == 0
-    assert completed.stdout == "Public API snapshot matches (34 exports).\n"
+    assert completed.stdout == "Public API snapshot matches (46 exports).\n"
     assert completed.stderr == ""
 
 

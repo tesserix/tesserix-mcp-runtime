@@ -3,10 +3,11 @@
 Reusable, policy-aware hosting for Model Context Protocol servers on the
 Tesserix platform.
 
-The repository is in its pre-release foundation phase. The checked-in package
-provides typed contracts, deterministic lifecycle primitives, stable safe
-errors, a validated tool catalog, and reusable adapter conformance tests. It
-does not yet start a network listener or serve MCP requests. No stable package
+The repository is in its pre-release runtime phase. The checked-in package
+provides typed contracts, an explicit application composition root,
+deterministic bounded lifecycle, stable safe errors, a validated tool catalog,
+process-signal handling, and reusable in-process conformance support. It does
+not yet start a network listener or serve MCP over HTTP. No stable package
 release is implied by interfaces described as planned below.
 
 The accepted ownership boundary and measurable design envelope are recorded
@@ -18,6 +19,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | --- | --- |
 | Importable typed package and VCS-derived version command | Implemented in source; pre-release |
 | Runtime contracts, lifecycle, tool schema policy, and conformance helpers | Implemented in source; pre-release |
+| Explicit application composition, in-process transport, signals, and bounded drain | Implemented in source; pre-release |
 | MCP v2 Streamable HTTP serving and bounded sessions | Planned; not implemented |
 | ADK `ToolRegistry` bridge | Planned; not implemented |
 | Registry manifests, signing, publication, and verification | Planned; not implemented |
@@ -141,6 +143,17 @@ See the [runtime contract guide](docs/contracts.md) for authoring and adapter
 examples. [ADR-0005](docs/adr/0005-runtime-contracts-and-lifecycle.md) records
 the authority boundary, supported schema policy, failure semantics, lifecycle
 ordering, compatibility impact, and rollback.
+
+The [application guide](docs/application.md) shows explicit dependency
+composition, deterministic in-process invocation, manual lifecycle control,
+and SIGINT/SIGTERM process orchestration. [ADR-0006](docs/adr/0006-compositional-application-and-drain.md)
+records admission ordering, global deadline behavior, dependency failures,
+performance cost, alternatives, rollout, and rollback. The installed-wheel
+benchmark supervisor checks startup and idle RSS against the committed M0
+targets:
+
+    uv run --frozen python benchmarks/measure_application.py \
+      /path/to/installed/python tests/fixtures/application_smoke.py
 
 ## License
 
