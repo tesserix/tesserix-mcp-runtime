@@ -3,8 +3,8 @@
 Reusable, policy-aware hosting for Model Context Protocol servers on the
 Tesserix platform.
 
-The repository is in its architecture phase. It does not yet contain a
-released runtime package. The accepted ownership boundary and measurable
+The repository is in its pre-release foundation phase. It does not yet contain
+a released runtime package. The accepted ownership boundary and measurable
 design envelope are recorded in
 [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 
@@ -78,6 +78,18 @@ lifecycle, incident response, current gaps, and fake request walkthroughs. Its
 machine-readable review and 50-test implementation inventory are enforced with:
 
     uv run --frozen python security/check_threat_model.py --model security/threat-model.json
+
+## Runtime contracts
+
+The first reusable foundation defines one typed tool and call-context contract,
+stable payload-free errors, deterministic lifecycle ordering, and an
+adapter-neutral conformance suite. The same example is exercised in-process
+and through the official MCP SDK's in-memory client/server path.
+
+See the [runtime contract guide](docs/contracts.md) for authoring and adapter
+examples. [ADR-0005](docs/adr/0005-runtime-contracts-and-lifecycle.md) records
+the authority boundary, supported schema policy, failure semantics, lifecycle
+ordering, compatibility impact, and rollback.
 
 ## License
 

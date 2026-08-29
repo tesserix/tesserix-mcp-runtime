@@ -1,0 +1,56 @@
+[
+  {
+    "code": "invalid_input",
+    "message": "The request is invalid.",
+    "request_id": "request-example",
+    "retryability": "never"
+  },
+  {
+    "code": "unauthenticated",
+    "message": "Authentication is required.",
+    "request_id": "request-example",
+    "retryability": "never"
+  },
+  {
+    "code": "forbidden",
+    "message": "The operation is not permitted.",
+    "request_id": "request-example",
+    "retryability": "never"
+  },
+  {
+    "code": "approval_required",
+    "message": "Approval is required.",
+    "request_id": "request-example",
+    "retryability": "never"
+  },
+  {
+    "code": "conflict",
+    "message": "The operation conflicts with current state.",
+    "request_id": "request-example",
+    "retryability": "never"
+  },
+  {
+    "code": "timeout",
+    "message": "The operation timed out.",
+    "request_id": "request-example",
+    "retryability": "safe_or_idempotent"
+  },
+  {
+    "code": "cancelled",
+    "message": "The operation was cancelled.",
+    "request_id": "request-example",
+    "retryability": "never"
+  },
+  {
+    "code": "unavailable",
+    "message": "A required dependency is unavailable.",
+    "request_id": "request-example",
+    "retryability": "safe_or_idempotent"
+  },
+  {
+    "code": "internal_failure",
+    "message": "The operation failed.",
+    "request_id": "request-example",
+    "retryability": "never"
+  }
+]
