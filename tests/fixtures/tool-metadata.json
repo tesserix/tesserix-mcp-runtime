@@ -1,0 +1,11 @@
+{
+  "approval": "required",
+  "description": "Apply one synthetic order update.",
+  "effect": "write",
+  "idempotency": "required",
+  "name": "orders.update",
+  "required_scopes": [
+    "orders:write"
+  ],
+  "title": "Update an order"
+}

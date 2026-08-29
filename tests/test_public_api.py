@@ -23,15 +23,40 @@ def run_snapshot_check(snapshot: Path) -> subprocess.CompletedProcess[str]:
 
 def test_public_api_exports_only_the_stable_contract_surface() -> None:
     assert set(tesserix_mcp_runtime.__all__) == {
+        "ApprovalRequirement",
+        "AuthenticatedIdentity",
         "Authorizer",
         "CallContext",
+        "Cancellation",
         "Clock",
+        "ContractViolation",
         "CredentialProvider",
+        "ErrorCode",
+        "ErrorResponse",
+        "IdempotencyRequirement",
+        "InvocationResult",
+        "InvocationStatus",
         "JsonValue",
         "Lifecycle",
+        "LifecycleController",
+        "LifecycleFailure",
+        "LifecycleState",
+        "LifecycleTransitionError",
+        "MappedError",
+        "Retryability",
+        "RuntimeFailure",
+        "SchemaPolicy",
+        "ScrubbedError",
         "Telemetry",
-        "Tool",
+        "TerminalEmitter",
+        "ToolCatalog",
+        "ToolDefinition",
+        "ToolEffect",
+        "ToolHandler",
+        "ToolMetadata",
+        "TraceContext",
         "__version__",
+        "map_exception",
     }
     for name in tesserix_mcp_runtime.__all__:
         assert getattr(tesserix_mcp_runtime, name) is not None
@@ -41,7 +66,7 @@ def test_checked_in_public_api_snapshot_matches_exports() -> None:
     completed = run_snapshot_check(SNAPSHOT)
 
     assert completed.returncode == 0
-    assert completed.stdout == "Public API snapshot matches (9 exports).\n"
+    assert completed.stdout == "Public API snapshot matches (34 exports).\n"
     assert completed.stderr == ""
 
 
@@ -49,8 +74,8 @@ def test_public_api_snapshot_reports_owner_drift(tmp_path: Path) -> None:
     drifted_snapshot = tmp_path / "public-api.txt"
     drifted_snapshot.write_text(
         SNAPSHOT.read_text(encoding="utf-8").replace(
-            "Tool = tesserix_mcp_runtime.contracts.Tool",
-            "Tool = tesserix_mcp_runtime.adapters.Tool",
+            "ToolDefinition = tesserix_mcp_runtime.contracts.ToolDefinition",
+            "ToolDefinition = tesserix_mcp_runtime.adapters.ToolDefinition",
         ),
         encoding="utf-8",
     )
@@ -58,5 +83,11 @@ def test_public_api_snapshot_reports_owner_drift(tmp_path: Path) -> None:
     completed = run_snapshot_check(drifted_snapshot)
 
     assert completed.returncode == 1
-    assert "-Tool = tesserix_mcp_runtime.adapters.Tool" in completed.stderr
-    assert "+Tool = tesserix_mcp_runtime.contracts.Tool" in completed.stderr
+    assert (
+        "-ToolDefinition = tesserix_mcp_runtime.adapters.ToolDefinition"
+        in completed.stderr
+    )
+    assert (
+        "+ToolDefinition = tesserix_mcp_runtime.contracts.ToolDefinition"
+        in completed.stderr
+    )
