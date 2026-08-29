@@ -10,6 +10,30 @@
     "constraint": ">=2.1.1,<3",
     "locked": "2.1.1"
   },
+  "server_fixture": {
+    "implementation": "tesserix-mcp-runtime",
+    "network": "loopback",
+    "path": "/mcp",
+    "transport": "streamable-http"
+  },
+  "inspector": {
+    "mode": "cli",
+    "support": "required",
+    "version": "2.4.0"
+  },
+  "gateway_proxy": {
+    "client_sdk": "2.1.1",
+    "path": "/gateway/runtime/mcp",
+    "rewritten_path": "/mcp"
+  },
+  "verified_operations": [
+    "initialize",
+    "list_tools",
+    "paginate_tools",
+    "call_tool",
+    "cancel_work",
+    "close"
+  ],
   "client_lanes": [
     {
       "name": "devai",
