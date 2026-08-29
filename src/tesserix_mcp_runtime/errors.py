@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from tesserix_mcp_runtime.contracts import (
     ErrorCode,
@@ -16,11 +17,15 @@ from tesserix_mcp_runtime.contracts import (
 _EXCEPTION_TYPE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,255}\Z")
 
 
+def _is_runtime_instance(value: object, expected: type[Any]) -> bool:
+    return isinstance(value, expected)
+
+
 class RuntimeFailure(Exception):
     """Raise a known public failure without accepting unsafe message text."""
 
     def __init__(self, code: ErrorCode) -> None:
-        if not isinstance(code, ErrorCode):
+        if not _is_runtime_instance(code, ErrorCode):
             raise ValueError("code must be a stable ErrorCode")
         self.code = code
         super().__init__(code.value)
@@ -35,7 +40,7 @@ class TerminalEmitter:
         self._result: InvocationResult | None = None
 
     async def emit(self, result: InvocationResult) -> bool:
-        if not isinstance(result, InvocationResult):
+        if not _is_runtime_instance(result, InvocationResult):
             raise ValueError("result must satisfy the invocation result contract")
         async with self._lock:
             if self._result is not None:
@@ -63,7 +68,7 @@ class ScrubbedError:
     def __post_init__(self) -> None:
         ErrorResponse.from_code(self.code, request_id=self.request_id)
         if (
-            not isinstance(self.exception_type, str)
+            not _is_runtime_instance(self.exception_type, str)
             or _EXCEPTION_TYPE.fullmatch(self.exception_type) is None
         ):
             raise ValueError("exception_type must be a bounded type name")
@@ -84,7 +89,7 @@ class MappedError:
     audit: ScrubbedError
 
     def __post_init__(self) -> None:
-        if not isinstance(self.response, ErrorResponse) or not isinstance(
+        if not _is_runtime_instance(self.response, ErrorResponse) or not _is_runtime_instance(
             self.audit, ScrubbedError
         ):
             raise ValueError("mapped errors require response and audit contracts")

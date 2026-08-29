@@ -8,7 +8,6 @@ import argparse
 
 from mcp.server import MCPServer
 
-
 server = MCPServer("tesserix-mcp-runtime-compatibility")
 
 

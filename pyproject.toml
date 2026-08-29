@@ -1,10 +1,11 @@
 [project]
 name = "tesserix-mcp-runtime"
-version = "0.1.0.dev0"
+dynamic = ["version"]
 description = "Reusable, policy-aware hosting for Model Context Protocol servers."
 readme = "README.md"
 requires-python = ">=3.12,<3.15"
 license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [{ name = "Tesserix" }]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
@@ -17,11 +18,21 @@ classifiers = [
 ]
 dependencies = ["mcp>=2.1.1,<3"]
 
+[project.scripts]
+tesserix-mcp-runtime = "tesserix_mcp_runtime.__main__:main"
+
 [dependency-groups]
 dev = [
   "hypothesis==6.165.10",
   "import-linter==2.14",
+  "mypy==2.3.1",
+  "pip-audit==2.10.1",
+  "pyright==1.1.411",
   "pytest==9.0.3",
+  "pytest-cov==7.1.0",
+  "pytest-socket==0.8.1",
+  "ruff==0.16.5",
+  "twine==7.0.0",
 ]
 
 [project.urls]
@@ -29,11 +40,68 @@ Issues = "https://github.com/tesserix/tesserix-mcp-runtime/issues"
 Repository = "https://github.com/tesserix/tesserix-mcp-runtime"
 
 [build-system]
-requires = ["hatchling>=1.27,<2"]
+requires = ["hatchling==1.32.0", "hatch-vcs==0.5.0"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "0.0.0"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tesserix_mcp_runtime"]
+
+[tool.uv]
+required-version = ">=0.12,<0.13"
+default-groups = ["dev"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "W",
+  "F",
+  "I",
+  "UP",
+  "B",
+  "A",
+  "C4",
+  "SIM",
+  "ASYNC",
+  "RUF",
+  "PGH",
+  "ARG",
+  "RET",
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+disallow_any_unimported = true
+files = ["src", "tests"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-config --strict-markers --disable-socket --allow-unix-socket --cov --cov-report=term-missing"
+xfail_strict = true
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["src/tesserix_mcp_runtime"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
 
 [tool.importlinter]
 root_package = "tesserix_mcp_runtime"

@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from tesserix_mcp_runtime.contracts import (
     Lifecycle,
     LifecycleState,
-    _require_deadline,
+    validate_deadline,
 )
 
 
@@ -77,7 +77,7 @@ class LifecycleController:
         self._state = LifecycleState.READY
 
     async def drain(self, *, deadline: float) -> None:
-        _require_deadline(deadline)
+        validate_deadline(deadline)
         async with self._transition_lock:
             await self._drain(deadline=deadline)
 

@@ -224,11 +224,7 @@ def check(model_path: Path) -> dict[str, Any]:
         *model.get("compromise_scenarios", []),
         *model.get("negative_tests", []),
         *model.get("review_examples", []),
-        *[
-            control
-            for threat in model.get("threats", [])
-            for control in threat.get("controls", [])
-        ],
+        *[control for threat in model.get("threats", []) for control in threat.get("controls", [])],
         *[
             control
             for scenario in model.get("compromise_scenarios", [])
@@ -295,9 +291,7 @@ def check(model_path: Path) -> dict[str, Any]:
                 "reason": "required threat category missing",
             }
         )
-    components = {
-        scenario.get("component") for scenario in model.get("compromise_scenarios", [])
-    }
+    components = {scenario.get("component") for scenario in model.get("compromise_scenarios", [])}
     for component in sorted(REQUIRED_COMPROMISE_SCENARIOS - components):
         violations.append(
             {
@@ -420,10 +414,7 @@ def check(model_path: Path) -> dict[str, Any]:
                 violations.append(
                     {
                         "id": threat.get("id", "<missing>"),
-                        "reason": (
-                            "threat references unknown negative test "
-                            f"{negative_test_id}"
-                        ),
+                        "reason": (f"threat references unknown negative test {negative_test_id}"),
                     }
                 )
 
@@ -444,9 +435,7 @@ def check(model_path: Path) -> dict[str, Any]:
         violations.append(
             {
                 "id": negative_test_id,
-                "reason": (
-                    "negative test is not referenced by a threat or compromise scenario"
-                ),
+                "reason": ("negative test is not referenced by a threat or compromise scenario"),
             }
         )
     effects = {item.get("effect"): item for item in model.get("effect_classes", [])}
@@ -457,9 +446,7 @@ def check(model_path: Path) -> dict[str, Any]:
             continue
         review = effect_policy.get("security_review", {})
         if not review.get("required"):
-            violations.append(
-                {"id": effect, "reason": "effect requires security review"}
-            )
+            violations.append({"id": effect, "reason": "effect requires security review"})
         if not review.get("independent_reviewer"):
             violations.append(
                 {
@@ -473,15 +460,12 @@ def check(model_path: Path) -> dict[str, Any]:
                 {
                     "id": effect,
                     "reason": (
-                        "security review missing bindings "
-                        + ", ".join(sorted(missing_bindings))
+                        "security review missing bindings " + ", ".join(sorted(missing_bindings))
                     ),
                 }
             )
         if not review.get("reapprove_on_change"):
-            violations.append(
-                {"id": effect, "reason": "effect changes require reapproval"}
-            )
+            violations.append({"id": effect, "reason": "effect changes require reapproval"})
         if not review.get("per_call_approval_remains_enforced"):
             violations.append(
                 {
@@ -511,9 +495,7 @@ def check(model_path: Path) -> dict[str, Any]:
             violations.append(
                 {
                     "id": example.get("id", "<missing>"),
-                    "reason": (
-                        "review example authorization must use the fake placeholder"
-                    ),
+                    "reason": ("review example authorization must use the fake placeholder"),
                 }
             )
     if "secret_classes" in model:
@@ -526,13 +508,9 @@ def check(model_path: Path) -> dict[str, Any]:
                         "reason": "secret class missing class",
                     }
                 )
-        secret_classes = {
-            item["class"]: item for item in secret_class_items if item.get("class")
-        }
+        secret_classes = {item["class"]: item for item in secret_class_items if item.get("class")}
         for secret_class in sorted(REQUIRED_SECRET_CLASSES - set(secret_classes)):
-            violations.append(
-                {"id": secret_class, "reason": "required secret class missing"}
-            )
+            violations.append({"id": secret_class, "reason": "required secret class missing"})
         for secret_class, policy in sorted(secret_classes.items()):
             for field in SECRET_FIELDS:
                 if not policy.get(field):
@@ -561,13 +539,9 @@ def check(model_path: Path) -> dict[str, Any]:
                         "reason": "incident scenario missing scenario",
                     }
                 )
-        incidents = {
-            item["scenario"]: item for item in incident_items if item.get("scenario")
-        }
+        incidents = {item["scenario"]: item for item in incident_items if item.get("scenario")}
         for scenario in sorted(REQUIRED_INCIDENT_SCENARIOS - set(incidents)):
-            violations.append(
-                {"id": scenario, "reason": "required incident scenario missing"}
-            )
+            violations.append({"id": scenario, "reason": "required incident scenario missing"})
         for scenario, response in sorted(incidents.items()):
             for field in INCIDENT_FIELDS:
                 if not response.get(field):

@@ -9,17 +9,19 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 
 from tesserix_mcp_runtime import (
     ApprovalRequirement,
     ContractViolation,
     IdempotencyRequirement,
+    JsonValue,
     SchemaPolicy,
-    ToolEffect,
-    ToolDefinition,
-    ToolHandler,
     ToolCatalog,
+    ToolDefinition,
+    ToolEffect,
+    ToolHandler,
     ToolMetadata,
 )
 
@@ -83,7 +85,7 @@ def test_tool_metadata_rejects_invalid_or_unsafe_values(
     values.update(overrides)
 
     with pytest.raises(ValueError):
-        ToolMetadata(**values)  # type: ignore[arg-type]
+        ToolMetadata(**values)
 
 
 def test_write_metadata_requires_an_explicit_idempotency_contract() -> None:
@@ -129,7 +131,7 @@ class EchoDefinition:
     def parse_input(self, arguments: Mapping[str, Any]) -> EchoInput:
         return EchoInput(text=str(arguments["text"]))
 
-    def serialize_output(self, output_model: EchoOutput) -> dict[str, str]:
+    def serialize_output(self, output_model: EchoOutput) -> dict[str, JsonValue]:
         return {"text": output_model.text}
 
 
@@ -177,9 +179,7 @@ def test_typed_tool_definition_and_handler_are_structural_contracts() -> None:
     assert definition.parse_input({"text": "hello"}) == EchoInput(text="hello")
 
 
-def test_tool_catalog_rejects_non_structural_definitions_with_a_contract_error() -> (
-    None
-):
+def test_tool_catalog_rejects_non_structural_definitions_with_a_contract_error() -> None:
     malformed: Any = object()
 
     with pytest.raises(ContractViolation) as captured:
@@ -582,10 +582,7 @@ def test_schema_policy_enforces_the_recursive_depth_budget() -> None:
         )
 
     assert captured.value.code == "schema_limit_exceeded"
-    assert (
-        captured.value.path
-        == "tools[0].input_schema.properties.payload.properties.value"
-    )
+    assert captured.value.path == "tools[0].input_schema.properties.payload.properties.value"
     assert (
         len(
             ToolCatalog(

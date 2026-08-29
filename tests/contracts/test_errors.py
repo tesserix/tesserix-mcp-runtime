@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 
 from tesserix_mcp_runtime import (
     ErrorCode,
@@ -36,13 +37,10 @@ def test_every_stable_error_code_matches_the_golden_public_shape() -> None:
         "unavailable",
         "internal_failure",
     }
-    expected = json.loads(
-        (FIXTURES / "error-responses.json").read_text(encoding="utf-8")
-    )
+    expected = json.loads((FIXTURES / "error-responses.json").read_text(encoding="utf-8"))
 
     actual = [
-        ErrorResponse.from_code(code, request_id="request-example").to_dict()
-        for code in ErrorCode
+        ErrorResponse.from_code(code, request_id="request-example").to_dict() for code in ErrorCode
     ]
 
     assert actual == expected

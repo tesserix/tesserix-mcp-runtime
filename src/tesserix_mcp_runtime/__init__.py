@@ -1,5 +1,7 @@
 """Reusable hosting for Tesserix MCP servers."""
 
+from importlib.metadata import version as _distribution_version
+
 from tesserix_mcp_runtime.contracts import (
     ApprovalRequirement,
     AuthenticatedIdentity,
@@ -10,10 +12,10 @@ from tesserix_mcp_runtime.contracts import (
     CredentialProvider,
     ErrorCode,
     ErrorResponse,
-    JsonValue,
     IdempotencyRequirement,
     InvocationResult,
     InvocationStatus,
+    JsonValue,
     Lifecycle,
     LifecycleState,
     Retryability,
@@ -38,7 +40,7 @@ from tesserix_mcp_runtime.lifecycle import (
 )
 from tesserix_mcp_runtime.tool import ContractViolation, SchemaPolicy, ToolCatalog
 
-__version__ = "0.1.0.dev0"
+__version__ = _distribution_version("tesserix-mcp-runtime")
 
 __all__ = [
     "ApprovalRequirement",
@@ -51,10 +53,10 @@ __all__ = [
     "CredentialProvider",
     "ErrorCode",
     "ErrorResponse",
-    "JsonValue",
     "IdempotencyRequirement",
     "InvocationResult",
     "InvocationStatus",
+    "JsonValue",
     "Lifecycle",
     "LifecycleController",
     "LifecycleFailure",
@@ -63,8 +65,8 @@ __all__ = [
     "MappedError",
     "Retryability",
     "RuntimeFailure",
-    "ScrubbedError",
     "SchemaPolicy",
+    "ScrubbedError",
     "Telemetry",
     "TerminalEmitter",
     "ToolCatalog",

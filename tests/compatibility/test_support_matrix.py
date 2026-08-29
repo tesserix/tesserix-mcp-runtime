@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import tomllib
-
+from pathlib import Path
 
 ROOT = Path(__file__).parents[2]
 
@@ -74,8 +73,7 @@ def test_every_compatibility_environment_locks_the_declared_sdk() -> None:
     }
 
     actual = {
-        filename: locked_mcp_version(ROOT / "compatibility" / filename)
-        for filename in expected
+        filename: locked_mcp_version(ROOT / "compatibility" / filename) for filename in expected
     }
 
     assert actual == expected

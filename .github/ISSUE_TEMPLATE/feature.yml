@@ -1,0 +1,65 @@
+name: Feature
+description: Propose a scoped runtime, Registry, Gateway, or delivery capability.
+title: "[Area] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: Keep one independently verifiable outcome in each issue.
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: Describe the observable result, not an implementation preference.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List measurable success criteria and failure or edge scenarios.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and ownership
+      description: Name upstream issues, schema owners, and external repository changes.
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Tests
+      description: State the automated and end-to-end evidence needed for closure.
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security
+      description: Name assets, actors, trust boundaries, authorization, and data-safety checks.
+    validations:
+      required: true
+  - type: textarea
+    id: rollout
+    attributes:
+      label: Rollout
+      description: State the delivery order, monitoring, success criteria, and blast radius.
+    validations:
+      required: true
+  - type: textarea
+    id: rollback
+    attributes:
+      label: Rollback
+      description: State how the change is reversed and identify irreversible steps.
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility
+      description: State Python, MCP, ADK, Registry, Gateway, and migration impacts.
+    validations:
+      required: true

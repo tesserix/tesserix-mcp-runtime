@@ -3,17 +3,14 @@ from __future__ import annotations
 
 import json
 import math
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import Any
-
 
 TARGETS_PATH = Path(__file__).with_name("envelope-targets.json")
 
 
-def evaluate(
-    observed: dict[str, object], targets: list[dict[str, Any]]
-) -> dict[str, Any]:
+def evaluate(observed: dict[str, object], targets: list[dict[str, Any]]) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     for target in targets:
         metric = target["metric"]
@@ -27,11 +24,7 @@ def evaluate(
         ):
             raise ValueError(f"observation {metric} must be a finite number")
         expected = target["value"]
-        passed = (
-            actual >= expected
-            if target["operator"] == "minimum"
-            else actual <= expected
-        )
+        passed = actual >= expected if target["operator"] == "minimum" else actual <= expected
         checks.append(
             {
                 "actual": actual,

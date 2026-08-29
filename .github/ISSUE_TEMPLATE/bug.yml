@@ -1,0 +1,58 @@
+name: Bug report
+description: Report reproducible incorrect behavior without sensitive data.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Never attach credentials, tokens, tenant payloads, or production data.
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      description: Include sanitized errors, frequency, and affected versions.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior and reproduction
+      description: Give the smallest deterministic reproduction and expected result.
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Tests
+      description: State the regression test and affected full-suite evidence required.
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security
+      description: State whether authorization, tenancy, secrets, or untrusted input is involved.
+    validations:
+      required: true
+  - type: textarea
+    id: rollout
+    attributes:
+      label: Rollout
+      description: State fix delivery order, monitoring, and blast radius.
+    validations:
+      required: true
+  - type: textarea
+    id: rollback
+    attributes:
+      label: Rollback
+      description: State the safe reversal or mitigation path.
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility
+      description: State affected Python, MCP, ADK, Registry, Gateway, and released versions.
+    validations:
+      required: true

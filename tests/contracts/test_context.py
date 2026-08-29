@@ -45,7 +45,7 @@ def test_call_context_separates_verified_identity_from_arguments() -> None:
         "run_id": "argument-controlled",
     }
     with pytest.raises(TypeError):
-        CallContext(**model_arguments)  # type: ignore[arg-type]
+        CallContext(**model_arguments)
 
 
 @pytest.mark.parametrize(
@@ -148,7 +148,7 @@ def test_authenticated_identity_rejects_ambiguous_or_mutable_values(
     identity_values: dict[str, Any],
 ) -> None:
     with pytest.raises(ValueError):
-        AuthenticatedIdentity(**identity_values)  # type: ignore[arg-type]
+        AuthenticatedIdentity(**identity_values)
 
 
 @pytest.mark.parametrize(
@@ -192,4 +192,4 @@ def test_call_context_rejects_invalid_authority_fields(
     values.update(overrides)
 
     with pytest.raises(ValueError):
-        CallContext(**values)  # type: ignore[arg-type]
+        CallContext(**values)

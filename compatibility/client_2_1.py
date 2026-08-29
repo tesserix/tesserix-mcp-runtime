@@ -5,9 +5,9 @@
 from __future__ import annotations
 
 import asyncio
-from importlib.metadata import version
 import json
 import os
+from importlib.metadata import version
 
 from mcp import Client
 from mcp.types import TextContent

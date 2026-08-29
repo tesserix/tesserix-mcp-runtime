@@ -11,9 +11,7 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Any, Protocol, runtime_checkable
 
-type JsonValue = (
-    str | int | float | bool | None | list[JsonValue] | dict[str, JsonValue]
-)
+type JsonValue = str | int | float | bool | list[JsonValue] | dict[str, JsonValue] | None
 
 
 @runtime_checkable
@@ -56,7 +54,11 @@ def _require_text(name: str, value: object, *, maximum: int) -> None:
         raise ValueError(f"{name} must be bounded, non-empty text")
 
 
-def _require_deadline(value: object) -> None:
+def _is_runtime_instance(value: object, expected: type[Any]) -> bool:
+    return isinstance(value, expected)
+
+
+def validate_deadline(value: object) -> None:
     if (
         isinstance(value, bool)
         or not isinstance(value, int | float)
@@ -79,7 +81,7 @@ class AuthenticatedIdentity:
         _require_text("tenant", self.tenant, maximum=256)
         _require_text("subject", self.subject, maximum=512)
         _require_text("issuer", self.issuer, maximum=2048)
-        if not isinstance(self.scopes, tuple):
+        if not _is_runtime_instance(self.scopes, tuple):
             raise ValueError("scopes must be an immutable tuple")
         for scope in self.scopes:
             _require_text("scope", scope, maximum=256)
@@ -158,15 +160,15 @@ class CallContext:
     idempotency_key: str | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.identity, AuthenticatedIdentity):
+        if not _is_runtime_instance(self.identity, AuthenticatedIdentity):
             raise ValueError("identity must come from the authenticated boundary")
         _require_text("request_id", self.request_id, maximum=256)
         _require_text("run_id", self.run_id, maximum=256)
-        if not isinstance(self.trace_context, TraceContext):
+        if not _is_runtime_instance(self.trace_context, TraceContext):
             raise ValueError("trace_context must be immutable")
         if self.deadline is not None:
-            _require_deadline(self.deadline)
-        if not isinstance(self.cancellation, Cancellation):
+            validate_deadline(self.deadline)
+        if not _is_runtime_instance(self.cancellation, Cancellation):
             raise ValueError("cancellation must implement the cancellation contract")
         if self.idempotency_key is not None:
             _require_text("idempotency_key", self.idempotency_key, maximum=512)
@@ -272,7 +274,7 @@ class ErrorResponse:
     retryability: Retryability
 
     def __post_init__(self) -> None:
-        if not isinstance(self.code, ErrorCode):
+        if not _is_runtime_instance(self.code, ErrorCode):
             raise ValueError("code must be a stable ErrorCode")
         if self.message != _ERROR_MESSAGES[self.code]:
             raise ValueError("message must use the stable public text")
@@ -282,7 +284,7 @@ class ErrorResponse:
 
     @classmethod
     def from_code(cls, code: ErrorCode, *, request_id: str) -> ErrorResponse:
-        if not isinstance(code, ErrorCode):
+        if not _is_runtime_instance(code, ErrorCode):
             raise ValueError("code must be a stable ErrorCode")
         _require_text("request_id", request_id, maximum=256)
         return cls(
@@ -310,7 +312,7 @@ class InvocationResult:
     error: ErrorResponse | None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.status, InvocationStatus):
+        if not _is_runtime_instance(self.status, InvocationStatus):
             raise ValueError("status must be a stable InvocationStatus")
         if self.status is InvocationStatus.SUCCESS and self.error is not None:
             raise ValueError("a successful result cannot contain an error")
@@ -346,13 +348,13 @@ class ToolMetadata:
             raise ValueError("name contains unsupported characters")
         _require_text("title", self.title, maximum=128)
         _require_text("description", self.description, maximum=2048)
-        if not isinstance(self.effect, ToolEffect):
+        if not _is_runtime_instance(self.effect, ToolEffect):
             raise ValueError("effect must be a supported ToolEffect")
-        if not isinstance(self.approval, ApprovalRequirement):
+        if not _is_runtime_instance(self.approval, ApprovalRequirement):
             raise ValueError("approval must be explicit")
-        if not isinstance(self.idempotency, IdempotencyRequirement):
+        if not _is_runtime_instance(self.idempotency, IdempotencyRequirement):
             raise ValueError("idempotency must be explicit")
-        if not isinstance(self.required_scopes, tuple):
+        if not _is_runtime_instance(self.required_scopes, tuple):
             raise ValueError("required_scopes must be an immutable tuple")
         for scope in self.required_scopes:
             _require_text("scope", scope, maximum=256)
@@ -477,10 +479,10 @@ __all__ = [
     "CredentialProvider",
     "ErrorCode",
     "ErrorResponse",
-    "JsonValue",
     "IdempotencyRequirement",
     "InvocationResult",
     "InvocationStatus",
+    "JsonValue",
     "Lifecycle",
     "LifecycleState",
     "Retryability",

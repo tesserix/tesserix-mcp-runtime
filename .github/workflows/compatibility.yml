@@ -20,6 +20,9 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - name: Install Python 3.14
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -61,8 +64,8 @@ jobs:
           wheel_env_dir=$(mktemp -d)
           uv venv --python 3.14 "$wheel_env_dir"
           uv pip install --python "$wheel_env_dir/bin/python" dist/*.whl
-          "$wheel_env_dir/bin/python" -c "from importlib.metadata import version; import tesserix_mcp_runtime; assert version('mcp') == '2.1.1'; assert tesserix_mcp_runtime.__version__ == '0.1.0.dev0'"
+          "$wheel_env_dir/bin/python" -c "from importlib.metadata import version; import tesserix_mcp_runtime; assert version('mcp') == '2.1.1'; assert tesserix_mcp_runtime.__version__ == version('tesserix-mcp-runtime'); assert tesserix_mcp_runtime.__version__ != '0.0.0'"
           site_packages=$("$wheel_env_dir/bin/python" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
           uv run --frozen python architecture/check_dependencies.py --wheel dist/*.whl --site-packages "$site_packages"
       - name: Exercise the exact client matrix
-        run: uv run python compatibility/run_matrix.py
+        run: uv run --frozen python compatibility/run_matrix.py

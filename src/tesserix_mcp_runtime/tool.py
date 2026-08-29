@@ -6,17 +6,17 @@ import json
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any
+from typing import Any, TypeGuard
 
 from tesserix_mcp_runtime.contracts import ToolDefinition, ToolHandler, ToolMetadata
 
-_SCHEMA_TYPES = frozenset(
+_SCHEMA_TYPES: frozenset[str] = frozenset(
     {"array", "boolean", "integer", "null", "number", "object", "string"}
 )
-_COMMON_SCHEMA_KEYWORDS = frozenset(
+_COMMON_SCHEMA_KEYWORDS: frozenset[str] = frozenset(
     {"$comment", "const", "default", "description", "enum", "examples", "title", "type"}
 )
-_SCHEMA_KEYWORDS_BY_TYPE = {
+_SCHEMA_KEYWORDS_BY_TYPE: dict[str, frozenset[str]] = {
     "array": frozenset({"items", "maxItems", "minItems", "uniqueItems"}),
     "boolean": frozenset(),
     "integer": frozenset(
@@ -37,7 +37,7 @@ _SCHEMA_KEYWORDS_BY_TYPE = {
     ),
     "string": frozenset({"format", "maxLength", "minLength"}),
 }
-_ROOT_SCHEMA_KEYWORDS = frozenset({"$id", "$schema"})
+_ROOT_SCHEMA_KEYWORDS: frozenset[str] = frozenset({"$id", "$schema"})
 
 
 class ContractViolation(ValueError):
@@ -72,8 +72,27 @@ class SchemaPolicy:
                 raise ValueError(f"{name} must be a positive integer")
 
 
-def _is_non_negative_integer(value: object) -> bool:
+_DEFAULT_SCHEMA_POLICY = SchemaPolicy()
+
+
+def _is_non_negative_integer(value: object) -> TypeGuard[int]:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _is_object_mapping(value: object) -> TypeGuard[Mapping[object, object]]:
+    return isinstance(value, Mapping)
+
+
+def _is_string_mapping(value: object) -> TypeGuard[Mapping[str, object]]:
+    return _is_object_mapping(value) and all(isinstance(key, str) for key in value)
+
+
+def _is_object_list(value: object) -> TypeGuard[list[object]]:
+    return isinstance(value, list)
+
+
+def _is_runtime_instance(value: object, expected: type[Any]) -> bool:
+    return isinstance(value, expected)
 
 
 def _validate_schema_node(
@@ -84,7 +103,7 @@ def _validate_schema_node(
     depth: int = 1,
     root: bool = False,
 ) -> None:
-    if not isinstance(schema, Mapping):
+    if not _is_string_mapping(schema):
         raise ContractViolation("invalid_schema", path)
     if depth > policy.max_depth:
         raise ContractViolation("schema_limit_exceeded", path)
@@ -101,8 +120,6 @@ def _validate_schema_node(
             raise ContractViolation("invalid_schema", path) from error
         if len(encoded) > policy.max_schema_bytes:
             raise ContractViolation("schema_limit_exceeded", path)
-    if any(not isinstance(key, str) for key in schema):
-        raise ContractViolation("invalid_schema", path)
     schema_type = schema.get("type")
     unsupported_keywords = set(schema) - _COMMON_SCHEMA_KEYWORDS
     if isinstance(schema_type, str) and schema_type in _SCHEMA_TYPES:
@@ -125,22 +142,16 @@ def _validate_schema_node(
                 f"{path}.additionalProperties",
             )
         properties = schema.get("properties", {})
-        if not isinstance(properties, Mapping):
-            raise ContractViolation("invalid_object_schema", f"{path}.properties")
-        if any(not isinstance(name, str) for name in properties):
+        if not _is_string_mapping(properties):
             raise ContractViolation("invalid_object_schema", f"{path}.properties")
         if len(properties) > policy.max_properties:
             raise ContractViolation("schema_limit_exceeded", f"{path}.properties")
         required = schema.get("required", [])
-        if not isinstance(required, list):
+        if not _is_object_list(required):
             raise ContractViolation("invalid_object_schema", f"{path}.required")
         seen_required: set[str] = set()
         for index, name in enumerate(required):
-            if (
-                not isinstance(name, str)
-                or name not in properties
-                or name in seen_required
-            ):
+            if not isinstance(name, str) or name not in properties or name in seen_required:
                 raise ContractViolation(
                     "invalid_object_schema",
                     f"{path}.required[{index}]",
@@ -154,20 +165,22 @@ def _validate_schema_node(
                 depth=depth + 1,
             )
     elif schema_type == "string":
-        if not _is_non_negative_integer(schema.get("maxLength")):
+        max_length = schema.get("maxLength")
+        if not _is_non_negative_integer(max_length):
             raise ContractViolation(
                 "unbounded_string_schema",
                 f"{path}.maxLength",
             )
-        if schema["maxLength"] > policy.max_string_length:
+        if max_length > policy.max_string_length:
             raise ContractViolation("schema_limit_exceeded", f"{path}.maxLength")
     elif schema_type == "array":
-        if not _is_non_negative_integer(schema.get("maxItems")):
+        max_items = schema.get("maxItems")
+        if not _is_non_negative_integer(max_items):
             raise ContractViolation(
                 "unbounded_array_schema",
                 f"{path}.maxItems",
             )
-        if schema["maxItems"] > policy.max_array_items:
+        if max_items > policy.max_array_items:
             raise ContractViolation("schema_limit_exceeded", f"{path}.maxItems")
         _validate_schema_node(
             schema.get("items"),
@@ -184,12 +197,12 @@ class ToolCatalog:
         self,
         definitions: Iterable[ToolDefinition[Any, Any]],
         *,
-        schema_policy: SchemaPolicy = SchemaPolicy(),
+        schema_policy: SchemaPolicy = _DEFAULT_SCHEMA_POLICY,
     ) -> None:
         tools = tuple(definitions)
         by_name: dict[str, ToolDefinition[Any, Any]] = {}
         for index, definition in enumerate(tools):
-            if not isinstance(definition, ToolDefinition):
+            if not _is_runtime_instance(definition, ToolDefinition):
                 raise ContractViolation("invalid_tool_definition", f"tools[{index}]")
             try:
                 metadata = definition.metadata
@@ -199,17 +212,11 @@ class ToolCatalog:
                 parse_input = definition.parse_input
                 serialize_output = definition.serialize_output
             except Exception as error:
-                raise ContractViolation(
-                    "invalid_tool_definition", f"tools[{index}]"
-                ) from error
-            if not isinstance(metadata, ToolMetadata):
-                raise ContractViolation(
-                    "invalid_tool_definition", f"tools[{index}].metadata"
-                )
-            if not isinstance(handler, ToolHandler):
-                raise ContractViolation(
-                    "invalid_tool_definition", f"tools[{index}].handler"
-                )
+                raise ContractViolation("invalid_tool_definition", f"tools[{index}]") from error
+            if not _is_runtime_instance(metadata, ToolMetadata):
+                raise ContractViolation("invalid_tool_definition", f"tools[{index}].metadata")
+            if not _is_runtime_instance(handler, ToolHandler):
+                raise ContractViolation("invalid_tool_definition", f"tools[{index}].handler")
             if not callable(parse_input) or not callable(serialize_output):
                 raise ContractViolation("invalid_tool_definition", f"tools[{index}]")
             name = metadata.name

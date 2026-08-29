@@ -245,9 +245,7 @@ def test_checked_in_threat_model_is_complete_and_traceable() -> None:
     assert result["violations"] == []
     assert result["summary"]["trust_boundaries"] >= 20
     assert result["summary"]["threats"] >= len(REQUIRED_THREAT_CATEGORIES)
-    assert result["summary"]["compromise_scenarios"] == len(
-        REQUIRED_COMPROMISE_SCENARIOS
-    )
+    assert result["summary"]["compromise_scenarios"] == len(REQUIRED_COMPROMISE_SCENARIOS)
     assert result["summary"]["negative_tests"] >= 30
     assert result["summary"]["review_examples"] >= 5
 
@@ -767,9 +765,7 @@ def test_rejects_an_unreferenced_negative_test(tmp_path: Path) -> None:
             "expected": "fail closed",
             "owner": {
                 "repository": "tesserix/tesserix-mcp-runtime",
-                "tracking_issue": (
-                    "https://github.com/tesserix/tesserix-mcp-runtime/issues/30"
-                ),
+                "tracking_issue": ("https://github.com/tesserix/tesserix-mcp-runtime/issues/30"),
             },
         }
     )

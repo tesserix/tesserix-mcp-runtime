@@ -18,6 +18,7 @@ from tesserix_mcp_runtime import (
     ErrorResponse,
     IdempotencyRequirement,
     InvocationResult,
+    JsonValue,
     ToolEffect,
     ToolMetadata,
 )
@@ -61,7 +62,7 @@ class EchoDefinition:
             raise ValueError("text must be a string")
         return EchoInput(text=text)
 
-    def serialize_output(self, output_model: EchoOutput) -> dict[str, str]:
+    def serialize_output(self, output_model: EchoOutput) -> dict[str, JsonValue]:
         return {"text": output_model.text}
 
 
@@ -140,17 +141,17 @@ class McpSdkAdapter(AbstractAsyncContextManager["McpSdkAdapter"]):
         self._context = context
         self._server = MCPServer("contract-conformance")
 
-        @self._server.tool(
-            name=tool.metadata.name,
-            title=tool.metadata.title,
-            description=tool.metadata.description,
-            structured_output=True,
-        )
-        async def invoke_echo(text: str) -> dict[str, str]:
+        async def _invoke_echo(text: str) -> dict[str, JsonValue]:
             input_model = tool.parse_input({"text": text})
             output = await tool.handler(input_model, context=context)
             return tool.serialize_output(output)
 
+        self._server.tool(
+            name=tool.metadata.name,
+            title=tool.metadata.title,
+            description=tool.metadata.description,
+            structured_output=True,
+        )(_invoke_echo)
         self._client = Client(self._server)
 
     async def __aenter__(self) -> Self:

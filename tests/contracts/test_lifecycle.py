@@ -5,7 +5,8 @@ import math
 from dataclasses import dataclass
 
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 
 from tesserix_mcp_runtime import (
     LifecycleController,
@@ -30,6 +31,10 @@ class RecordingLifecycle:
         self.events.append(f"{self.name}.stop")
 
 
+def assert_state(controller: LifecycleController, expected: LifecycleState) -> None:
+    assert controller.state is expected
+
+
 def test_lifecycle_starts_in_order_and_drains_and_stops_in_reverse() -> None:
     async def exercise() -> None:
         events: list[str] = []
@@ -40,13 +45,13 @@ def test_lifecycle_starts_in_order_and_drains_and_stops_in_reverse() -> None:
             ]
         )
 
-        assert controller.state is LifecycleState.STARTUP
+        assert_state(controller, LifecycleState.STARTUP)
         await controller.start()
-        assert controller.state is LifecycleState.READY
+        assert_state(controller, LifecycleState.READY)
         await controller.drain(deadline=42.0)
-        assert controller.state is LifecycleState.DRAINING
+        assert_state(controller, LifecycleState.DRAINING)
         await controller.stop()
-        assert controller.state is LifecycleState.STOPPED
+        assert_state(controller, LifecycleState.STOPPED)
         assert events == [
             "dependency.start",
             "listener.start",
@@ -75,7 +80,7 @@ def test_lifecycle_rejects_invalid_deadlines_before_draining(
         with pytest.raises(ValueError):
             await controller.drain(deadline=invalid_deadline)
 
-        assert controller.state is LifecycleState.READY
+        assert_state(controller, LifecycleState.READY)
         assert events == ["runtime.start"]
 
     asyncio.run(exercise())
@@ -102,7 +107,7 @@ def test_start_failure_rolls_back_started_hooks_and_stops() -> None:
         with pytest.raises(LifecycleFailure) as captured:
             await controller.start()
 
-        assert controller.state is LifecycleState.STOPPED
+        assert_state(controller, LifecycleState.STOPPED)
         assert captured.value.phase is LifecycleState.STARTUP
         assert captured.value.component == "failing"
         assert "never-return-example-secret" not in str(captured.value)
@@ -137,7 +142,7 @@ def test_drain_failure_runs_remaining_hooks_and_stays_draining() -> None:
         with pytest.raises(LifecycleFailure) as captured:
             await controller.drain(deadline=42.0)
 
-        assert controller.state is LifecycleState.DRAINING
+        assert_state(controller, LifecycleState.DRAINING)
         assert captured.value.phase is LifecycleState.DRAINING
         assert captured.value.component == "listener"
         assert events[-2:] == ["listener.drain:42.0", "dependency.drain:42.0"]
@@ -167,7 +172,7 @@ def test_stop_failure_runs_remaining_hooks_and_finishes_stopped() -> None:
         with pytest.raises(LifecycleFailure) as captured:
             await controller.stop()
 
-        assert controller.state is LifecycleState.STOPPED
+        assert_state(controller, LifecycleState.STOPPED)
         assert captured.value.phase is LifecycleState.STOPPED
         assert captured.value.component == "listener"
         assert events[-2:] == ["listener.stop", "dependency.stop"]
@@ -264,9 +269,7 @@ def test_concurrent_start_attempts_run_hooks_once() -> None:
         results = await asyncio.gather(first, second, return_exceptions=True)
 
         assert events == ["runtime.start"]
-        assert (
-            sum(isinstance(result, LifecycleTransitionError) for result in results) == 1
-        )
-        assert controller.state is LifecycleState.READY
+        assert sum(isinstance(result, LifecycleTransitionError) for result in results) == 1
+        assert_state(controller, LifecycleState.READY)
 
     asyncio.run(exercise())

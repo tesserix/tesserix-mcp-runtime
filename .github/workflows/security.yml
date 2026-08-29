@@ -1,0 +1,60 @@
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "43 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    name: Dependency, license, and secret policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install Python 3.14
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.7"
+          enable-cache: true
+      - name: Install the frozen environment
+        run: uv sync --frozen
+      - name: Audit vulnerabilities
+        run: |
+          requirements="${RUNNER_TEMP}/runtime-requirements.txt"
+          uv export --quiet --frozen --no-dev --no-emit-project \
+            --format requirements.txt --output-file "$requirements"
+          uv run --frozen pip-audit --requirement "$requirements" \
+            --require-hashes --disable-pip --strict --progress-spinner off
+      - name: Enforce runtime dependency licenses
+        run: uv run --frozen python security/check_licenses.py
+      - name: Verify the cross-system threat model
+        run: uv run --frozen python security/check_threat_model.py --model security/threat-model.json
+      - name: Scan Git history for secrets
+        env:
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          archive="${RUNNER_TEMP}/gitleaks.tar.gz"
+          binary="${RUNNER_TEMP}/gitleaks"
+          curl --fail --location --silent --show-error \
+            --output "$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${archive}" | sha256sum --check --strict
+          tar --extract --gzip --file "$archive" --directory "$RUNNER_TEMP" gitleaks
+          "$binary" git --redact --no-banner --exit-code 1
