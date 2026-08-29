@@ -64,6 +64,21 @@ architecture invariants:
     uv run --frozen python architecture/check_public_api.py
     uv run --frozen python architecture/check_dependencies.py
 
+## Security model
+
+Publication, semantic discovery, activation, Gateway routing, runtime
+invocation, and backing API access are separate default-deny trust boundaries.
+Semantic ranking returns tenant-filtered candidates only; an exact immutable
+Registry version is authorized again before activation or use. Neither search
+metadata nor AgentGateway replaces runtime per-tool authorization.
+
+[ADR-0004](docs/adr/0004-cross-system-threat-model.md) records the data flows,
+claim trust contract, non-disclosing failures, write-capability review, secret
+lifecycle, incident response, current gaps, and fake request walkthroughs. Its
+machine-readable review and 50-test implementation inventory are enforced with:
+
+    uv run --frozen python security/check_threat_model.py --model security/threat-model.json
+
 ## License
 
 Apache-2.0.
