@@ -46,6 +46,7 @@ jobs:
           uv run --frozen python architecture/check_layers.py
           uv run --frozen python architecture/check_public_api.py
           uv run --frozen python architecture/check_dependencies.py
+          uv run --frozen python security/check_threat_model.py --model security/threat-model.json
       - name: Verify supported Python minors
         run: |
           uv python install 3.12 3.13 3.14
