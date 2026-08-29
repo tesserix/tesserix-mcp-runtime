@@ -1,0 +1,44 @@
+# Runtime envelope checker
+
+envelope-targets.json is the machine-readable form of ADR-0001's initial
+capacity and SLO contract. check_envelope.py compares one observed result
+document with every committed target:
+
+    python3 benchmarks/check_envelope.py benchmarks/example-observations.json
+
+Exit codes are stable:
+
+- 0: every observation meets the target;
+- 1: the document is valid and at least one target is missed;
+- 2: the measurement document is incomplete or invalid.
+
+The JSON report includes every actual value, operator, target, unit, and result.
+CI can archive it without parsing human text.
+
+## Observation contract
+
+Input has one top-level observed object containing every metric named by the
+target document. Values are finite JSON numbers. The example is synthetic and
+exists only to prove the comparison contract; it is not production evidence.
+
+## How later benchmarks collect each value
+
+| Metric | Collection method |
+|---|---|
+| sustained_calls_per_second | Highest completed no-op tool rate maintained for the committed steady window without exceeding latency or error targets |
+| burst_calls_per_second | Highest completed no-op tool rate during the committed short burst window without overload outside policy |
+| supported_request_bytes | Largest accepted valid MCP request at the server-enforced boundary |
+| supported_response_bytes | Largest accepted valid structured result at the server-enforced boundary |
+| runtime_added_p99_milliseconds | Client-observed loopback p99 for a no-op handler through the runtime transport and policy path; gateway and product latency excluded |
+| startup_seconds | Monotonic duration from process start until readiness first succeeds |
+| idle_rss_mebibytes | Resident set after startup has settled with no active calls, sampled by the benchmark supervisor |
+| monthly_invocation_availability_percent | Successful eligible invocations divided by all eligible invocations over the SLI window, excluding documented client faults |
+
+The reliability issue will commit the load profile, steady and burst windows,
+hardware or pod shape, exact package and image digests, sample count, and raw
+sanitized results. A p99 is measured directly; percentiles from different
+paths are not subtracted.
+
+The checker deliberately does not collect measurements. Load generation and
+process supervision arrive with the runtime and reliability slices; keeping
+the target contract separate prevents each tool from redefining success.
