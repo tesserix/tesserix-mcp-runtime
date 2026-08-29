@@ -1,0 +1,12 @@
+{
+  "observed": {
+    "sustained_calls_per_second": 60,
+    "burst_calls_per_second": 220,
+    "supported_request_bytes": 65536,
+    "supported_response_bytes": 524288,
+    "runtime_added_p99_milliseconds": 12,
+    "startup_seconds": 1.4,
+    "idle_rss_mebibytes": 104,
+    "monthly_invocation_availability_percent": 99.95
+  }
+}

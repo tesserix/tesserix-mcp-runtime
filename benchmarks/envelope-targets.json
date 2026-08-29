@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "capacity_assumptions": {
+    "deployed_servers_12_months": 100,
+    "deployed_servers_36_months": 500,
+    "tools_per_server_typical": 12,
+    "tools_per_server_maximum": 128
+  },
+  "targets": [
+    {
+      "metric": "sustained_calls_per_second",
+      "operator": "minimum",
+      "value": 50,
+      "unit": "calls/second"
+    },
+    {
+      "metric": "burst_calls_per_second",
+      "operator": "minimum",
+      "value": 200,
+      "unit": "calls/second"
+    },
+    {
+      "metric": "supported_request_bytes",
+      "operator": "minimum",
+      "value": 65536,
+      "unit": "bytes"
+    },
+    {
+      "metric": "supported_response_bytes",
+      "operator": "minimum",
+      "value": 524288,
+      "unit": "bytes"
+    },
+    {
+      "metric": "runtime_added_p99_milliseconds",
+      "operator": "maximum",
+      "value": 15,
+      "unit": "milliseconds"
+    },
+    {
+      "metric": "startup_seconds",
+      "operator": "maximum",
+      "value": 2,
+      "unit": "seconds"
+    },
+    {
+      "metric": "idle_rss_mebibytes",
+      "operator": "maximum",
+      "value": 128,
+      "unit": "MiB"
+    },
+    {
+      "metric": "monthly_invocation_availability_percent",
+      "operator": "minimum",
+      "value": 99.9,
+      "unit": "percent"
+    }
+  ]
+}
