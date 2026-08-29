@@ -56,6 +56,7 @@ def _install_and_probe(
     artifact: Path,
     environment: Path,
     *,
+    install_dependencies: bool,
     offline: bool,
 ) -> dict[str, Any]:
     _run([uv, "venv", "--python", sys.executable, str(environment)], cwd=environment.parent)
@@ -63,16 +64,24 @@ def _install_and_probe(
     install = [uv, "pip", "install", "--python", str(python)]
     if offline:
         install.append("--offline")
+    if not install_dependencies:
+        install.append("--no-deps")
     install.append(str(artifact))
     _run(install, cwd=environment.parent)
     completed = _run([str(python), "-I", "-c", IMPORT_CHECK], cwd=environment.parent)
     result = json.loads(completed.stdout)
     if result.get("typed") is not True or result.get("version_export_matches") is not True:
         raise SmokeInstallError(f"{artifact.name}: installed metadata probe failed: {result}")
+    result["dependencies_installed"] = install_dependencies
     return result
 
 
-def check(directory: Path, *, offline: bool) -> dict[str, dict[str, Any]]:
+def check(
+    directory: Path,
+    *,
+    install_dependencies: bool,
+    offline: bool,
+) -> dict[str, dict[str, Any]]:
     directory = directory.resolve(strict=True)
     uv = shutil.which("uv")
     if uv is None:
@@ -91,12 +100,14 @@ def check(directory: Path, *, offline: bool) -> dict[str, dict[str, Any]]:
                 uv,
                 wheels[0],
                 temporary_root / "wheel-env",
+                install_dependencies=install_dependencies,
                 offline=offline,
             ),
             "sdist": _install_and_probe(
                 uv,
                 sdists[0],
                 temporary_root / "sdist-env",
+                install_dependencies=install_dependencies,
                 offline=offline,
             ),
         }
@@ -107,11 +118,16 @@ def check(directory: Path, *, offline: bool) -> dict[str, dict[str, Any]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--no-deps", action="store_true")
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("directory", type=Path)
     args = parser.parse_args()
     try:
-        report = check(args.directory, offline=args.offline)
+        report = check(
+            args.directory,
+            install_dependencies=not args.no_deps,
+            offline=args.offline,
+        )
     except (OSError, json.JSONDecodeError, SmokeInstallError) as error:
         print(f"artifact install smoke test failed: {error}", file=sys.stderr)
         return 1

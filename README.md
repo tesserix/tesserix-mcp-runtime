@@ -75,12 +75,13 @@ allowing the Unix socket pairs required by asyncio.
     uv run --frozen python security/check_licenses.py
 
 Build validation is also offline after the frozen environment has been
-installed:
+installed. The artifact smoke step installs only the distribution itself;
+`uv sync --frozen` and the dependency checks above verify its locked closure.
 
     uv build --clear --offline
     uv run --frozen twine check --strict dist/*
     uv run --frozen python architecture/check_artifacts.py dist
-    uv run --frozen python architecture/smoke_install_artifacts.py --offline dist
+    uv run --frozen python architecture/smoke_install_artifacts.py --offline --no-deps dist
 
 The security workflow exports hash-pinned runtime requirements from `uv.lock`
 for `pip-audit`, verifies the license path of every reachable runtime

@@ -54,6 +54,7 @@ def test_wheel_and_sdist_install_and_import_without_network(
         [
             sys.executable,
             str(ROOT / "architecture" / "smoke_install_artifacts.py"),
+            "--no-deps",
             "--offline",
             built_artifacts.name,
         ],
@@ -68,3 +69,5 @@ def test_wheel_and_sdist_install_and_import_without_network(
     assert report["wheel"]["version"] == report["sdist"]["version"]
     assert report["wheel"]["typed"] is True
     assert report["sdist"]["typed"] is True
+    assert report["wheel"]["dependencies_installed"] is False
+    assert report["sdist"]["dependencies_installed"] is False

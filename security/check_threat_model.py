@@ -578,7 +578,11 @@ def main() -> int:
     parser.add_argument("--model", type=Path, required=True)
     arguments = parser.parse_args()
     result = check(arguments.model)
-    print(json.dumps(result, sort_keys=True))
+    safe_report = {
+        "passed": bool(result["passed"]),
+        "violation_count": len(result["violations"]),
+    }
+    print(json.dumps(safe_report, sort_keys=True))
     return 0 if result["passed"] else 1
 
 
