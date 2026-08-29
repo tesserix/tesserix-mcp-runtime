@@ -383,6 +383,21 @@ def test_application_starts_serves_drains_and_stops() -> None:
     asyncio.run(exercise())
 
 
+def test_application_exposes_handler_free_manifests_to_transport_during_startup() -> None:
+    catalog = ToolCatalog([EchoDefinition()])
+    application = Application(
+        catalog=catalog,
+        authorizer=RecordingAuthorizer(),
+        transport=InProcessTransport(),
+        telemetry=RecordingTelemetry(),
+        limits=ApplicationLimits(drain_timeout=5.0),
+        clock=ManualClock(now=100.0),
+    )
+
+    assert application.state is LifecycleState.STARTUP
+    assert application.list_tool_manifests() == catalog.manifests
+
+
 def test_application_orders_hooks_around_transport() -> None:
     async def exercise() -> None:
         events: list[str] = []

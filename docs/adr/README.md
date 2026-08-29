@@ -9,6 +9,7 @@
 | [0005](0005-runtime-contracts-and-lifecycle.md) | Accepted | Typed runtime contracts, stable failures, and lifecycle ordering |
 | [0006](0006-compositional-application-and-drain.md) | Accepted | Explicit application composition, signal ownership, and bounded drain |
 | [0007](0007-typed-callable-authority-and-manifests.md) | Accepted | Typed callable schema authority, bounded metadata, and handler-free manifests |
+| [0008](0008-streamable-http-and-bounded-sessions.md) | Accepted | Official Streamable HTTP adapter, private listener, finite envelopes, and tenant-bound sessions |
 
 Architecture decisions are append-only. A later decision supersedes an
 accepted ADR instead of silently rewriting its history.

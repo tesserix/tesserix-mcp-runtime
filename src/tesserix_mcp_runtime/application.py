@@ -26,6 +26,7 @@ from tesserix_mcp_runtime.contracts import (
 from tesserix_mcp_runtime.errors import ScrubbedError, map_exception
 from tesserix_mcp_runtime.lifecycle import LifecycleController
 from tesserix_mcp_runtime.tool import ToolCatalog
+from tesserix_mcp_runtime.tool_manifest import ToolManifest
 
 _COMPONENT_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{0,127}\Z")
 _EXCEPTION_TYPE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,255}\Z")
@@ -162,6 +163,8 @@ class ApplicationEndpoint(Protocol):
     """Expose adapter-neutral capabilities to one bound transport."""
 
     def list_tools(self) -> tuple[str, ...]: ...
+
+    def list_tool_manifests(self) -> tuple[ToolManifest, ...]: ...
 
     async def invoke(
         self,
@@ -447,6 +450,9 @@ class Application:
         if self.state is not LifecycleState.READY:
             return ()
         return tuple(tool.metadata.name for tool in self._catalog)
+
+    def list_tool_manifests(self) -> tuple[ToolManifest, ...]:
+        return self._catalog.manifests
 
     async def invoke(
         self,

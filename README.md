@@ -7,10 +7,10 @@ The repository is in its pre-release runtime phase. The checked-in package
 provides typed contracts, an explicit application composition root,
 deterministic bounded lifecycle, stable safe errors, a validated tool catalog,
 typed-callable schema generation, handler-free manifest snapshots,
-process-signal handling, and reusable in-process conformance support. It does
-not yet start a network listener, publish Registry versions, or serve MCP over
-HTTP. No stable package release is implied by interfaces described as planned
-below.
+process-signal handling, reusable in-process conformance support, and the
+official MCP v2 Streamable HTTP transport with a private bounded listener. It
+does not yet publish Registry versions or activate Gateway routes. No stable
+package release is implied by interfaces described as planned below.
 
 The accepted ownership boundary and measurable design envelope are recorded
 in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
@@ -23,7 +23,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | Runtime contracts, lifecycle, tool schema policy, and conformance helpers | Implemented in source; pre-release |
 | Explicit application composition, in-process transport, signals, and bounded drain | Implemented in source; pre-release |
 | Typed callable authoring, schema fingerprints, compatibility classification, and handler-free metadata export | Implemented in source; pre-release |
-| MCP v2 Streamable HTTP serving and bounded sessions | Planned; not implemented |
+| MCP v2 Streamable HTTP serving, compatibility matrix, and bounded sessions | Implemented in source; pre-release |
 | ADK `ToolRegistry` bridge | Planned; not implemented |
 | Registry manifest compilation, signing, publication, and verification | Planned; not implemented |
 | Registry-backed semantic discovery and progressive disclosure | Planned; not implemented |
@@ -173,6 +173,26 @@ example, semantic metadata rules, schema limits, manifest shape, and change
 classification. [ADR-0007](docs/adr/0007-typed-callable-authority-and-manifests.md)
 records the schema authority, trust boundary, dependency failures, quantitative
 ceilings, alternatives, rollout, and rollback.
+
+## Streamable HTTP
+
+The runtime now serves its compositional `Application` through the official MCP
+SDK v2 Streamable HTTP server. The default listener is loopback-only and
+stateless, waits for ASGI readiness, normalizes one stable route, enforces
+finite headers, bodies, responses, schemas, tools, pages, and optional legacy
+sessions, and propagates trusted call context plus cancellation without leaking
+SDK types into core handlers.
+
+Stateful compatibility mode binds each opaque session to tenant, issuer, and
+subject with a finite absolute lifetime. Non-loopback binding requires explicit
+host and origin allowlists. AgentGateway remains the supported public ingress
+and may rewrite `/gateway/runtime/mcp` to the stable upstream `/mcp` path.
+
+See the [Streamable HTTP guide](docs/streamable-http.md) for composition,
+limits, gateway routing, failure responses, and verification commands.
+[ADR-0008](docs/adr/0008-streamable-http-and-bounded-sessions.md) records the
+protocol authority, session model, cancellation ordering, SDK upgrade risk,
+alternatives, rollout, and rollback.
 
 ## License
 

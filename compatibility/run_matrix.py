@@ -4,8 +4,11 @@ import json
 import os
 import socket
 import subprocess
+import threading
 import time
 from pathlib import Path
+
+from reverse_proxy import ReverseProxyServer
 
 ROOT = Path(__file__).parent
 LANES = (
@@ -16,7 +19,9 @@ LANES = (
 EXPECTED_OPERATIONS = {
     "initialize",
     "list_tools",
+    "paginate_tools",
     "call_tool",
+    "cancel_work",
     "tool_error",
     "close",
 }
@@ -84,7 +89,7 @@ def main() -> int:
             "uv",
             "run",
             "--frozen",
-            "--script",
+            "python",
             str(ROOT / "server.py"),
             "--port",
             str(port),
@@ -94,10 +99,26 @@ def main() -> int:
         stdout=subprocess.DEVNULL,
         text=True,
     )
+    proxy: ReverseProxyServer | None = None
     try:
         wait_until_listening(server, port)
+        proxy = ReverseProxyServer(port)
+        proxy_thread = threading.Thread(
+            target=proxy.serve_forever,
+            name="mcp-compatibility-reverse-proxy",
+            daemon=True,
+        )
+        proxy_thread.start()
         reports = [run_lane(script, endpoint) for script in LANES]
+        proxy_port = int(proxy.server_address[1])
+        proxy_report = run_lane(
+            ROOT / "client_2_1.py",
+            f"http://127.0.0.1:{proxy_port}/gateway/runtime/mcp",
+        )
     finally:
+        if proxy is not None:
+            proxy.shutdown()
+            proxy.server_close()
         server.terminate()
         try:
             server.wait(timeout=10)
@@ -105,7 +126,21 @@ def main() -> int:
             server.kill()
             server.wait(timeout=5)
 
-    print(json.dumps({"lanes": reports, "passed": True}, indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "lanes": reports,
+                "passed": True,
+                "proxy": {
+                    **proxy_report,
+                    "path": "/gateway/runtime/mcp",
+                    "rewritten_path": "/mcp",
+                },
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
     return 0
 
 

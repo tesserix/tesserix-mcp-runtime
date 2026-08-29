@@ -37,7 +37,11 @@ def test_core_dependency_report_matches_frozen_resolution() -> None:
     result = json.loads(completed.stdout)
     assert result["passed"] is True
     assert result["violations"] == []
-    assert result["profiles"]["core"]["declared_dependencies"] == ["mcp>=2.1.1,<3"]
+    assert result["profiles"]["core"]["declared_dependencies"] == [
+        "mcp-types>=2.1.1,<3",
+        "mcp>=2.1.1,<3",
+        "uvicorn>=0.52.4,<1",
+    ]
     assert result["profiles"]["core"]["distribution_count"] == 31
 
 
