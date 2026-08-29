@@ -18,7 +18,10 @@ classifiers = [
 dependencies = ["mcp>=2.1.1,<3"]
 
 [dependency-groups]
-dev = ["pytest==9.0.3"]
+dev = [
+  "import-linter==2.14",
+  "pytest==9.0.3",
+]
 
 [project.urls]
 Issues = "https://github.com/tesserix/tesserix-mcp-runtime/issues"
@@ -30,3 +33,34 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tesserix_mcp_runtime"]
+
+[tool.importlinter]
+root_package = "tesserix_mcp_runtime"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+id = "core-does-not-depend-on-adapters"
+name = "Core does not depend on adapters or integration libraries"
+type = "forbidden"
+source_modules = [
+  "tesserix_mcp_runtime",
+  "tesserix_mcp_runtime.contracts",
+]
+forbidden_modules = [
+  "anthropic",
+  "asyncpg",
+  "fastapi",
+  "google",
+  "httpx",
+  "kubernetes",
+  "litellm",
+  "mcp",
+  "openai",
+  "opentelemetry",
+  "psycopg",
+  "starlette",
+  "temporalio",
+  "tesserix_adk",
+  "tesserix_mcp_runtime.adapters",
+]
+as_packages = false

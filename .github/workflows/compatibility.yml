@@ -40,6 +40,12 @@ jobs:
         run: uv sync --frozen
       - name: Test the compatibility policy
         run: uv run --frozen pytest -q
+      - name: Verify architecture contracts
+        run: |
+          uv run --frozen lint-imports --config pyproject.toml --no-cache --no-logo
+          uv run --frozen python architecture/check_layers.py
+          uv run --frozen python architecture/check_public_api.py
+          uv run --frozen python architecture/check_dependencies.py
       - name: Verify supported Python minors
         run: |
           uv python install 3.12 3.13 3.14
@@ -55,5 +61,7 @@ jobs:
           uv venv --python 3.14 "$wheel_env_dir"
           uv pip install --python "$wheel_env_dir/bin/python" dist/*.whl
           "$wheel_env_dir/bin/python" -c "from importlib.metadata import version; import tesserix_mcp_runtime; assert version('mcp') == '2.1.1'; assert tesserix_mcp_runtime.__version__ == '0.1.0.dev0'"
+          site_packages=$("$wheel_env_dir/bin/python" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
+          uv run --frozen python architecture/check_dependencies.py --wheel dist/*.whl --site-packages "$site_packages"
       - name: Exercise the exact client matrix
         run: uv run python compatibility/run_matrix.py

@@ -48,6 +48,22 @@ There is no MCP Python SDK 1.34 release. The evidence, upgrade policy, and
 protocol-versus-package distinction are recorded in
 [ADR-0002](docs/adr/0002-python-and-mcp-compatibility.md).
 
+## Public API and dependency boundaries
+
+The distribution is library-first. Stable runtime contracts are imported from
+`tesserix_mcp_runtime`; integrations live under the explicit adapter namespace
+and point inward to those contracts. Core never imports SDK, ADK, Registry,
+Kubernetes, database, orchestration, or provider implementations.
+
+[ADR-0003](docs/adr/0003-public-api-and-dependency-layering.md) records the
+dependency arrows, authoritative schema owners, ADK source strategy,
+deprecation policy, and measured package budgets. CI executes all three
+architecture invariants:
+
+    uv run --frozen lint-imports --config pyproject.toml --no-cache --no-logo
+    uv run --frozen python architecture/check_public_api.py
+    uv run --frozen python architecture/check_dependencies.py
+
 ## License
 
 Apache-2.0.
