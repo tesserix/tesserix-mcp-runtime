@@ -1,0 +1,43 @@
+{
+  "as_of": "2026-08-30",
+  "runtime_python": "3.14",
+  "library_python": [
+    "3.12",
+    "3.13",
+    "3.14"
+  ],
+  "server_sdk": {
+    "constraint": ">=2.1.1,<3",
+    "locked": "2.1.1"
+  },
+  "client_lanes": [
+    {
+      "name": "devai",
+      "sdk": "1.28.1",
+      "support": "required"
+    },
+    {
+      "name": "maintained-v1",
+      "sdk": "1.29.1",
+      "support": "required"
+    },
+    {
+      "name": "current-v2",
+      "sdk": "2.1.1",
+      "support": "required"
+    }
+  ],
+  "protocol_revisions": {
+    "legacy_latest": "2025-11-25",
+    "modern": "2026-07-28"
+  },
+  "adk": {
+    "release": "0.53.1",
+    "locked_mcp_sdk": "2.1.0",
+    "bridge_status": "planned"
+  },
+  "nonexistent_versions": [
+    "1.34",
+    "1.34.0"
+  ]
+}

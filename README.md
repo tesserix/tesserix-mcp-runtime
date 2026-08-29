@@ -37,6 +37,17 @@ contract without rewriting thresholds in each test.
 These targets are assumptions to validate before GA, not claims about current
 production performance.
 
+## Compatibility baseline
+
+Production images use Python 3.14. The library supports Python 3.12 through
+3.14 and declares MCP Python SDK v2.1.1 or newer within major version 2.
+Frozen compatibility lanes exercise DevAI's 1.28.1 client, maintained v1
+1.29.1, and current v2 2.1.1 against the same server.
+
+There is no MCP Python SDK 1.34 release. The evidence, upgrade policy, and
+protocol-versus-package distinction are recorded in
+[ADR-0002](docs/adr/0002-python-and-mcp-compatibility.md).
+
 ## License
 
 Apache-2.0.
