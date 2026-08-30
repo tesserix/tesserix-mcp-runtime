@@ -37,6 +37,11 @@ class _Named(Protocol):
     def name(self) -> str: ...
 
 
+@runtime_checkable
+class _ToolVisibilityPolicy(Protocol):
+    def is_exported(self, tool_name: str) -> bool: ...
+
+
 def _is_runtime_instance(value: object, expected: type[Any]) -> bool:
     return isinstance(value, expected)
 
@@ -449,10 +454,24 @@ class Application:
     def list_tools(self) -> tuple[str, ...]:
         if self.state is not LifecycleState.READY:
             return ()
-        return tuple(tool.metadata.name for tool in self._catalog)
+        return tuple(
+            manifest.metadata.name
+            for manifest in self._catalog.manifests
+            if self._is_exported(manifest.metadata.name)
+        )
 
     def list_tool_manifests(self) -> tuple[ToolManifest, ...]:
-        return self._catalog.manifests
+        return tuple(
+            manifest
+            for manifest in self._catalog.manifests
+            if self._is_exported(manifest.metadata.name)
+        )
+
+    def _is_exported(self, tool_name: str) -> bool:
+        authorizer: object = self._authorizer
+        if not isinstance(authorizer, _ToolVisibilityPolicy):
+            return True
+        return authorizer.is_exported(tool_name)
 
     async def invoke(
         self,

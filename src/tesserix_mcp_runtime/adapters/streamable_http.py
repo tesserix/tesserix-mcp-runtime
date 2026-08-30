@@ -971,6 +971,7 @@ def _validate_authority_meta(
         "traceparent": trace.get("traceparent"),
         "tracestate": trace.get("tracestate"),
         "idempotency-key": context.idempotency_key,
+        "approval-id": context.approval_id,
     }
     for prefix in ("tesserix/runtime", "tesserix/adk"):
         for name, value in expected.items():

@@ -103,6 +103,8 @@ example, it cannot alias `sub`.
 | `x-tesserix-run-id` | Must equal token `run_id`; supplies it only when the token omits it |
 | `x-request-id` | Optional bounded correlation ID; never identity |
 | `traceparent`, `tracestate` | Optional trace attribution from the trusted path |
+| `Idempotency-Key` | Optional bounded mutation replay key; never identity or authorization |
+| `X-Tesserix-Approval-Id` | Optional bounded approval lookup reference; never approval by itself |
 
 If neither the token nor the trusted gateway supplies a run ID, the request ID
 is used. Duplicate identity or attribution headers fail closed. Values from
@@ -110,8 +112,10 @@ tool arguments are never inspected as identity.
 
 MCP metadata with the prefixes `tesserix/runtime/` and `tesserix/adk/` is never
 promoted to authority. Matching values are tolerated for compatibility;
-mismatched tenant, subject, run, scopes, trace, or idempotency metadata returns
-the stable `authority_mismatch` code with only the safe request ID.
+mismatched tenant, subject, run, scopes, trace, idempotency, or approval
+metadata returns the stable `authority_mismatch` code with only the safe
+request ID. The concrete [tool policy](tool-policy.md) validates the exact
+approval record and requires idempotency for mutating tools.
 
 ## JWKS retrieval, caching, and rotation
 

@@ -322,6 +322,85 @@ def test_trusted_gateway_run_header_supplies_run_when_the_token_has_none() -> No
     assert context.run_id == "run-a"
 
 
+def test_authenticated_gateway_propagates_bounded_call_control_identifiers() -> None:
+    private, public = _key_pair("key-a")
+    request = _request(_token(private, kid="key-a"))
+    request = HTTPRequestMetadata(
+        method=request.method,
+        path=request.path,
+        headers=(
+            *request.headers,
+            ("idempotency-key", "idempotency-a"),
+            ("x-tesserix-approval-id", "approval-a"),
+        ),
+        peer_host=request.peer_host,
+    )
+
+    context = asyncio.run(
+        _provider(_JWKS({"keys": [public]})).create(
+            request,
+            cancellation=_Cancellation(),
+        )
+    )
+
+    assert context.idempotency_key == "idempotency-a"
+    assert context.approval_id == "approval-a"
+
+
+@pytest.mark.parametrize(
+    ("header", "value"),
+    [
+        ("idempotency-key", "i" * 513),
+        ("x-tesserix-approval-id", "a" * 257),
+    ],
+)
+def test_gateway_rejects_unbounded_call_control_identifiers(
+    header: str,
+    value: str,
+) -> None:
+    private, public = _key_pair("key-a")
+    request = _request(_token(private, kid="key-a"))
+    request = HTTPRequestMetadata(
+        method=request.method,
+        path=request.path,
+        headers=(*request.headers, (header, value)),
+        peer_host=request.peer_host,
+    )
+
+    with pytest.raises(HTTPRequestAuthenticationError) as raised:
+        asyncio.run(
+            _provider(_JWKS({"keys": [public]})).create(
+                request,
+                cancellation=_Cancellation(),
+            )
+        )
+
+    assert raised.value.request_id == "request-a"
+    assert value not in repr(raised.value)
+
+
+@pytest.mark.parametrize("header", ["idempotency-key", "x-tesserix-approval-id"])
+def test_gateway_rejects_ambiguous_call_control_identifiers(header: str) -> None:
+    private, public = _key_pair("key-a")
+    request = _request(_token(private, kid="key-a"))
+    request = HTTPRequestMetadata(
+        method=request.method,
+        path=request.path,
+        headers=(*request.headers, (header, "first"), (header, "second")),
+        peer_host=request.peer_host,
+    )
+
+    with pytest.raises(HTTPRequestAuthenticationError) as raised:
+        asyncio.run(
+            _provider(_JWKS({"keys": [public]})).create(
+                request,
+                cancellation=_Cancellation(),
+            )
+        )
+
+    assert raised.value.request_id == "request-a"
+
+
 @pytest.mark.parametrize(
     "case",
     [

@@ -300,6 +300,8 @@ class GatewayJWTContextProvider:
                 traceparent=self._optional_header(request, "traceparent"),
                 tracestate=self._optional_header(request, "tracestate"),
             )
+            idempotency_key = self._optional_header(request, "idempotency-key")
+            approval_id = self._optional_header(request, "x-tesserix-approval-id")
             identity = AuthenticatedIdentity(
                 tenant=tenant,
                 subject=subject,
@@ -312,6 +314,8 @@ class GatewayJWTContextProvider:
                 run_id=run_id,
                 trace_context=trace_context,
                 cancellation=cancellation,
+                idempotency_key=idempotency_key,
+                approval_id=approval_id,
             )
         except asyncio.CancelledError:
             raise

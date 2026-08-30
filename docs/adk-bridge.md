@@ -66,6 +66,10 @@ tool body's message. Configured secrets and credential-shaped output remain
 redacted. An unknown name and a registered-but-unexported name return the same
 generic response.
 
+`CallContext.approval_id` is intentionally not promoted into ADK authority.
+The core `ToolPolicy` applies to runtime-owned non-ADK definitions; ADK
+continues to own ADK approvals and pending-result semantics.
+
 ## Image choice
 
 Tool-only MCP servers can start from the smaller runtime image and install the

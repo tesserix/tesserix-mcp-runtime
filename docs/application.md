@@ -18,7 +18,7 @@ from tesserix_mcp_runtime.adapters.in_process import InProcessTransport
 from tesserix_mcp_runtime.adapters.process_signals import ProcessSignalSource
 
 # catalog is a validated ToolCatalog.
-# authorizer implements the default-deny Authorizer protocol.
+# Use ToolPolicy for the production default-deny authorizer.
 # telemetry accepts ScrubbedError values and never receives tool payloads.
 application = Application(
     catalog=catalog,
@@ -87,3 +87,10 @@ transport start. A global drain or stop deadline raises
 `ApplicationDeadlineExceeded`. `run()` converts lifecycle and signal failures
 to exit code 1 plus a payload-free `ApplicationDiagnostic`, and always attempts
 stop after a post-readiness failure.
+
+For non-ADK production tools, compose the concrete
+[`ToolPolicy`](tool-policy.md). It filters experimental or disabled tools from
+both listings and manifests, enforces exact review, scopes, effect,
+idempotency, and approval before the handler, and appends payload-free policy
+decisions. Structural test authorizers remain supported for existing read-only
+fixtures. The ADK bridge keeps ADK's own policy authority.

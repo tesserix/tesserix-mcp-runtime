@@ -33,8 +33,9 @@ server. Add `transport` to `Application`; the application's existing
 `HTTPCallContextProvider.create()` receives `HTTPRequestMetadata` and the
 request cancellation object. It must authenticate and validate the gateway
 metadata, then return a `CallContext` containing the authoritative identity,
-request/run IDs, trace context, deadline, and idempotency key. Header values are
-available through `header_values()` but are always redacted from `repr()`.
+request/run IDs, trace context, deadline, idempotency key, and approval lookup
+reference. Header values are available through `header_values()` but are
+always redacted from `repr()`.
 Header presence alone is not authentication. Use the concrete
 `GatewayJWTContextProvider` described in the
 [Gateway identity guide](gateway-identity.md) to verify the direct peer, token,

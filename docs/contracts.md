@@ -86,8 +86,8 @@ catalog = ToolCatalog([EchoTool()])
 `ToolCatalog` preserves registration order and rejects non-structural
 definitions, duplicate exposed names, invalid schemas, and schemas outside the
 reviewed policy before traffic starts. `ToolMetadata` is immutable. Write and
-external-effect tools must declare idempotency as required; approval metadata
-is always explicit.
+external-effect tools must declare idempotency as required; external effects
+must also require per-call approval. Approval metadata is always explicit.
 
 Issue #9 owns the typed-callable registration API and official SDK/Pydantic
 schema normalization. Until that lands, the contract accepts this closed
@@ -115,8 +115,9 @@ be passed to `ToolCatalog`.
 
 Only an authenticated transport adapter constructs `AuthenticatedIdentity`
 and `CallContext`. Tenant, subject, issuer, scopes, request ID, run ID, trace
-state, deadline, cancellation, and idempotency key must never be copied from
-model-controlled tool arguments.
+state, deadline, cancellation, idempotency key, and approval reference must
+never be copied from model-controlled tool arguments. Use the
+[tool policy guide](tool-policy.md) to enforce reviewed metadata at invocation.
 
 Both objects are frozen. Deadlines are finite, non-negative monotonic
 timestamps. `TraceContext` accepts W3C traceparent version 00 with non-zero IDs

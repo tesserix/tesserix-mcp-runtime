@@ -68,6 +68,11 @@ def test_tool_metadata_is_typed_and_immutable() -> None:
             "effect": ToolEffect.EXTERNAL_EFFECT,
             "idempotency": IdempotencyRequirement.NOT_APPLICABLE,
         },
+        {
+            "effect": ToolEffect.EXTERNAL_EFFECT,
+            "approval": ApprovalRequirement.NOT_REQUIRED,
+            "idempotency": IdempotencyRequirement.REQUIRED,
+        },
     ],
 )
 def test_tool_metadata_rejects_invalid_or_unsafe_values(

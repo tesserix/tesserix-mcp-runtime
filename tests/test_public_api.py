@@ -32,7 +32,10 @@ def test_public_api_exports_only_the_stable_contract_surface() -> None:
         "ApplicationLimits",
         "ApplicationRunResult",
         "ApplicationTransport",
+        "ApprovalRecord",
         "ApprovalRequirement",
+        "ApprovalStore",
+        "ApprovalUse",
         "AuthenticatedIdentity",
         "Authorizer",
         "CallContext",
@@ -72,12 +75,21 @@ def test_public_api_exports_only_the_stable_contract_surface() -> None:
         "ToolHandler",
         "ToolMetadata",
         "ToolManifest",
+        "ToolPolicy",
+        "ToolPolicyAuditEvent",
+        "ToolPolicyAuditSink",
+        "ToolPolicyConfigurationError",
+        "ToolPolicyDecision",
+        "ToolPolicyRule",
+        "ToolPolicyState",
+        "ToolReview",
         "TraceContext",
         "__version__",
         "classify_schema_change",
         "map_exception",
         "normalize_tool_name",
         "schema_fingerprint",
+        "tool_policy_fingerprint",
     }
     for name in tesserix_mcp_runtime.__all__:
         assert getattr(tesserix_mcp_runtime, name) is not None
@@ -87,7 +99,7 @@ def test_checked_in_public_api_snapshot_matches_exports() -> None:
     completed = run_snapshot_check(SNAPSHOT)
 
     assert completed.returncode == 0
-    assert completed.stdout == "Public API snapshot matches (55 exports).\n"
+    assert completed.stdout == "Public API snapshot matches (67 exports).\n"
     assert completed.stderr == ""
 
 
