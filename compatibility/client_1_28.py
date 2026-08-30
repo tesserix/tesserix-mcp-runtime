@@ -9,4 +9,4 @@ import asyncio
 from client_v1 import exercise
 
 if __name__ == "__main__":
-    asyncio.run(exercise("1.28.1", "devai"))
+    raise SystemExit(asyncio.run(exercise("1.28.1", "devai-sdk")))

@@ -1,60 +1,96 @@
 {
-  "as_of": "2026-08-30",
-  "runtime_python": "3.14",
-  "library_python": [
-    "3.12",
-    "3.13",
-    "3.14"
-  ],
-  "server_sdk": {
-    "constraint": ">=2.1.1,<3",
-    "locked": "2.1.1"
+  "adk": {
+    "bridge_status": "implemented",
+    "locked_mcp_sdk": "2.1.0",
+    "release": "0.53.1"
   },
-  "server_fixture": {
-    "implementation": "tesserix-mcp-runtime",
-    "network": "loopback",
-    "path": "/mcp",
-    "transport": "streamable-http"
-  },
-  "inspector": {
-    "mode": "cli",
-    "support": "required",
-    "version": "2.4.0"
-  },
-  "gateway_proxy": {
-    "client_sdk": "2.1.1",
-    "path": "/gateway/runtime/mcp",
-    "rewritten_path": "/mcp"
-  },
-  "verified_operations": [
-    "initialize",
-    "list_tools",
-    "paginate_tools",
-    "call_tool",
-    "cancel_work",
-    "close"
+  "as_of": "2026-08-31",
+  "ci_triggers": [
+    "pull_request",
+    "main",
+    "release_candidate",
+    "weekly",
+    "manual"
   ],
   "client_lanes": [
     {
-      "name": "devai",
+      "feature_gaps": [],
+      "name": "devai-sdk",
+      "negotiated_out": [
+        "prompts",
+        "resources"
+      ],
+      "protocols": [
+        "2025-11-25"
+      ],
       "sdk": "1.28.1",
-      "support": "required"
+      "support": "required",
+      "supported_features": [
+        "cancellation",
+        "pagination",
+        "reconnect",
+        "structured_content",
+        "tool_errors"
+      ],
+      "surfaces": [
+        "wheel-direct",
+        "image-direct",
+        "image-agentgateway"
+      ]
     },
     {
+      "feature_gaps": [],
       "name": "maintained-v1",
+      "negotiated_out": [
+        "prompts",
+        "resources"
+      ],
+      "protocols": [
+        "2025-11-25"
+      ],
       "sdk": "1.29.1",
-      "support": "required"
+      "support": "required",
+      "supported_features": [
+        "cancellation",
+        "pagination",
+        "reconnect",
+        "structured_content",
+        "tool_errors"
+      ],
+      "surfaces": [
+        "wheel-direct",
+        "image-direct",
+        "image-agentgateway"
+      ]
     },
     {
+      "feature_gaps": [],
       "name": "current-v2",
+      "negotiated_out": [
+        "prompts",
+        "resources"
+      ],
+      "protocols": [
+        "2026-07-28",
+        "2025-11-25"
+      ],
       "sdk": "2.1.1",
-      "support": "required"
+      "support": "required",
+      "supported_features": [
+        "cancellation",
+        "legacy_mode",
+        "pagination",
+        "reconnect",
+        "structured_content",
+        "tool_errors"
+      ],
+      "surfaces": [
+        "wheel-direct",
+        "image-direct",
+        "image-agentgateway"
+      ]
     }
   ],
-  "protocol_revisions": {
-    "legacy_latest": "2025-11-25",
-    "modern": "2026-07-28"
-  },
   "conformance": {
     "adk_applicable_cases": 2,
     "contract_version": "1.0",
@@ -65,13 +101,105 @@
     ],
     "sdk_applicable_cases": 2
   },
-  "adk": {
-    "release": "0.53.1",
-    "locked_mcp_sdk": "2.1.0",
-    "bridge_status": "implemented"
+  "deprecation": {
+    "minimum_notice_days": 90,
+    "requirements": [
+      "downstream_migration_evidence",
+      "two_release_candidates_green",
+      "reviewed_compatibility_change"
+    ]
   },
+  "devai_adapter": {
+    "adapter": "devai.mcphub.downstream.DownstreamConnection",
+    "adapter_sha256": "2971b73f96ffc050df5437edad5e32c5c5b29e4dd86654f5f620ae0467793ad5",
+    "commit": "850379a833bb5740c82eb2a16cac452ff93695f0",
+    "feature_gaps": [
+      "devai_adapter_pagination:first-page-only"
+    ],
+    "lock": "frozen",
+    "repository": "tesserix/devai",
+    "sdk": "1.28.1",
+    "support": "required",
+    "surface": "image-agentgateway"
+  },
+  "evidence": {
+    "captures": [
+      "client",
+      "sdk",
+      "protocol",
+      "operation",
+      "artifact",
+      "transport"
+    ],
+    "excludes": [
+      "auth_tokens",
+      "tool_payloads",
+      "tenant_payloads"
+    ],
+    "formats": [
+      "json",
+      "junit"
+    ],
+    "retention_days": 7
+  },
+  "gateway": {
+    "client_sdks": [
+      "1.28.1",
+      "1.29.1",
+      "2.1.1"
+    ],
+    "feature_gaps": [
+      "agentgateway_pagination:first-page-only"
+    ],
+    "image": "cr.agentgateway.dev/agentgateway:v1.4.1@sha256:efd79355b89094a8225a9db465d9a01dc656b377f0bab458761b935a13231d29",
+    "implementation": "agentgateway",
+    "routed_path": "/gateway/runtime/mcp",
+    "support": "required",
+    "upstream_path": "/mcp"
+  },
+  "inspector": {
+    "mode": "cli",
+    "support": "required",
+    "version": "2.4.0"
+  },
+  "library_python": [
+    "3.12",
+    "3.13",
+    "3.14"
+  ],
   "nonexistent_versions": [
     "1.34",
     "1.34.0"
+  ],
+  "protocol_revisions": {
+    "legacy_latest": "2025-11-25",
+    "modern": "2026-07-28"
+  },
+  "runtime_python": "3.14",
+  "server_fixture": {
+    "artifacts": [
+      "built-wheel",
+      "built-image"
+    ],
+    "implementation": "tesserix-mcp-runtime",
+    "network": "loopback",
+    "path": "/mcp",
+    "transport": "streamable-http"
+  },
+  "server_sdk": {
+    "constraint": ">=2.1.1,<3",
+    "locked": "2.1.1"
+  },
+  "verified_operations": [
+    "initialize",
+    "capabilities",
+    "list_tools",
+    "paginate_tools",
+    "call_tool",
+    "cancel_work",
+    "tool_error",
+    "close",
+    "reconnect",
+    "reject_unsupported_initialization"
   ]
 }

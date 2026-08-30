@@ -199,11 +199,11 @@ async def serve(
         catalog=ToolCatalog(
             [
                 callable_tool(echo, metadata=metadata("echo", "Echo")),
+                CancellationProbeDefinition(),
                 callable_tool(
                     always_fails,
                     metadata=metadata("always_fails", "Always fails"),
                 ),
-                CancellationProbeDefinition(),
             ]
         ),
         authorizer=AllowAllAuthorizer(),

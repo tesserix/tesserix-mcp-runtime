@@ -1,8 +1,8 @@
 # ADR-0002: Python and MCP compatibility policy
 
 - Status: Accepted
-- Date: 2026-08-30
-- Tracking: [tesserix-mcp-runtime#3](https://github.com/tesserix/tesserix-mcp-runtime/issues/3)
+- Date: 2026-08-31
+- Tracking: [tesserix-mcp-runtime#3](https://github.com/tesserix/tesserix-mcp-runtime/issues/3), [tesserix-mcp-runtime#26](https://github.com/tesserix/tesserix-mcp-runtime/issues/26)
 - Supersedes: none
 
 ## Evidence
@@ -16,6 +16,15 @@ than inferred from a requested number:
 - The maintained v1 branch had released 1.29.1. DevAI remained locked to
   mcp 1.28.1 with a less-than-2 upper bound.
 - The Tesserix ADK v0.53.1 lock resolved mcp 2.1.0.
+- DevAI commit `850379a833bb5740c82eb2a16cac452ff93695f0`
+  resolved mcp 1.28.1 from its frozen lock. Its real downstream adapter is
+  `devai.mcphub.downstream.DownstreamConnection`; the reviewed adapter file
+  SHA-256 is
+  `2971b73f96ffc050df5437edad5e32c5c5b29e4dd86654f5f620ae0467793ad5`.
+- AgentGateway v1.4.1 is built from commit
+  `163ea2146acb7b82082acea30ed691b29079095f`. Its MCP merge implementation
+  returns the first page from each target without an aggregate cursor, while
+  its call resolver follows upstream cursors with a 64-page bound.
 - PyPI contained neither mcp 1.34 nor mcp 1.34.0. Version 1.34 is not a
   valid SDK target and must not appear in dependencies or support claims.
 - Tesserix had published the dated 20260829 Python 3.14 runtime and ADK base
@@ -51,18 +60,69 @@ Three exact client lanes are release requirements:
 
 | Lane | Python SDK | Expected protocol evidence | Purpose |
 |---|---:|---|---|
-| DevAI | 1.28.1 | 2025-11-25 | Preserve the checked-in DevAI client |
+| DevAI SDK | 1.28.1 | 2025-11-25 | Preserve the exact SDK used by DevAI |
 | Maintained v1 | 1.29.1 | 2025-11-25 | Detect regressions against the patched v1 line |
 | Current v2 | 2.1.1 | 2026-07-28 and 2025-11-25 | Exercise modern and legacy paths in the current client |
 
-Each lane uses an independent PEP 723 script and uv lock. All connect to one
-SDK v2.1.1 Streamable HTTP server process and must negotiate, list tools, call
-a successful tool, receive a tool failure, and close. Exact versions and
-observed revisions are emitted as machine-readable JSON.
+Each lane uses an independent PEP 723 script and uv lock. Every client must
+initialize, validate capabilities, list tools, call a structured tool, cancel
+active work, receive a tool failure, close, and reconnect. Exact versions,
+observed revisions, operations, artifact surface, and transport are emitted as
+bounded JSON and JUnit. A separate negative probe requires unsupported modern
+protocol initialization to fail with error `-32022`.
 
 The compatibility server is a test fixture bound to loopback without
 authentication. It must never be deployed or used as the production runtime.
 The production transport and identity boundary arrive in their owning issues.
+
+## Artifact and gateway evidence
+
+Compatibility is a property of the published shape, not the checkout. The
+release gate therefore runs the exact clients against three surfaces:
+
+1. a server started by an isolated environment containing only the built
+   runtime wheel and its dependencies;
+2. the built, verified core image directly over loopback;
+3. the same image through digest-pinned AgentGateway v1.4.1.
+
+The real DevAI adapter runs only on the third surface from a fresh checkout at
+the reviewed commit and its frozen environment. MCP Inspector 2.4.0 runs
+against both image routes. The hand-written reverse proxy previously used as a
+path smoke test is not compatibility evidence and has been removed.
+
+AgentGateway's first-page merge behavior is recorded as
+`agentgateway_pagination`, not reported as successful end-to-end pagination.
+Direct wheel and image lanes must still traverse both server pages. Gateway
+lanes must observe one page with no cursor and then successfully invoke the
+tool deliberately placed on the hidden second page. This distinguishes a
+known gateway feature gap from a regression in initialization, routing, calls,
+cancellation, errors, closure, or reconnect.
+
+DevAI's adapter also calls `list_tools()` only once. Its lane records a
+separate pagination feature gap and proves the adapter can discover the
+first-page `echo` tool, invoke it, close, and reconnect.
+
+## CI bounds and threat model
+
+One run contains 13 matrix cases and two Inspector surfaces. Each client
+process has a 60-second timeout, the workflow has a 30-minute hard limit,
+client JSON is capped at 64 KiB, aggregate matrix evidence at 256 KiB, and
+retention at seven days. There is no persistent service, datastore, or cloud
+resource, so recurring cost is bounded to one GitHub-hosted job per trigger.
+The release-gate objective is a deterministic pass on every pull request,
+release-candidate tag, main update, weekly schedule, and manual run; it is not
+a production availability SLO.
+
+Assets worth protecting are CI credentials, dependency integrity, and any
+future tool/session data. Threats are an untrusted pull request, a compromised
+dependency or container, and accidental logging. The trust boundaries are the
+fresh DevAI checkout, isolated client processes, Docker network, and retained
+artifact directory. Actions and images are immutable pins, downloaded Compose
+is checksum-verified, clients receive an allowlisted environment, ports bind
+only to loopback, and containers are non-root/read-only/capability-dropped.
+No credentials are mounted into the stack. Raw gateway session logs and tool
+payloads are not retained; the evidence scanner rejects bearer tokens, secret
+assignments, or oversized surfaces before upload.
 
 ## Legacy-session consequence
 
@@ -72,10 +132,12 @@ initialize handshake and, by default, in-process sessions. Multiple workers
 therefore require sticky routing unless the server chooses stateless legacy
 HTTP and accepts losing legacy back-channel behavior.
 
-The compatibility matrix uses one server process, so it proves protocol
-interoperability without deciding the production session policy. That
-decision belongs to the bounded Streamable HTTP transport issue and must test
-gateway routing explicitly.
+The compatibility matrix uses one runtime replica per artifact surface, so it
+proves protocol interoperability and AgentGateway session forwarding without
+deciding a multi-replica production session policy. A disconnect must cancel
+the active handler on direct and gateway routes; a fresh connection must then
+initialize and list successfully. A timeout, dropped stream, or lost gateway
+session therefore fails the exact client, protocol, and operation JUnit case.
 
 ## Update policy
 
@@ -88,12 +150,16 @@ gateway routing explicitly.
    in the old minimum.
 4. A new maintained v1 release updates the maintained-v1 script and support
    matrix after it passes against the same server.
-5. DevAI 1.28.1 remains until DevAI changes its checked-in dependency. Its lane
-   is removed only in a reviewed migration with downstream evidence.
+5. DevAI 1.28.1 remains until DevAI changes its checked-in dependency. Its SDK
+   and real-adapter lanes are removed only after downstream migration evidence,
+   two green release candidates, a reviewed compatibility change, and at least
+   90 days' notice.
 6. SDK v3 requires a new ADR, a parallel server adapter or migration branch,
    and an overlap period. The less-than-3 bound does not move automatically.
 7. The required Compatibility / MCP SDK matrix check protects main. Scheduled
    weekly runs catch upstream yanks or environment changes even without a PR.
+8. Release-candidate tags run the same artifact matrix. A failure blocks the
+   release; bypassing or weakening a lane requires a reviewed ADR update.
 
 Current means the newest reviewed release in the committed lock and matrix,
 not whatever PyPI returns during a build.
@@ -140,17 +206,26 @@ remain standardized on 3.14.
 
 Rejected because that package version does not exist.
 
+### Use a hand-written proxy as gateway evidence
+
+Rejected. A path-rewriting proxy cannot exercise AgentGateway's initialization,
+catalog merge, target resolution, streaming cancellation, or session behavior.
+The real digest-pinned image is small enough for the required CI lane.
+
 ## Consequences
 
-The project carries four small locks: one server and three client lanes, in
-addition to the package lock. That duplication is intentional because
-incompatible SDK majors cannot coexist in one environment. Shared v1 client
-behavior lives in one module, while each executable lane owns only its exact
-dependency declaration.
+The project carries three script locks in addition to the project lock. That
+duplication is intentional because incompatible SDK majors cannot coexist in
+one environment. Shared v1 client behavior and evidence encoding each live in
+one reusable module, while every executable lane owns only its exact dependency
+declaration. DevAI retains its own authoritative frozen lock.
 
 Compatibility failures block dependency updates and releases. This costs CI
 time but keeps the released lock reproducible and separates SDK API migration
-from wire-protocol compatibility.
+from wire-protocol compatibility. The gateway pagination limitation is visible
+to consumers and must be revisited when the pinned AgentGateway version changes.
+Rollback is one Git revert plus reuse of the last immutable wheel/image digest;
+the compatibility stack itself has no state to migrate or restore.
 
 ## References
 
@@ -160,3 +235,5 @@ from wire-protocol compatibility.
 - [Serving legacy clients](https://github.com/modelcontextprotocol/python-sdk/blob/v2.1.1/docs/run/legacy-clients.md)
 - [Tesserix Python 3.14 images](https://github.com/tesserix/base-docker-images/pull/24)
 - [Tesserix ADK v0.53.1](https://github.com/tesserix/agent-development-kit/releases/tag/v0.53.1)
+- [DevAI pinned adapter](https://github.com/tesserix/devai/blob/850379a833bb5740c82eb2a16cac452ff93695f0/src/devai/mcphub/downstream.py)
+- [AgentGateway v1.4.1 MCP merge behavior](https://github.com/agentgateway/agentgateway/blob/163ea2146acb7b82082acea30ed691b29079095f/crates/agentgateway/src/mcp/handler.rs#L680-L745)
