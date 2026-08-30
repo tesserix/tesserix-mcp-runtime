@@ -63,6 +63,7 @@ def test_project_declares_the_hermetic_quality_policy() -> None:
         "pytest-cov==7.1.0",
         "pytest-socket==0.8.1",
         "ruff==0.16.5",
+        "tesserix-mcp-manifest",
         "tesserix-mcp-testkit",
         "twine==7.0.0",
         "types-jsonschema==4.26.0.20260518",
@@ -72,8 +73,16 @@ def test_project_declares_the_hermetic_quality_policy() -> None:
     assert tool["uv"] == {
         "required-version": ">=0.12,<0.13",
         "default-groups": ["dev"],
-        "sources": {"tesserix-mcp-testkit": {"workspace": True}},
-        "workspace": {"members": ["packages/tesserix-mcp-testkit"]},
+        "sources": {
+            "tesserix-mcp-manifest": {"workspace": True},
+            "tesserix-mcp-testkit": {"workspace": True},
+        },
+        "workspace": {
+            "members": [
+                "packages/tesserix-mcp-manifest",
+                "packages/tesserix-mcp-testkit",
+            ]
+        },
     }
     assert tool["mypy"] == {
         "python_version": "3.12",

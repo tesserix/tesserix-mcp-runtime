@@ -1,0 +1,70 @@
+{
+  "adapter": "adk",
+  "description": "Search bounded inventory records.",
+  "egress_hosts": [],
+  "lifecycle": "active",
+  "manifest_version": "1.0",
+  "name": "io.github.tesserix/inventory",
+  "ownership": {
+    "annotations": {
+      "owner": "supply-platform"
+    },
+    "labels": {
+      "domain": "inventory"
+    },
+    "namespace": "tenant-inventory",
+    "org_id": "tesserix",
+    "tenant_id": "tenant-inventory",
+    "visibility": "internal"
+  },
+  "package": {
+    "file_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "identifier": "tesserix-inventory-mcp",
+    "registry_base_url": "https://pypi.org",
+    "registry_type": "pypi",
+    "runtime_hint": "uvx",
+    "transport": {
+      "type": "stdio"
+    },
+    "version": "2.0.0"
+  },
+  "protocol_versions": [
+    "2025-11-25"
+  ],
+  "repository": {
+    "source": "github",
+    "url": "https://github.com/tesserix/inventory-mcp"
+  },
+  "required_scopes": [
+    "inventory:read"
+  ],
+  "route_policy": {
+    "direct_access": false,
+    "gateway_path": "/gateway/inventory/mcp"
+  },
+  "semantic": {
+    "capabilities": [
+      "inventory.search"
+    ],
+    "domains": [
+      "supply-chain"
+    ],
+    "keywords": [
+      "inventory",
+      "search"
+    ]
+  },
+  "title": "Inventory MCP",
+  "tools": [
+    {
+      "description": "Search inventory.",
+      "input_fingerprint": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "name": "inventory_search",
+      "output_fingerprint": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "required_scopes": [
+        "inventory:read"
+      ]
+    }
+  ],
+  "version": "2.0.0"
+}

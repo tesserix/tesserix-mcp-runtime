@@ -33,6 +33,9 @@ adk = [
 otel = [
   "opentelemetry-sdk>=1.44,<2",
 ]
+manifest = [
+  "tesserix-mcp-manifest>=0.0.1.dev0,<1",
+]
 testkit = [
   "tesserix-mcp-testkit>=0.0.1.dev0,<1",
 ]
@@ -53,6 +56,7 @@ dev = [
   "pytest-cov==7.1.0",
   "pytest-socket==0.8.1",
   "ruff==0.16.5",
+  "tesserix-mcp-manifest",
   "tesserix-mcp-testkit",
   "twine==7.0.0",
   "types-jsonschema==4.26.0.20260518",
@@ -81,10 +85,11 @@ required-version = ">=0.12,<0.13"
 default-groups = ["dev"]
 
 [tool.uv.sources]
+tesserix-mcp-manifest = { workspace = true }
 tesserix-mcp-testkit = { workspace = true }
 
 [tool.uv.workspace]
-members = ["packages/tesserix-mcp-testkit"]
+members = ["packages/tesserix-mcp-manifest", "packages/tesserix-mcp-testkit"]
 
 [tool.ruff]
 line-length = 100

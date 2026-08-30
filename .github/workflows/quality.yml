@@ -41,10 +41,14 @@ jobs:
       - name: Check static types
         run: |
           uv run --frozen mypy --strict src tests \
+            packages/tesserix-mcp-manifest/src \
+            packages/tesserix-mcp-manifest/tests \
             packages/tesserix-mcp-testkit/src \
             packages/tesserix-mcp-testkit/tests \
             examples/conformance-server
           uv run --frozen pyright src tests \
+            packages/tesserix-mcp-manifest/src \
+            packages/tesserix-mcp-manifest/tests \
             packages/tesserix-mcp-testkit/src \
             packages/tesserix-mcp-testkit/tests \
             examples/conformance-server
@@ -57,6 +61,13 @@ jobs:
             --source=tesserix_mcp_testkit -m pytest
           uv run --project ../.. --frozen coverage report \
             --show-missing --fail-under=90
+      - name: Run the manifest compiler suite
+        working-directory: packages/tesserix-mcp-manifest
+        run: |
+          uv run --project ../.. --frozen coverage run --branch \
+            --source=tesserix_mcp_manifest -m pytest
+          uv run --project ../.. --frozen coverage report \
+            --show-missing --fail-under=90
       - name: Run the external conformance example
         working-directory: examples/conformance-server
         run: uv run --frozen pytest
@@ -67,6 +78,8 @@ jobs:
           uv run --frozen python architecture/check_public_api.py
           uv run --frozen python architecture/check_public_api.py \
             architecture/testkit-public-api.txt --package tesserix_mcp_testkit
+          uv run --frozen python architecture/check_public_api.py \
+            architecture/manifest-public-api.txt --package tesserix_mcp_manifest
           uv run --frozen python architecture/check_dependencies.py
 
   package:
@@ -91,7 +104,7 @@ jobs:
       - name: Build and validate distributions
         run: |
           uv sync --frozen
-          uv build --all-packages --clear --offline
+          uv build --all-packages --clear --offline --no-create-gitignore
           uv run --frozen twine check --strict dist/*
           uv run --frozen python architecture/check_artifacts.py dist
           uv run --frozen python architecture/smoke_install_artifacts.py \

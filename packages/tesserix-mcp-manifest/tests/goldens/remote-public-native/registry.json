@@ -1,0 +1,83 @@
+{
+  "apiVersion": "registry.agentic.dev/v1alpha1",
+  "kind": "MCPServer",
+  "metadata": {
+    "annotations": {
+      "owner": "platform"
+    },
+    "labels": {
+      "domain": "orders",
+      "transport": "streamable-http"
+    },
+    "name": "io.github.tesserix/orders",
+    "namespace": "tenant-orders",
+    "orgId": "tesserix",
+    "tag": "1.2.3",
+    "tenantId": "tenant-orders",
+    "visibility": "public"
+  },
+  "spec": {
+    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+    "credentialRef": {
+      "key": "access-credential",
+      "secretName": "orders-mcp-upstream"
+    },
+    "description": "Read bounded synthetic order data.",
+    "name": "io.github.tesserix/orders",
+    "remotes": [
+      {
+        "type": "streamable-http",
+        "url": "https://mcp.example.com/orders/mcp"
+      }
+    ],
+    "repository": {
+      "id": "123456789",
+      "source": "github",
+      "url": "https://github.com/tesserix/orders-mcp"
+    },
+    "title": "Orders MCP",
+    "version": "1.2.3",
+    "x-tesserix": {
+      "adapter": "native",
+      "authoringVersion": "1.0",
+      "egressHosts": [
+        "orders.example.com"
+      ],
+      "lifecycle": "active",
+      "protocolVersions": [
+        "2025-11-25",
+        "2026-07-28"
+      ],
+      "requiredScopes": [
+        "orders:read"
+      ],
+      "routePolicy": {
+        "directAccess": false,
+        "gatewayPath": "/gateway/orders/mcp"
+      },
+      "semantic": {
+        "capabilities": [
+          "orders.read"
+        ],
+        "domains": [
+          "commerce"
+        ],
+        "keywords": [
+          "orders",
+          "read"
+        ]
+      },
+      "tools": [
+        {
+          "description": "Read one order.",
+          "inputFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "name": "orders_get",
+          "outputFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "requiredScopes": [
+            "orders:read"
+          ]
+        }
+      ]
+    }
+  }
+}

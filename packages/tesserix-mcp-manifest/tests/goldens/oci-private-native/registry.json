@@ -1,0 +1,80 @@
+{
+  "apiVersion": "registry.agentic.dev/v1alpha1",
+  "kind": "MCPServer",
+  "metadata": {
+    "annotations": {
+      "owner": "payments-platform"
+    },
+    "labels": {
+      "domain": "settlements",
+      "transport": "package"
+    },
+    "name": "io.github.tesserix/settlements",
+    "namespace": "tenant-settlements",
+    "orgId": "tesserix",
+    "tag": "3.1.0",
+    "teamId": "payments",
+    "tenantId": "tenant-settlements",
+    "visibility": "private"
+  },
+  "spec": {
+    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+    "description": "Read private settlement status.",
+    "name": "io.github.tesserix/settlements",
+    "packages": [
+      {
+        "identifier": "ghcr.io/tesserix/settlements-mcp:3.1.0@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "registryType": "oci",
+        "runtimeHint": "docker",
+        "transport": {
+          "type": "stdio"
+        }
+      }
+    ],
+    "repository": {
+      "source": "github",
+      "url": "https://github.com/tesserix/settlements-mcp"
+    },
+    "title": "Settlements MCP",
+    "version": "3.1.0",
+    "x-tesserix": {
+      "adapter": "native",
+      "authoringVersion": "1.0",
+      "egressHosts": [],
+      "lifecycle": "deprecated",
+      "protocolVersions": [
+        "2025-11-25"
+      ],
+      "requiredScopes": [
+        "settlements:read"
+      ],
+      "routePolicy": {
+        "directAccess": false,
+        "gatewayPath": "/gateway/settlements/mcp"
+      },
+      "semantic": {
+        "capabilities": [
+          "settlements.read"
+        ],
+        "domains": [
+          "payments"
+        ],
+        "keywords": [
+          "settlements",
+          "status"
+        ]
+      },
+      "tools": [
+        {
+          "description": "Read settlement status.",
+          "inputFingerprint": "1111111111111111111111111111111111111111111111111111111111111111",
+          "name": "settlements_get",
+          "outputFingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+          "requiredScopes": [
+            "settlements:read"
+          ]
+        }
+      ]
+    }
+  }
+}

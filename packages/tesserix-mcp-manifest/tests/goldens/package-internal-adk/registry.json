@@ -1,0 +1,82 @@
+{
+  "apiVersion": "registry.agentic.dev/v1alpha1",
+  "kind": "MCPServer",
+  "metadata": {
+    "annotations": {
+      "owner": "supply-platform"
+    },
+    "labels": {
+      "domain": "inventory",
+      "transport": "package"
+    },
+    "name": "io.github.tesserix/inventory",
+    "namespace": "tenant-inventory",
+    "orgId": "tesserix",
+    "tag": "2.0.0",
+    "tenantId": "tenant-inventory",
+    "visibility": "internal"
+  },
+  "spec": {
+    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+    "description": "Search bounded inventory records.",
+    "name": "io.github.tesserix/inventory",
+    "packages": [
+      {
+        "fileSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "identifier": "tesserix-inventory-mcp",
+        "registryBaseUrl": "https://pypi.org",
+        "registryType": "pypi",
+        "runtimeHint": "uvx",
+        "transport": {
+          "type": "stdio"
+        },
+        "version": "2.0.0"
+      }
+    ],
+    "repository": {
+      "source": "github",
+      "url": "https://github.com/tesserix/inventory-mcp"
+    },
+    "title": "Inventory MCP",
+    "version": "2.0.0",
+    "x-tesserix": {
+      "adapter": "adk",
+      "authoringVersion": "1.0",
+      "egressHosts": [],
+      "lifecycle": "active",
+      "protocolVersions": [
+        "2025-11-25"
+      ],
+      "requiredScopes": [
+        "inventory:read"
+      ],
+      "routePolicy": {
+        "directAccess": false,
+        "gatewayPath": "/gateway/inventory/mcp"
+      },
+      "semantic": {
+        "capabilities": [
+          "inventory.search"
+        ],
+        "domains": [
+          "supply-chain"
+        ],
+        "keywords": [
+          "inventory",
+          "search"
+        ]
+      },
+      "tools": [
+        {
+          "description": "Search inventory.",
+          "inputFingerprint": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "name": "inventory_search",
+          "outputFingerprint": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "requiredScopes": [
+            "inventory:read"
+          ]
+        }
+      ]
+    }
+  }
+}
