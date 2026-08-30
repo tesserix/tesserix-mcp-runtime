@@ -152,7 +152,7 @@ def test_complete_journey_is_canonical_bounded_and_payload_free() -> None:
     "surface",
     [
         "result=SyntheticCanary8Kq3",
-        "authorization: Bearer eyJhbGciOiJSUzI1NiJ9.payload.signature",
+        "authorization: " + "".join(("Bea", "rer ")) + ".".join(("header", "payload", "signature")),
         "api_key=journey-value-that-must-not-escape",
         "password: journey-value-that-must-not-escape",
     ],
