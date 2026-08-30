@@ -31,6 +31,7 @@ def test_adk_bridge_is_an_exact_optional_release_dependency() -> None:
         "adk": [ADK_WHEEL],
         "manifest": ["tesserix-mcp-manifest>=0.0.1.dev0,<1"],
         "otel": ["opentelemetry-sdk>=1.44,<2"],
+        "publisher": ["tesserix-mcp-publisher>=0.0.1.dev0,<1"],
         "testkit": ["tesserix-mcp-testkit>=0.0.1.dev0,<1"],
     }
     assert document["tool"]["hatch"]["metadata"] == {"allow-direct-references": True}

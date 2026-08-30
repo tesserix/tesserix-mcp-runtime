@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 import tesserix_mcp_manifest
+import tesserix_mcp_publisher
 import tesserix_mcp_testkit
 
 import tesserix_mcp_runtime
@@ -13,6 +14,7 @@ ROOT = Path(__file__).parents[1]
 CHECKER = ROOT / "architecture" / "check_public_api.py"
 SNAPSHOT = ROOT / "architecture" / "public-api.txt"
 MANIFEST_SNAPSHOT = ROOT / "architecture" / "manifest-public-api.txt"
+PUBLISHER_SNAPSHOT = ROOT / "architecture" / "publisher-public-api.txt"
 TESTKIT_SNAPSHOT = ROOT / "architecture" / "testkit-public-api.txt"
 
 
@@ -244,6 +246,21 @@ def test_manifest_public_api_snapshot_matches_exports() -> None:
 
     assert completed.returncode == 0
     assert completed.stdout == "Public API snapshot matches (49 exports).\n"
+    assert completed.stderr == ""
+
+
+def test_publisher_public_api_snapshot_matches_exports() -> None:
+    assert len(tesserix_mcp_publisher.__all__) == 21
+    for name in tesserix_mcp_publisher.__all__:
+        assert getattr(tesserix_mcp_publisher, name) is not None
+
+    completed = run_snapshot_check(
+        PUBLISHER_SNAPSHOT,
+        package="tesserix_mcp_publisher",
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout == "Public API snapshot matches (21 exports).\n"
     assert completed.stderr == ""
 
 

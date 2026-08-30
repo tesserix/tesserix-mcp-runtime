@@ -64,6 +64,7 @@ def test_project_declares_the_hermetic_quality_policy() -> None:
         "pytest-socket==0.8.1",
         "ruff==0.16.5",
         "tesserix-mcp-manifest",
+        "tesserix-mcp-publisher",
         "tesserix-mcp-testkit",
         "twine==7.0.0",
         "types-jsonschema==4.26.0.20260518",
@@ -75,11 +76,13 @@ def test_project_declares_the_hermetic_quality_policy() -> None:
         "default-groups": ["dev"],
         "sources": {
             "tesserix-mcp-manifest": {"workspace": True},
+            "tesserix-mcp-publisher": {"workspace": True},
             "tesserix-mcp-testkit": {"workspace": True},
         },
         "workspace": {
             "members": [
                 "packages/tesserix-mcp-manifest",
+                "packages/tesserix-mcp-publisher",
                 "packages/tesserix-mcp-testkit",
             ]
         },

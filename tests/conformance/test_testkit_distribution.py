@@ -17,6 +17,7 @@ def test_testkit_is_an_opt_in_workspace_distribution() -> None:
     assert runtime["tool"]["uv"]["workspace"] == {
         "members": [
             "packages/tesserix-mcp-manifest",
+            "packages/tesserix-mcp-publisher",
             "packages/tesserix-mcp-testkit",
         ]
     }

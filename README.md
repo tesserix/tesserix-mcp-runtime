@@ -10,8 +10,9 @@ typed-callable schema generation, handler-free manifest snapshots,
 process-signal handling, reusable in-process conformance support, and the
 official MCP v2 Streamable HTTP transport with a private bounded listener,
 finite execution, tenant bulkheads, deadlines, cancellation, safe retries, and
-identity-scoped bounded Registry discovery. It does not yet publish Registry
-versions or activate Gateway routes. No stable package release is implied by
+identity-scoped bounded Registry discovery, and opt-in immutable Registry
+publication with exact read-back and signature verification. It does not yet
+activate Gateway routes. No stable package release is implied by
 interfaces described as planned below.
 
 The accepted ownership boundary and measurable design envelope are recorded
@@ -30,7 +31,8 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | Default-deny per-tool scopes, effects, approvals, idempotency, and audit | Implemented in source; pre-release |
 | Bounded JSON, concurrency, deadlines, cancellation, and safe retries | Implemented in source; pre-release |
 | [Bounded telemetry, health, and graceful drain](docs/observability.md) | Implemented in source; pre-release |
-| [Registry manifests](packages/tesserix-mcp-manifest/README.md) | Compilation is opt-in; publication and verification are planned |
+| [Registry manifests](packages/tesserix-mcp-manifest/README.md) | Compilation is opt-in; pre-release |
+| [Registry publication](docs/registry-publication.md) | Implemented as opt-in delegated tooling; pre-release |
 | [Registry-backed semantic discovery and progressive disclosure](docs/registry-discovery.md) | Implemented as an opt-in bounded client; pre-release |
 | Automatic Gateway route pickup and activation status | Planned; not implemented |
 

@@ -45,6 +45,7 @@ def test_wheel_and_sdist_carry_version_license_and_typing_metadata(
     assert set(report["distributions"]) == {
         "tesserix-mcp-runtime",
         "tesserix-mcp-manifest",
+        "tesserix-mcp-publisher",
         "tesserix-mcp-testkit",
     }
     for distribution in report["distributions"].values():
@@ -74,6 +75,7 @@ def test_wheel_and_sdist_install_and_import_without_network(
     report = json.loads(completed.stdout)
     assert set(report) == {
         "tesserix-mcp-manifest",
+        "tesserix-mcp-publisher",
         "tesserix-mcp-runtime",
         "tesserix-mcp-testkit",
     }

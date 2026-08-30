@@ -1,0 +1,49 @@
+[project]
+name = "tesserix-mcp-publisher"
+dynamic = ["version"]
+description = "Bounded delegated publication workflows for Tesserix MCP servers."
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Tesserix" }]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Typing :: Typed",
+]
+dependencies = [
+  "tesserix-mcp-manifest>=0.0.1.dev0,<1",
+  "tesserix-mcp-runtime>=0.0.1.dev0,<1",
+]
+
+[project.scripts]
+tesserix-mcp-publish = "tesserix_mcp_publisher.cli:main"
+
+[project.urls]
+Issues = "https://github.com/tesserix/tesserix-mcp-runtime/issues"
+Repository = "https://github.com/tesserix/tesserix-mcp-runtime"
+
+[build-system]
+requires = ["hatchling==1.32.0", "hatch-vcs==0.5.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+raw-options = { root = "../.." }
+fallback-version = "0.0.0"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tesserix_mcp_publisher"]
+
+[tool.uv.sources]
+tesserix-mcp-manifest = { workspace = true }
+tesserix-mcp-runtime = { workspace = true }
+
+[tool.pytest.ini_options]
+addopts = "-q --strict-config --strict-markers --disable-socket --allow-unix-socket"
+testpaths = ["tests"]

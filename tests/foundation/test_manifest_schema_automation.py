@@ -48,9 +48,10 @@ def test_manifest_compatibility_workflow_uses_only_no_write_validators() -> None
         in workflow
     )
     assert (
-        "github.com/tesserix/agentic-registry/cmd/agentic@8f0b5615fdfd1adbe48ade99e717f6cff22535e7"
+        "github.com/tesserix/agentic-registry/cmd/agentic@6921474591b6c59e89025370c310c7f85859246f"
         in workflow
     )
+    assert '"packages/tesserix-mcp-publisher/**"' in workflow
     assert " validate " in workflow
     assert " publish " not in workflow
     assert " apply " not in workflow

@@ -36,6 +36,9 @@ otel = [
 manifest = [
   "tesserix-mcp-manifest>=0.0.1.dev0,<1",
 ]
+publisher = [
+  "tesserix-mcp-publisher>=0.0.1.dev0,<1",
+]
 testkit = [
   "tesserix-mcp-testkit>=0.0.1.dev0,<1",
 ]
@@ -57,6 +60,7 @@ dev = [
   "pytest-socket==0.8.1",
   "ruff==0.16.5",
   "tesserix-mcp-manifest",
+  "tesserix-mcp-publisher",
   "tesserix-mcp-testkit",
   "twine==7.0.0",
   "types-jsonschema==4.26.0.20260518",
@@ -86,10 +90,15 @@ default-groups = ["dev"]
 
 [tool.uv.sources]
 tesserix-mcp-manifest = { workspace = true }
+tesserix-mcp-publisher = { workspace = true }
 tesserix-mcp-testkit = { workspace = true }
 
 [tool.uv.workspace]
-members = ["packages/tesserix-mcp-manifest", "packages/tesserix-mcp-testkit"]
+members = [
+  "packages/tesserix-mcp-manifest",
+  "packages/tesserix-mcp-publisher",
+  "packages/tesserix-mcp-testkit",
+]
 
 [tool.ruff]
 line-length = 100
