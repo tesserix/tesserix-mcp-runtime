@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*-rc*"
   repository_dispatch:
     types: [adk-release]
   schedule:
@@ -15,16 +17,31 @@ permissions:
   contents: read
   attestations: read
 
+env:
+  AGENTGATEWAY_IMAGE: cr.agentgateway.dev/agentgateway:v1.4.1@sha256:efd79355b89094a8225a9db465d9a01dc656b377f0bab458761b935a13231d29
+  COMPOSE_SHA256: c57ab918abd5b05ca7e7d0f275875dd1330a695074f309dc9eab1b49efafcd4b
+  COMPOSE_VERSION: v5.5.0
+  CORE_IMAGE: tesserix-mcp-runtime:compatibility
+  DEVAI_ADAPTER_SHA256: 2971b73f96ffc050df5437edad5e32c5c5b29e4dd86654f5f620ae0467793ad5
+  DEVAI_COMMIT: 850379a833bb5740c82eb2a16cac452ff93695f0
+
 jobs:
   compatibility:
     name: MCP SDK matrix
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
+      - name: Check out the pinned DevAI adapter
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: tesserix/devai
+          ref: 850379a833bb5740c82eb2a16cac452ff93695f0
+          path: .compatibility/devai
           persist-credentials: false
       - name: Install Python 3.14
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -35,14 +52,37 @@ jobs:
         with:
           version: "0.12.7"
           enable-cache: true
+      - name: Install pinned Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        with:
+          version: v0.36.1
+      - name: Install checksum-verified Compose
+        run: |
+          mkdir -p .compatibility/tools artifacts/compatibility
+          compose_bin="$PWD/.compatibility/tools/docker-compose-linux-x86_64"
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            --output "$compose_bin" \
+            "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-x86_64"
+          printf '%s  %s\n' "$COMPOSE_SHA256" "$compose_bin" \
+            | sha256sum --check --strict
+          chmod 0755 "$compose_bin"
       - name: Verify frozen locks
         run: |
           uv lock --check
           uv lock --check --script compatibility/client_1_28.py
           uv lock --check --script compatibility/client_1_29.py
           uv lock --check --script compatibility/client_2_1.py
-      - name: Install the locked project
-        run: uv sync --frozen
+          test "$(git -C .compatibility/devai rev-parse HEAD)" = "$DEVAI_COMMIT"
+          printf '%s  %s\n' \
+            "$DEVAI_ADAPTER_SHA256" \
+            .compatibility/devai/src/devai/mcphub/downstream.py \
+            | sha256sum --check --strict
+      - name: Install the locked project and DevAI environments
+        run: |
+          uv sync --frozen
+          uv sync --directory .compatibility/devai --frozen --no-dev
+          .compatibility/devai/.venv/bin/python -c \
+            "from importlib.metadata import version; assert version('mcp') == '1.28.1'"
       - name: Test the compatibility policy
         run: uv run --frozen pytest -q
       - name: Verify architecture contracts
@@ -60,17 +100,108 @@ jobs:
           done
       - name: Verify dependency boundaries
         run: uv run --frozen python compatibility/check_resolution.py
-      - name: Build and import the wheel
+      - name: Build and install the wheel artifact
         run: |
-          uv build
-          wheel_env_dir=$(mktemp -d)
+          uv build --wheel --out-dir dist/compatibility-wheel
+          wheel_env_dir="$RUNNER_TEMP/compatibility-wheel-env"
           uv venv --python 3.14 "$wheel_env_dir"
-          uv pip install --python "$wheel_env_dir/bin/python" dist/*.whl
+          wheel_files=(dist/compatibility-wheel/tesserix_mcp_runtime-*.whl)
+          test "${#wheel_files[@]}" -eq 1
+          uv pip install --python "$wheel_env_dir/bin/python" "${wheel_files[0]}"
           "$wheel_env_dir/bin/python" -c "from importlib.metadata import version; import tesserix_mcp_runtime; assert version('mcp') == '2.1.1'; assert tesserix_mcp_runtime.__version__ == version('tesserix-mcp-runtime'); assert tesserix_mcp_runtime.__version__ != '0.0.0'"
           site_packages=$("$wheel_env_dir/bin/python" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
-          uv run --frozen python architecture/check_dependencies.py --wheel dist/*.whl --site-packages "$site_packages"
-      - name: Exercise the exact client matrix
-        run: uv run --frozen python compatibility/run_matrix.py
+          uv run --frozen python architecture/check_dependencies.py \
+            --wheel "${wheel_files[0]}" \
+            --site-packages "$site_packages"
+          printf 'WHEEL_PYTHON=%s/bin/python\n' "$wheel_env_dir" >> "$GITHUB_ENV"
+      - name: Build and verify the core image artifact
+        run: |
+          provenance_oci="$RUNNER_TEMP/core-provenance-oci"
+          docker buildx build \
+            --build-arg PACKAGE_VERSION=0.0.1.dev0 \
+            --file deploy/container/core.Dockerfile \
+            --metadata-file artifacts/compatibility/core-build.json \
+            --output "type=oci,dest=${provenance_oci},tar=false" \
+            --provenance=mode=max \
+            .
+          uv run --frozen python -c \
+            'import json, re, sys; from pathlib import Path; root = Path(sys.argv[1]); index = json.loads((root / "index.json").read_text(encoding="utf-8")); documents = [index, *(json.loads((root / "blobs" / "sha256" / item["digest"][7:]).read_text(encoding="utf-8")) for item in index.get("manifests", []) if isinstance(item, dict) and isinstance(item.get("digest"), str) and re.fullmatch(r"sha256:[0-9a-f]{64}", item["digest"]))]; assert any(isinstance(item, dict) and isinstance(item.get("annotations"), dict) and item["annotations"].get("vnd.docker.reference.type") == "attestation-manifest" for document in documents for item in document.get("manifests", []))' \
+            "$provenance_oci"
+          docker buildx build \
+            --build-arg PACKAGE_VERSION=0.0.1.dev0 \
+            --file deploy/container/core.Dockerfile \
+            --load --provenance=false \
+            --tag "$CORE_IMAGE" \
+            .
+          uv run --frozen python deploy/container/verify.py \
+            --image "$CORE_IMAGE" \
+            --variant core \
+            --base-image ghcr.io/tesserix/base-python-runtime-3.14:20260829@sha256:3854f5d9d00705b14077bf6715feb9c3bd6d1ad2e41d5594b3c09c0a74c22add \
+            --expected-sdk 2.1.1 \
+            --output artifacts/compatibility/core-runtime.json
+      - name: Pull the digest-pinned AgentGateway image
+        run: |
+          docker pull "$AGENTGATEWAY_IMAGE"
+          docker image inspect "$AGENTGATEWAY_IMAGE" \
+            --format '{{json .RepoDigests}}' \
+            > artifacts/compatibility/agentgateway-image.json
+      - name: Exercise built artifacts, exact clients, DevAI, and Inspector
+        run: |
+          compose_bin="$PWD/.compatibility/tools/docker-compose-linux-x86_64"
+          export COMPAT_RUNTIME_IMAGE="$CORE_IMAGE"
+          export COMPOSE_PROJECT_NAME="compatibility-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          collect_compose_evidence() {
+            "$compose_bin" --file compatibility/compose.yaml ps \
+              --format json \
+              > artifacts/compatibility/stack.json 2>/dev/null || true
+            "$compose_bin" --file compatibility/compose.yaml down \
+              --volumes --remove-orphans --timeout 10 || true
+          }
+          trap collect_compose_evidence EXIT
+          "$compose_bin" --file compatibility/compose.yaml config --quiet
+          "$compose_bin" --file compatibility/compose.yaml up --detach --no-build
+          runtime_binding=$("$compose_bin" --file compatibility/compose.yaml port runtime 8000)
+          gateway_binding=$("$compose_bin" --file compatibility/compose.yaml port gateway 3000)
+          case "$runtime_binding" in 127.0.0.1:[0-9]*) ;; *) exit 1 ;; esac
+          case "$gateway_binding" in 127.0.0.1:[0-9]*) ;; *) exit 1 ;; esac
+          runtime_endpoint="http://${runtime_binding}/mcp"
+          gateway_endpoint="http://${gateway_binding}/gateway/runtime/mcp"
+          status=0
+          uv run --frozen python compatibility/run_matrix.py \
+            --wheel-python "$WHEEL_PYTHON" \
+            --image-endpoint "$runtime_endpoint" \
+            --gateway-endpoint "$gateway_endpoint" \
+            --devai-python "$PWD/.compatibility/devai/.venv/bin/python" \
+            --devai-root "$PWD/.compatibility/devai" \
+            --report artifacts/compatibility/matrix.json \
+            --junit artifacts/compatibility/junit.xml || status=$?
+          uv run --frozen python compatibility/run_inspector.py \
+            --endpoint "$runtime_endpoint" \
+            --report artifacts/compatibility/inspector-direct.json || status=1
+          uv run --frozen python compatibility/run_inspector.py \
+            --endpoint "$gateway_endpoint" \
+            --report artifacts/compatibility/inspector-agentgateway.json || status=1
+          collect_compose_evidence
+          trap - EXIT
+          exit "$status"
+      - name: Sanitize retained compatibility evidence
+        id: sanitize
+        if: ${{ always() }}
+        run: >-
+          uv run --frozen python -c
+          'from pathlib import Path; from tesserix_mcp_testkit import scan_journey_surfaces;
+          root = Path("artifacts/compatibility");
+          surfaces = [path.read_bytes() for path in sorted(root.rglob("*")) if path.is_file()];
+          scan_journey_surfaces(surfaces);
+          print(f"sanitized_files={len(surfaces)}")'
+      - name: Upload sanitized compatibility evidence
+        if: ${{ always() && steps.sanitize.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: compatibility-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/compatibility/
+          if-no-files-found: error
+          retention-days: 7
 
   adk-compatibility:
     name: Attested ADK bridge

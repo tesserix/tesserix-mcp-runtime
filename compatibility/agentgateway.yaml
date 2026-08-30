@@ -1,0 +1,15 @@
+binds:
+  - port: 3000
+    listeners:
+      - routes:
+          - name: compatibility-runtime
+            matches:
+              - path:
+                  pathPrefix: /gateway/runtime/mcp
+            backends:
+              - mcp:
+                  failureMode: failClosed
+                  targets:
+                    - name: runtime
+                      mcp:
+                        host: http://runtime:8000/mcp

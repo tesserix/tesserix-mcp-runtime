@@ -1,0 +1,70 @@
+x-hardened: &hardened
+  cap_drop:
+    - ALL
+  read_only: true
+  restart: "no"
+  security_opt:
+    - no-new-privileges:true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=67108864
+
+services:
+  runtime:
+    <<: *hardened
+    image: ${COMPAT_RUNTIME_IMAGE:?set COMPAT_RUNTIME_IMAGE}
+    user: "10001:10001"
+    command:
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --allowed-host
+      - 127.0.0.1
+      - --allowed-host
+      - 127.0.0.1:38080
+      - --allowed-host
+      - runtime
+      - --allowed-host
+      - runtime:8000
+      - --allowed-origin
+      - http://gateway:3000
+    healthcheck:
+      test:
+        - CMD
+        - /opt/app/bin/python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2).read(4096)
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    networks:
+      - compatibility
+    ports:
+      - host_ip: 127.0.0.1
+        published: "38080"
+        protocol: tcp
+        target: 8000
+
+  gateway:
+    <<: *hardened
+    image: cr.agentgateway.dev/agentgateway:v1.4.1@sha256:efd79355b89094a8225a9db465d9a01dc656b377f0bab458761b935a13231d29
+    user: "65532:65532"
+    command:
+      - -f
+      - /etc/agentgateway/config.yaml
+    depends_on:
+      runtime:
+        condition: service_healthy
+    networks:
+      - compatibility
+    ports:
+      - host_ip: 127.0.0.1
+        published: "33000"
+        protocol: tcp
+        target: 3000
+    volumes:
+      - ./agentgateway.yaml:/etc/agentgateway/config.yaml:ro
+
+networks:
+  compatibility:
+    internal: false
