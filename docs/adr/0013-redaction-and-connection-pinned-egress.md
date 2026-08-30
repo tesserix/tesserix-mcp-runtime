@@ -189,7 +189,8 @@ A process-wide union of tool destinations would weaken least privilege even
 though every destination remained valid. Composition must bind a client to one
 tool manifest or an identical reviewed authority set. Third-party HTTP Core
 DEBUG logging is also outside the redacted audit contract and must remain
-disabled under the production logger policy owned by issue #16.
+disabled in production. ADR-0014 owns the payload-free runtime logging
+contract; dependency logger configuration remains a deployment responsibility.
 
 ## Verification
 

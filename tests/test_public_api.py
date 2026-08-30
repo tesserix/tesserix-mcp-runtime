@@ -66,8 +66,21 @@ def test_public_api_exports_only_the_stable_contract_surface() -> None:
         "RedactionError",
         "RedactionLimits",
         "RedactionPolicy",
+        "ReadinessCheck",
         "Retryability",
+        "RuntimeExporter",
         "RuntimeFailure",
+        "RuntimeLimit",
+        "RuntimeLogEvent",
+        "RuntimeLogName",
+        "RuntimeObservability",
+        "RuntimeOperation",
+        "RuntimeOperationsEndpoint",
+        "RuntimeOutcome",
+        "RuntimeReason",
+        "RuntimeSpan",
+        "RuntimeSpanName",
+        "RuntimeSpanSpec",
         "SchemaPolicy",
         "SchemaChange",
         "SchemaDirection",
@@ -110,7 +123,7 @@ def test_checked_in_public_api_snapshot_matches_exports() -> None:
     completed = run_snapshot_check(SNAPSHOT)
 
     assert completed.returncode == 0
-    assert completed.stdout == "Public API snapshot matches (78 exports).\n"
+    assert completed.stdout == "Public API snapshot matches (91 exports).\n"
     assert completed.stderr == ""
 
 

@@ -587,6 +587,18 @@ def test_application_limits_reject_drain_timeout_above_hard_maximum() -> None:
         ApplicationLimits(drain_timeout=300.001)
 
 
+@pytest.mark.parametrize(
+    "readiness_timeout",
+    [0.0, -1.0, 5.001, float("inf"), float("nan")],
+)
+def test_application_limits_bound_readiness_checks(readiness_timeout: float) -> None:
+    with pytest.raises(ValueError, match="readiness_timeout"):
+        ApplicationLimits(
+            drain_timeout=1.0,
+            readiness_timeout=readiness_timeout,
+        )
+
+
 def test_application_diagnostics_and_run_results_reject_invalid_combinations() -> None:
     with pytest.raises(ValueError, match="exception_type must be a bounded type name"):
         ApplicationDiagnostic(

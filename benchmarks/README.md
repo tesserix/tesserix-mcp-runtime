@@ -59,3 +59,20 @@ temporary bytes. The committed
 `execution-limits-observations.json` is local regression evidence from Python
 3.14 on arm64 macOS. It is not a production throughput, RSS, pod-shape, or SLO
 claim; issue #29 owns those load and soak measurements.
+
+## Observability hot-path benchmark
+
+`measure_observability.py` measures complete successful no-op invocations
+through `Application` and the in-process transport with synchronous local
+observability enabled:
+
+    uv run --frozen python benchmarks/measure_observability.py \
+      --samples 5000 --warmup 500
+
+Each measured invocation must exercise three spans, two in-flight changes, one
+RED observation, and one structured log. The script fails if that seven-event
+contract changes unexpectedly or if p99 is not below the unchanged 15 ms
+runtime budget. `observability-observations.json` records a 0.313 ms local p99
+on Python 3.14 arm64 macOS. This is instrumentation regression evidence, not a
+production throughput or end-to-end network SLO claim; issue #29 still owns
+load and soak proof.

@@ -33,7 +33,19 @@ from tesserix_mcp_runtime.execution import (
     ExecutionLimits,
     validate_json_value,
 )
+from tesserix_mcp_runtime.health import ReadinessCheck
 from tesserix_mcp_runtime.lifecycle import LifecycleController
+from tesserix_mcp_runtime.observability import (
+    RuntimeLimit,
+    RuntimeLogEvent,
+    RuntimeLogName,
+    RuntimeObservability,
+    RuntimeOperation,
+    RuntimeOutcome,
+    RuntimeReason,
+    RuntimeSpanName,
+    RuntimeSpanSpec,
+)
 from tesserix_mcp_runtime.redaction import (
     DEFAULT_REDACTION_POLICY,
     RedactionError,
@@ -72,18 +84,18 @@ class ApplicationLimits:
     """Bound application shutdown work with one monotonic drain timeout."""
 
     drain_timeout: float
+    readiness_timeout: float = 1.0
 
     def __post_init__(self) -> None:
-        if (
-            _is_runtime_instance(self.drain_timeout, bool)
-            or not (
-                _is_runtime_instance(self.drain_timeout, int)
-                or _is_runtime_instance(self.drain_timeout, float)
-            )
-            or not math.isfinite(self.drain_timeout)
-            or not 0 < self.drain_timeout <= 300
-        ):
-            raise ValueError("drain_timeout must be a positive finite number at most 300 seconds")
+        for name, maximum in (("drain_timeout", 300.0), ("readiness_timeout", 5.0)):
+            value = getattr(self, name)
+            if (
+                _is_runtime_instance(value, bool)
+                or not (_is_runtime_instance(value, int) or _is_runtime_instance(value, float))
+                or not math.isfinite(value)
+                or not 0 < value <= maximum
+            ):
+                raise ValueError(f"{name} must be a positive finite number at most {maximum:g}")
 
 
 class ApplicationDeadlineExceeded(TimeoutError):
@@ -287,9 +299,17 @@ class Application:
         clock: Clock,
         execution_limits: ExecutionLimits = _DEFAULT_EXECUTION_LIMITS,
         redactor: RedactionPolicy = DEFAULT_REDACTION_POLICY,
+        observability: RuntimeObservability | None = None,
         lifecycle: Iterable[Lifecycle] = (),
+        readiness_checks: Iterable[ReadinessCheck] = (),
     ) -> None:
         components = tuple(lifecycle)
+        checks = tuple(readiness_checks)
+        resolved_observability = (
+            RuntimeObservability(server_name="tesserix-mcp-runtime")
+            if observability is None
+            else observability
+        )
         self._validate_configuration(
             catalog=catalog,
             authorizer=authorizer,
@@ -299,7 +319,9 @@ class Application:
             clock=clock,
             execution_limits=execution_limits,
             redactor=redactor,
+            observability=resolved_observability,
             lifecycle=components,
+            readiness_checks=checks,
         )
         self._catalog = catalog
         self._authorizer = authorizer
@@ -308,7 +330,13 @@ class Application:
         self._clock = clock
         self._execution_limits = execution_limits
         self._redactor = redactor
-        self._execution = ExecutionController(execution_limits, clock=clock)
+        self._observability = resolved_observability
+        self._readiness_checks = checks
+        self._execution = ExecutionController(
+            execution_limits,
+            clock=clock,
+            observability=resolved_observability,
+        )
         self._telemetry_failures = 0
         self._invocations = _InvocationLifecycle()
         self._lifecycle = LifecycleController(
@@ -330,7 +358,9 @@ class Application:
         clock: Clock,
         execution_limits: ExecutionLimits,
         redactor: RedactionPolicy,
+        observability: RuntimeObservability,
         lifecycle: tuple[Lifecycle, ...],
+        readiness_checks: tuple[ReadinessCheck, ...],
     ) -> None:
         dependencies: tuple[tuple[str, object, type[Any]], ...] = (
             ("catalog", catalog, ToolCatalog),
@@ -341,6 +371,7 @@ class Application:
             ("clock", clock, Clock),
             ("execution_limits", execution_limits, ExecutionLimits),
             ("redactor", redactor, RedactionPolicy),
+            ("observability", observability, RuntimeObservability),
         )
         for path, dependency, expected in dependencies:
             if not _is_runtime_instance(dependency, expected):
@@ -384,6 +415,25 @@ class Application:
                 )
             names.add(name)
 
+        check_names: set[str] = set()
+        for index, check in enumerate(readiness_checks):
+            path = f"readiness_checks[{index}]"
+            if not _is_runtime_instance(check, ReadinessCheck):
+                raise ApplicationConfigurationError(
+                    code="invalid_dependency",
+                    path=path,
+                )
+            name = Application._validated_component_name(
+                check,
+                path=f"{path}.name",
+            )
+            if name in check_names:
+                raise ApplicationConfigurationError(
+                    code="duplicate_component_name",
+                    path=f"{path}.name",
+                )
+            check_names.add(name)
+
     @staticmethod
     def _validated_component_name(component: _Named, *, path: str) -> str:
         try:
@@ -411,6 +461,41 @@ class Application:
     @property
     def detached_invocations(self) -> int:
         return self._execution.detached_count
+
+    def startup_status(self) -> bool:
+        return self.state in {LifecycleState.READY, LifecycleState.DRAINING}
+
+    def liveness_status(self) -> bool:
+        return True
+
+    async def readiness_status(self) -> bool:
+        if self.state is not LifecycleState.READY:
+            return False
+        try:
+            async with asyncio.timeout(self._limits.readiness_timeout):
+                async with asyncio.TaskGroup() as group:
+                    checks = tuple(
+                        group.create_task(check.ready()) for check in self._readiness_checks
+                    )
+        except Exception:
+            self._readiness_failed()
+            return False
+        ready = self.state is LifecycleState.READY and all(task.result() is True for task in checks)
+        if not ready:
+            self._readiness_failed()
+        return ready
+
+    def render_metrics(self) -> str:
+        return self._observability.render_prometheus()
+
+    def _readiness_failed(self) -> None:
+        self._observability.emit_log(
+            RuntimeLogEvent(
+                name=RuntimeLogName.READINESS_FAILED,
+                server_name=self._observability.server_name,
+                reason=RuntimeReason.READINESS_DEPENDENCY,
+            )
+        )
 
     async def start(self) -> None:
         await self._lifecycle.start()
@@ -516,30 +601,72 @@ class Application:
         *,
         context: CallContext,
     ) -> InvocationResult:
-        if self.state is not LifecycleState.READY:
-            return InvocationResult.failure(
-                ErrorResponse.from_code(
-                    ErrorCode.UNAVAILABLE,
+        tool = self._catalog.get(name)
+        tool_name = tool.metadata.name if tool is not None else None
+        started_at = self._clock.now()
+        with self._observability.start_span(
+            RuntimeSpanSpec(
+                name=RuntimeSpanName.MCP_REQUEST,
+                server_name=self._observability.server_name,
+                trace_context=context.trace_context,
+                operation=RuntimeOperation.TOOL_CALL,
+                tool_name=tool_name,
+            )
+        ) as request_span:
+            if self.state is not LifecycleState.READY:
+                if self.state is LifecycleState.DRAINING:
+                    self._observability.record_limit(
+                        tool_name=tool_name,
+                        limit=RuntimeLimit.DRAIN,
+                    )
+                result = InvocationResult.failure(
+                    ErrorResponse.from_code(
+                        ErrorCode.UNAVAILABLE,
+                        request_id=self._safe_request_id(context.request_id),
+                    )
+                )
+            else:
+                task = self._invocations.begin()
+                try:
+                    result = await self._execution.execute(
+                        lambda bounded_context: self._invoke(
+                            name,
+                            arguments,
+                            context=bounded_context,
+                        ),
+                        context=context,
+                    )
+                    result = self._redact_result(result, request_id=context.request_id)
+                except asyncio.CancelledError as error:
+                    result = self._mapped_failure(error, request_id=context.request_id)
+                except TimeoutError as error:
+                    result = self._mapped_failure(error, request_id=context.request_id)
+                except Exception as error:
+                    result = self._mapped_failure(error, request_id=context.request_id)
+                finally:
+                    self._invocations.finish(task)
+            outcome = self._result_outcome(result)
+            request_span.set_outcome(outcome)
+            duration_seconds = max(0.0, self._clock.now() - started_at)
+            self._observability.record_call(
+                operation=RuntimeOperation.TOOL_CALL,
+                tool_name=tool_name,
+                outcome=outcome,
+                duration_seconds=duration_seconds,
+            )
+            self._observability.emit_log(
+                RuntimeLogEvent(
+                    name=RuntimeLogName.REQUEST_COMPLETED,
+                    server_name=self._observability.server_name,
                     request_id=self._safe_request_id(context.request_id),
+                    trace_id=request_span.trace_id,
+                    operation=RuntimeOperation.TOOL_CALL,
+                    tool_name=tool_name,
+                    outcome=outcome,
+                    duration_seconds=duration_seconds,
                 )
             )
-        task = self._invocations.begin()
-        try:
-            result = await self._execution.execute(
-                lambda bounded_context: self._invoke(
-                    name,
-                    arguments,
-                    context=bounded_context,
-                ),
-                context=context,
-            )
-            return self._redact_result(result, request_id=context.request_id)
-        except asyncio.CancelledError as error:
-            return self._mapped_failure(error, request_id=context.request_id)
-        except TimeoutError as error:
-            return self._mapped_failure(error, request_id=context.request_id)
-        finally:
-            self._invocations.finish(task)
+            return result
 
     async def _invoke(
         self,
@@ -555,6 +682,11 @@ class Application:
                 maximum_bytes=self._execution_limits.max_input_bytes,
             )
         except ExecutionLimitExceeded:
+            known_tool = self._catalog.get(name)
+            self._observability.record_limit(
+                tool_name=(known_tool.metadata.name if known_tool is not None else None),
+                limit=RuntimeLimit.INPUT,
+            )
             return InvocationResult.failure(
                 ErrorResponse.from_code(ErrorCode.INVALID_INPUT, request_id=context.request_id)
             )
@@ -577,34 +709,94 @@ class Application:
             if lease is None:
                 raise RuntimeFailure(ErrorCode.OVERLOADED)
             try:
-                await self._authorizer.authorize(
-                    tool=tool,
-                    arguments=arguments,
-                    context=context,
-                )
+                with self._observability.start_span(
+                    RuntimeSpanSpec(
+                        name=RuntimeSpanName.AUTHORIZATION,
+                        server_name=self._observability.server_name,
+                        operation=RuntimeOperation.AUTHORIZATION,
+                        tool_name=tool.metadata.name,
+                    )
+                ) as authorization_span:
+                    try:
+                        await self._authorizer.authorize(
+                            tool=tool,
+                            arguments=arguments,
+                            context=context,
+                        )
+                    except BaseException as error:
+                        authorization_span.set_outcome(self._exception_outcome(error))
+                        raise
+                    authorization_span.set_outcome(RuntimeOutcome.SUCCESS)
                 retry_safe = tool.metadata.effect is ToolEffect.READ or (
                     tool.metadata.idempotency is IdempotencyRequirement.REQUIRED
                     and context.idempotency_key is not None
                 )
-                output_model = await self._execution.retry(
-                    lambda: tool.handler(input_model, context=context),
-                    context=context,
-                    safe=retry_safe,
-                )
-                output = tool.serialize_output(output_model)
-                try:
-                    validate_json_value(
-                        output,
-                        limits=self._execution_limits,
-                        maximum_bytes=self._execution_limits.max_result_bytes,
+                with self._observability.start_span(
+                    RuntimeSpanSpec(
+                        name=RuntimeSpanName.TOOL_EXECUTION,
+                        server_name=self._observability.server_name,
+                        operation=RuntimeOperation.TOOL_EXECUTION,
+                        tool_name=tool.metadata.name,
                     )
-                except ExecutionLimitExceeded:
-                    raise RuntimeFailure(ErrorCode.RESULT_TOO_LARGE) from None
+                ) as execution_span:
+                    try:
+                        output_model = await self._execution.retry(
+                            lambda: tool.handler(input_model, context=context),
+                            context=context,
+                            safe=retry_safe,
+                            tool_name=tool.metadata.name,
+                        )
+                        output = tool.serialize_output(output_model)
+                        validate_json_value(
+                            output,
+                            limits=self._execution_limits,
+                            maximum_bytes=self._execution_limits.max_result_bytes,
+                        )
+                    except ExecutionLimitExceeded:
+                        self._observability.record_limit(
+                            tool_name=tool.metadata.name,
+                            limit=RuntimeLimit.RESULT,
+                        )
+                        raise RuntimeFailure(ErrorCode.RESULT_TOO_LARGE) from None
+                    except BaseException as error:
+                        execution_span.set_outcome(self._exception_outcome(error))
+                        raise
+                    execution_span.set_outcome(RuntimeOutcome.SUCCESS)
                 return InvocationResult.success(output)
             finally:
                 self._execution.release(lease)
         except Exception as error:
             return self._mapped_failure(error, request_id=context.request_id)
+
+    @staticmethod
+    def _error_outcome(code: ErrorCode) -> RuntimeOutcome:
+        return {
+            ErrorCode.FORBIDDEN: RuntimeOutcome.POLICY_REFUSAL,
+            ErrorCode.TIMEOUT: RuntimeOutcome.TIMEOUT,
+            ErrorCode.CANCELLED: RuntimeOutcome.CANCELLATION,
+            ErrorCode.OVERLOADED: RuntimeOutcome.OVERLOAD,
+            ErrorCode.UNAVAILABLE: RuntimeOutcome.DEPENDENCY_OUTAGE,
+            ErrorCode.INVALID_INPUT: RuntimeOutcome.INVALID_INPUT,
+            ErrorCode.RESULT_TOO_LARGE: RuntimeOutcome.LIMIT_EXCEEDED,
+        }.get(code, RuntimeOutcome.TOOL_FAILURE)
+
+    @classmethod
+    def _result_outcome(cls, result: InvocationResult) -> RuntimeOutcome:
+        return (
+            RuntimeOutcome.SUCCESS
+            if result.error is None
+            else cls._error_outcome(result.error.code)
+        )
+
+    @classmethod
+    def _exception_outcome(cls, error: BaseException) -> RuntimeOutcome:
+        if isinstance(error, RuntimeFailure):
+            return cls._error_outcome(error.code)
+        if isinstance(error, asyncio.CancelledError):
+            return RuntimeOutcome.CANCELLATION
+        if isinstance(error, TimeoutError):
+            return RuntimeOutcome.TIMEOUT
+        return RuntimeOutcome.TOOL_FAILURE
 
     def _mapped_failure(self, error: BaseException, *, request_id: str) -> InvocationResult:
         safe_request_id = self._safe_request_id(request_id)

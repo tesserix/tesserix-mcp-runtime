@@ -1,0 +1,16 @@
+{
+  "case": "successful_tool_call_observability",
+  "events_per_sample": 7,
+  "latency_milliseconds": {
+    "maximum": 0.818542,
+    "p50": 0.176042,
+    "p99": 0.312791
+  },
+  "passed": true,
+  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "python": "3.14.7",
+  "samples": 5000,
+  "schema_version": 1,
+  "target_p99_milliseconds": 15.0,
+  "warmup": 500
+}

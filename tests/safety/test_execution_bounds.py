@@ -29,6 +29,7 @@ from tesserix_mcp_runtime import (
 )
 from tesserix_mcp_runtime.adapters.in_process import InProcessTransport
 from tesserix_mcp_runtime.contracts import ToolDefinition
+from tesserix_mcp_runtime.observability import RuntimeObservability
 from tesserix_mcp_runtime.tool import ToolCatalog
 
 
@@ -356,6 +357,7 @@ def test_over_limit_arguments_are_rejected_before_tool_parsing(
         handler = RecordingHandler()
         tool = BoundedTool(handler=handler)
         transport = InProcessTransport()
+        observability = RuntimeObservability(server_name="bounds-mcp")
         application = Application(
             catalog=ToolCatalog([tool]),
             authorizer=AllowAll(),
@@ -364,6 +366,7 @@ def test_over_limit_arguments_are_rejected_before_tool_parsing(
             limits=ApplicationLimits(drain_timeout=1.0),
             execution_limits=limits,
             clock=SystemClock(),
+            observability=observability,
         )
         await application.start()
 
@@ -377,6 +380,10 @@ def test_over_limit_arguments_are_rejected_before_tool_parsing(
         assert result.error.code.value == "invalid_input"
         assert tool.parse_calls == 0
         assert handler.calls == 0
+        assert (
+            'mcp_server_limit_count_total{limit="input",server="bounds-mcp",'
+            f'tool="{tool.metadata.name}"}} 1' in observability.render_prometheus()
+        )
 
         await application.drain()
         await application.stop()
@@ -468,6 +475,7 @@ def test_over_limit_result_is_replaced_without_returning_tool_output() -> None:
         handler = RecordingHandler()
         tool = BoundedTool(handler=handler)
         transport = InProcessTransport()
+        observability = RuntimeObservability(server_name="bounds-mcp")
         application = Application(
             catalog=ToolCatalog([tool]),
             authorizer=AllowAll(),
@@ -476,6 +484,7 @@ def test_over_limit_result_is_replaced_without_returning_tool_output() -> None:
             limits=ApplicationLimits(drain_timeout=1.0),
             execution_limits=ExecutionLimits(max_result_bytes=32),
             clock=SystemClock(),
+            observability=observability,
         )
         await application.start()
 
@@ -489,6 +498,10 @@ def test_over_limit_result_is_replaced_without_returning_tool_output() -> None:
         assert result.error.code.value == "result_too_large"
         assert "private-result" not in repr(result)
         assert handler.calls == 1
+        assert (
+            'mcp_server_limit_count_total{limit="result",server="bounds-mcp",'
+            f'tool="{tool.metadata.name}"}} 1' in observability.render_prometheus()
+        )
 
         await application.drain()
         await application.stop()
@@ -1086,6 +1099,7 @@ def test_read_retries_transient_failures_with_capped_jittered_backoff() -> None:
         handler = TransientHandler(failures=2)
         tool = BoundedTool(handler=handler)
         transport = InProcessTransport()
+        observability = RuntimeObservability(server_name="bounds-mcp")
         application = Application(
             catalog=ToolCatalog([tool]),
             authorizer=AllowAll(),
@@ -1098,6 +1112,7 @@ def test_read_retries_transient_failures_with_capped_jittered_backoff() -> None:
                 retry_max_delay_seconds=0.3,
             ),
             clock=clock,
+            observability=observability,
         )
         await application.start()
 
@@ -1126,6 +1141,10 @@ def test_read_retries_transient_failures_with_capped_jittered_backoff() -> None:
         assert handler.calls == 3
         assert all(0 < delay <= 0.3 for delay in delays)
         assert len(set(delays)) == 2
+        assert (
+            'mcp_tool_retry_count_total{server="bounds-mcp",tool="bounds.echo"} 2'
+            in observability.render_prometheus()
+        )
 
         await application.drain()
         await application.stop()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections.abc import AsyncIterator, Callable
 from dataclasses import FrozenInstanceError, replace
 from typing import cast
@@ -11,6 +12,7 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from jwt.algorithms import RSAAlgorithm
+from opentelemetry import metrics, trace
 
 from tesserix_mcp_runtime import Cancellation, JsonValue
 from tesserix_mcp_runtime.adapters.gateway_identity import (
@@ -20,10 +22,12 @@ from tesserix_mcp_runtime.adapters.gateway_identity import (
     JWKSFetcher,
     JWKSFetchError,
 )
+from tesserix_mcp_runtime.adapters.opentelemetry import OpenTelemetryRuntimeExporter
 from tesserix_mcp_runtime.adapters.streamable_http import (
     HTTPRequestAuthenticationError,
     HTTPRequestMetadata,
 )
+from tesserix_mcp_runtime.observability import RuntimeObservability
 
 NOW = 1_800_000_000.0
 ISSUER = "https://identity.example.invalid"
@@ -293,6 +297,7 @@ def _provider(
     fetcher: JWKSFetcher,
     *,
     cache_clock: Callable[[], float] = lambda: 100.0,
+    observability: RuntimeObservability | None = None,
 ) -> GatewayJWTContextProvider:
     return GatewayJWTContextProvider(
         _config(),
@@ -300,6 +305,7 @@ def _provider(
         wall_clock=lambda: NOW,
         cache_clock=cache_clock,
         request_id_factory=lambda: "generated-request",
+        observability=observability,
     )
 
 
@@ -696,7 +702,6 @@ def test_duplicate_attribution_header_fails_before_it_can_supply_request_id() ->
         ("x-jwt-claim-tenant-id", "another-tenant"),
         ("x-tesserix-run-id", "another-run"),
         ("x-jwt-claim-scope", "platform:admin"),
-        ("traceparent", "00-invalid"),
     ],
 )
 def test_forwarded_authority_disagreement_is_rejected_without_disclosure(
@@ -723,6 +728,47 @@ def test_forwarded_authority_disagreement_is_rejected_without_disclosure(
 
     assert raised.value.request_id == "request-a"
     assert value not in repr(raised.value)
+
+
+def test_malformed_trace_context_starts_locally_and_records_only_a_stable_reason(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    private, public = _key_pair("key-a")
+    request = _request(_token(private, kid="key-a"))
+    malformed = "00-SyntheticTraceCanary8Nz3"
+    headers = tuple(item for item in request.headers if item[0] != "traceparent")
+    request = HTTPRequestMetadata(
+        method=request.method,
+        path=request.path,
+        headers=(*headers, ("traceparent", malformed)),
+        peer_host=request.peer_host,
+    )
+    logger = logging.getLogger("test.gateway.trace-context")
+    caplog.set_level(logging.INFO, logger=logger.name)
+    exporter = OpenTelemetryRuntimeExporter(
+        server_name="orders-mcp",
+        tracer=trace.get_tracer("test.gateway.trace-context"),
+        meter=metrics.get_meter("test.gateway.trace-context"),
+        logger=logger,
+    )
+    observability = RuntimeObservability(server_name="orders-mcp", exporter=exporter)
+
+    context = asyncio.run(
+        _provider(
+            _JWKS({"keys": [public]}),
+            observability=observability,
+        ).create(request, cancellation=_Cancellation())
+    )
+
+    assert dict(context.trace) == {}
+    messages = [record.getMessage() for record in caplog.records if record.name == logger.name]
+    assert len(messages) == 1
+    assert json.loads(messages[0]) == {
+        "event": "trace_context_rejected",
+        "reason": "malformed_trace_context",
+        "server": "orders-mcp",
+    }
+    assert malformed not in messages[0]
 
 
 def test_scope_claim_ambiguity_and_excessive_token_lifetime_fail_closed() -> None:
