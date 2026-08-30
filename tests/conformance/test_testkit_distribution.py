@@ -14,7 +14,12 @@ def test_testkit_is_an_opt_in_workspace_distribution() -> None:
     assert runtime["project"]["optional-dependencies"]["testkit"] == [
         "tesserix-mcp-testkit>=0.0.1.dev0,<1"
     ]
-    assert runtime["tool"]["uv"]["workspace"] == {"members": ["packages/tesserix-mcp-testkit"]}
+    assert runtime["tool"]["uv"]["workspace"] == {
+        "members": [
+            "packages/tesserix-mcp-manifest",
+            "packages/tesserix-mcp-testkit",
+        ]
+    }
     assert runtime["tool"]["uv"]["sources"]["tesserix-mcp-testkit"] == {"workspace": True}
 
     assert testkit["project"]["name"] == "tesserix-mcp-testkit"

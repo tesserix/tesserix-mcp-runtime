@@ -1,0 +1,70 @@
+{
+  "adapter": "native",
+  "credential_ref": {
+    "key": "access-credential",
+    "secret_name": "orders-mcp-upstream"
+  },
+  "description": "Read bounded synthetic order data.",
+  "egress_hosts": [
+    "orders.example.com"
+  ],
+  "lifecycle": "active",
+  "manifest_version": "1.0",
+  "name": "io.github.tesserix/orders",
+  "ownership": {
+    "annotations": {
+      "owner": "platform"
+    },
+    "labels": {
+      "domain": "orders"
+    },
+    "namespace": "tenant-orders",
+    "org_id": "tesserix",
+    "tenant_id": "tenant-orders",
+    "visibility": "public"
+  },
+  "protocol_versions": [
+    "2025-11-25",
+    "2026-07-28"
+  ],
+  "remote": {
+    "url": "https://mcp.example.com/orders/mcp"
+  },
+  "repository": {
+    "id": "123456789",
+    "source": "github",
+    "url": "https://github.com/tesserix/orders-mcp"
+  },
+  "required_scopes": [
+    "orders:read"
+  ],
+  "route_policy": {
+    "direct_access": false,
+    "gateway_path": "/gateway/orders/mcp"
+  },
+  "semantic": {
+    "capabilities": [
+      "orders.read"
+    ],
+    "domains": [
+      "commerce"
+    ],
+    "keywords": [
+      "orders",
+      "read"
+    ]
+  },
+  "title": "Orders MCP",
+  "tools": [
+    {
+      "description": "Read one order.",
+      "input_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "name": "orders_get",
+      "output_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "required_scopes": [
+        "orders:read"
+      ]
+    }
+  ],
+  "version": "1.2.3"
+}

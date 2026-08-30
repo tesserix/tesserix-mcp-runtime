@@ -31,6 +31,7 @@ print(json.dumps({
 }))
 """
 DISTRIBUTIONS = {
+    "tesserix-mcp-manifest": "tesserix_mcp_manifest",
     "tesserix-mcp-runtime": "tesserix_mcp_runtime",
     "tesserix-mcp-testkit": "tesserix_mcp_testkit",
 }
@@ -160,10 +161,10 @@ def check(
                 suffix="sdist",
             )
             wheel_companions = (
-                (runtime_wheel,) if distribution_name == "tesserix-mcp-testkit" else ()
+                (runtime_wheel,) if distribution_name != "tesserix-mcp-runtime" else ()
             )
             sdist_companions = (
-                (runtime_sdist,) if distribution_name == "tesserix-mcp-testkit" else ()
+                (runtime_sdist,) if distribution_name != "tesserix-mcp-runtime" else ()
             )
             distribution_report = {
                 "wheel": _install_and_probe(

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "description": "Read bounded synthetic order data.",
+  "name": "io.github.tesserix/orders",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.example.com/orders/mcp"
+    }
+  ],
+  "repository": {
+    "id": "123456789",
+    "source": "github",
+    "url": "https://github.com/tesserix/orders-mcp"
+  },
+  "title": "Orders MCP",
+  "version": "1.2.3"
+}

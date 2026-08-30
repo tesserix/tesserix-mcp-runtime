@@ -29,7 +29,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | Default-deny per-tool scopes, effects, approvals, idempotency, and audit | Implemented in source; pre-release |
 | Bounded JSON, concurrency, deadlines, cancellation, and safe retries | Implemented in source; pre-release |
 | [Bounded telemetry, health, and graceful drain](docs/observability.md) | Implemented in source; pre-release |
-| Registry manifest compilation, signing, publication, and verification | Planned; not implemented |
+| [Registry manifests](packages/tesserix-mcp-manifest/README.md) | Compilation is opt-in; publication and verification are planned |
 | Registry-backed semantic discovery and progressive disclosure | Planned; not implemented |
 | Automatic Gateway route pickup and activation status | Planned; not implemented |
 
@@ -74,8 +74,8 @@ allowing the Unix socket pairs required by asyncio.
     uv sync --frozen
     uv run --frozen ruff format --check .
     uv run --frozen ruff check .
-    uv run --frozen mypy --strict src tests
-    uv run --frozen pyright src tests
+    uv run --frozen mypy --strict src tests packages/*/src packages/*/tests
+    uv run --frozen pyright src tests packages/*/src packages/*/tests
     uv run --frozen pytest
     uv run --frozen lint-imports --config pyproject.toml --no-cache --no-logo
     uv run --frozen python architecture/check_layers.py
@@ -87,7 +87,7 @@ Build validation is also offline after the frozen environment has been
 installed. The artifact smoke step installs only the distribution itself;
 `uv sync --frozen` and the dependency checks above verify its locked closure.
 
-    uv build --clear --offline
+    uv build --all-packages --clear --offline --no-create-gitignore
     uv run --frozen twine check --strict dist/*
     uv run --frozen python architecture/check_artifacts.py dist
     uv run --frozen python architecture/smoke_install_artifacts.py --offline --no-deps dist

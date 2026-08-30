@@ -4,6 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import tesserix_mcp_manifest
 import tesserix_mcp_testkit
 
 import tesserix_mcp_runtime
@@ -11,6 +12,7 @@ import tesserix_mcp_runtime
 ROOT = Path(__file__).parents[1]
 CHECKER = ROOT / "architecture" / "check_public_api.py"
 SNAPSHOT = ROOT / "architecture" / "public-api.txt"
+MANIFEST_SNAPSHOT = ROOT / "architecture" / "manifest-public-api.txt"
 TESTKIT_SNAPSHOT = ROOT / "architecture" / "testkit-public-api.txt"
 
 
@@ -149,6 +151,55 @@ def test_testkit_public_api_snapshot_matches_exports() -> None:
 
     assert completed.returncode == 0
     assert completed.stdout == "Public API snapshot matches (29 exports).\n"
+    assert completed.stderr == ""
+
+
+def test_manifest_public_api_snapshot_matches_exports() -> None:
+    assert set(tesserix_mcp_manifest.__all__) == {
+        "AUTHORING_MANIFEST_MAX_BYTES",
+        "AUTHORING_MANIFEST_MAX_DEPTH",
+        "AUTHORING_MANIFEST_MAX_NODES",
+        "AUTHORING_MANIFEST_VERSION",
+        "CompiledManifests",
+        "CredentialReference",
+        "ManifestError",
+        "ManifestLifecycle",
+        "ManifestValidationCode",
+        "ManifestValidationError",
+        "ManifestVersionMismatchError",
+        "ManifestVisibility",
+        "OFFICIAL_REGISTRY_COMMIT",
+        "OFFICIAL_REGISTRY_RELEASE",
+        "OFFICIAL_SCHEMA_SHA256",
+        "OFFICIAL_SCHEMA_URL",
+        "OFFICIAL_SCHEMA_VERSION",
+        "Ownership",
+        "PackageIdentity",
+        "PackageRegistry",
+        "PackageTransport",
+        "REGISTRY_API_VERSION",
+        "REGISTRY_EXTENSION_KEY",
+        "RemoteEndpoint",
+        "Repository",
+        "RoutePolicy",
+        "RuntimeAdapter",
+        "SemanticMetadata",
+        "ServerAuthoringManifest",
+        "ToolSummary",
+        "compile_manifests",
+        "extract_server_json",
+        "load_authoring_manifest",
+    }
+    for name in tesserix_mcp_manifest.__all__:
+        assert getattr(tesserix_mcp_manifest, name) is not None
+
+    completed = run_snapshot_check(
+        MANIFEST_SNAPSHOT,
+        package="tesserix_mcp_manifest",
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout == "Public API snapshot matches (33 exports).\n"
     assert completed.stderr == ""
 
 

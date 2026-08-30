@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "description": "Read private settlement status.",
+  "name": "io.github.tesserix/settlements",
+  "packages": [
+    {
+      "identifier": "ghcr.io/tesserix/settlements-mcp:3.1.0@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "registryType": "oci",
+      "runtimeHint": "docker",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ],
+  "repository": {
+    "source": "github",
+    "url": "https://github.com/tesserix/settlements-mcp"
+  },
+  "title": "Settlements MCP",
+  "version": "3.1.0"
+}
