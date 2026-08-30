@@ -19,6 +19,7 @@ def test_adk_bridge_is_an_exact_optional_release_dependency() -> None:
     project = document["project"]
 
     assert project["dependencies"] == [
+        "httpcore>=1.0.9,<2",
         "httpx>=0.28.1,<1",
         "mcp>=2.1.1,<3",
         "mcp-types>=2.1.1,<3",

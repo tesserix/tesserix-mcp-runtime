@@ -41,6 +41,13 @@ from tesserix_mcp_runtime.contracts import (
     ToolMetadata,
     TraceContext,
 )
+from tesserix_mcp_runtime.egress import (
+    DeclaredEgressPolicy,
+    EgressDestination,
+    EgressManifest,
+    EgressPolicy,
+    EgressPolicyViolation,
+)
 from tesserix_mcp_runtime.errors import (
     MappedError,
     RuntimeFailure,
@@ -67,6 +74,13 @@ from tesserix_mcp_runtime.policy import (
     ToolPolicyState,
     ToolReview,
     tool_policy_fingerprint,
+)
+from tesserix_mcp_runtime.redaction import (
+    RedactionError,
+    RedactionLimits,
+    RedactionPolicy,
+    SecretRedactor,
+    SecretValue,
 )
 from tesserix_mcp_runtime.schema_compatibility import (
     SchemaChange,
@@ -106,7 +120,12 @@ __all__ = [
     "Clock",
     "ContractViolation",
     "CredentialProvider",
+    "DeclaredEgressPolicy",
     "DuplicateToolName",
+    "EgressDestination",
+    "EgressManifest",
+    "EgressPolicy",
+    "EgressPolicyViolation",
     "ErrorCode",
     "ErrorResponse",
     "ExecutionLimits",
@@ -121,12 +140,17 @@ __all__ = [
     "LifecycleTransitionError",
     "MappedError",
     "MetadataPolicy",
+    "RedactionError",
+    "RedactionLimits",
+    "RedactionPolicy",
     "Retryability",
     "RuntimeFailure",
     "SchemaChange",
     "SchemaDirection",
     "SchemaPolicy",
     "ScrubbedError",
+    "SecretRedactor",
+    "SecretValue",
     "ShutdownSignal",
     "ShutdownSignalSource",
     "SystemClock",

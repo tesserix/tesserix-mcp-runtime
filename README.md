@@ -251,6 +251,25 @@ stable outcomes, and the checked-in memory/latency observation.
 threat boundary, quantitative tradeoffs, failure behavior, alternatives,
 rollout, and rollback.
 
+## Data safety and outbound HTTP
+
+`SecretValue` renders redacted by construction, while the replaceable
+`SecretRedactor` applies bounded exact-value and secret-shape redaction to final
+results, stable errors, protocol telemetry, and policy audit. A redaction error
+fails closed and the raw result is never returned.
+
+`EgressManifest` declares exact HTTPS host-port authorities. The provided
+`OutboundHTTPClient` resolves and validates every DNS answer at connection
+time, connects to a pinned address with the original TLS name, verifies the
+actual peer before sending bytes, and repeats the policy for bounded redirects.
+Private and special-purpose networks are denied unless a separate operator
+CIDR policy explicitly permits them.
+
+See [data safety and outbound HTTP](docs/data-safety-and-egress.md) and
+[ADR-0013](docs/adr/0013-redaction-and-connection-pinned-egress.md) for
+composition, limits, stable errors, residual risks, the isolated SSRF harness,
+rollout, and rollback.
+
 ## ADK bridge
 
 An optional adapter now binds an existing ADK `AgentToolView` and explicit

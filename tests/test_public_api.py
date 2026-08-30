@@ -43,7 +43,12 @@ def test_public_api_exports_only_the_stable_contract_surface() -> None:
         "Clock",
         "ContractViolation",
         "CredentialProvider",
+        "DeclaredEgressPolicy",
         "DuplicateToolName",
+        "EgressDestination",
+        "EgressManifest",
+        "EgressPolicy",
+        "EgressPolicyViolation",
         "ErrorCode",
         "ErrorResponse",
         "ExecutionLimits",
@@ -58,12 +63,17 @@ def test_public_api_exports_only_the_stable_contract_surface() -> None:
         "LifecycleTransitionError",
         "MappedError",
         "MetadataPolicy",
+        "RedactionError",
+        "RedactionLimits",
+        "RedactionPolicy",
         "Retryability",
         "RuntimeFailure",
         "SchemaPolicy",
         "SchemaChange",
         "SchemaDirection",
         "ScrubbedError",
+        "SecretRedactor",
+        "SecretValue",
         "ShutdownSignal",
         "ShutdownSignalSource",
         "SystemClock",
@@ -100,7 +110,7 @@ def test_checked_in_public_api_snapshot_matches_exports() -> None:
     completed = run_snapshot_check(SNAPSHOT)
 
     assert completed.returncode == 0
-    assert completed.stdout == "Public API snapshot matches (68 exports).\n"
+    assert completed.stdout == "Public API snapshot matches (78 exports).\n"
     assert completed.stderr == ""
 
 

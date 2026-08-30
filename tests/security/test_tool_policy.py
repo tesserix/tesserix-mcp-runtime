@@ -35,6 +35,7 @@ from tesserix_mcp_runtime import (
     tool_policy_fingerprint,
 )
 from tesserix_mcp_runtime.adapters.in_process import InProcessTransport
+from tesserix_mcp_runtime.redaction import SecretRedactor, SecretValue
 
 
 @dataclass(frozen=True, slots=True)
@@ -827,6 +828,37 @@ def test_policy_audit_event_contains_identifiers_and_hashes_but_no_payload() -> 
             "idempotency-private-marker",
         ):
             assert private_value not in document
+
+    asyncio.run(exercise())
+
+
+def test_policy_audit_redacts_exact_known_values_from_identity_fields() -> None:
+    async def exercise() -> None:
+        canary = "SyntheticAuditCanary8Ws2"
+        tool = PolicyTool()
+        catalog = ToolCatalog([tool])
+        audit = RecordingAuditSink()
+        policy = ToolPolicy(
+            catalog=catalog,
+            server_scopes=("orders:read",),
+            rules=(reviewed_rule(catalog, allowed_scopes=("orders:read",)),),
+            audit_sink=audit,
+            wall_clock=lambda: 100.0,
+            redactor=SecretRedactor(known_secrets=(SecretValue(canary),)),
+        )
+
+        await policy.authorize(
+            tool=tool,
+            arguments={"value": "visible"},
+            context=context(
+                scopes=("orders:read",),
+                tenant=f"tenant-{canary}",
+                request_id=f"request-{canary}",
+            ),
+        )
+
+        assert len(audit.events) == 1
+        assert canary not in json.dumps(audit.events[0].to_dict(), sort_keys=True)
 
     asyncio.run(exercise())
 

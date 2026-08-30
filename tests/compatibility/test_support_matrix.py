@@ -75,6 +75,7 @@ def test_project_metadata_excludes_unsupported_sdk_majors() -> None:
 
     assert project["requires-python"] == ">=3.12,<3.15"
     assert project["dependencies"] == [
+        "httpcore>=1.0.9,<2",
         "httpx>=0.28.1,<1",
         "mcp>=2.1.1,<3",
         "mcp-types>=2.1.1,<3",

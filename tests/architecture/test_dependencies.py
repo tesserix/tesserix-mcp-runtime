@@ -39,6 +39,7 @@ def test_core_dependency_report_matches_frozen_resolution() -> None:
     assert result["violations"] == []
     assert result["profiles"]["core"]["declared_dependencies"] == [
         "PyJWT[crypto]>=2.13,<3",
+        "httpcore>=1.0.9,<2",
         "httpx>=0.28.1,<1",
         "mcp-types>=2.1.1,<3",
         "mcp>=2.1.1,<3",
