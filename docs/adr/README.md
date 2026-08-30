@@ -18,6 +18,7 @@
 | [0014](0014-observability-health-and-graceful-drain.md) | Accepted | Bounded observability, dependency-safe health, and readiness-first graceful drain |
 | [0015](0015-reusable-conformance-and-fault-testkit.md) | Accepted | Versioned reusable conformance and deterministic fault testkit |
 | [0016](0016-portable-and-agentic-registry-manifests.md) | Accepted | One deterministic source for official and Agentic Registry MCP manifests |
+| [0017](0017-bounded-semantic-discovery-authoring.md) | Accepted | Bounded semantic authoring, safe Registry projections, and measurable progressive discovery |
 
 Architecture decisions are append-only. A later decision supersedes an
 accepted ADR instead of silently rewriting its history.

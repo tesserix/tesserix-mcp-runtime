@@ -51,7 +51,12 @@ def test_same_source_compiles_identical_portable_fields_in_both_artifacts(
     assert envelope["apiVersion"] == "registry.agentic.dev/v1alpha1"
     assert envelope["kind"] == "MCPServer"
     assert envelope["metadata"] == {
-        "annotations": {"owner": "platform"},
+        "annotations": {
+            "discovery.agentic.dev/capabilities": "cap/orders-read",
+            "discovery.agentic.dev/summary": "Locate customer orders by stable identifiers.",
+            "discovery.agentic.dev/when-to-use": "find a known customer order",
+            "owner": "platform",
+        },
         "labels": {"domain": "orders", "transport": "streamable-http"},
         "name": "io.github.tesserix/orders",
         "namespace": "tenant-orders",

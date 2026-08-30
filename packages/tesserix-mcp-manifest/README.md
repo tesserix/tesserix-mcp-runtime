@@ -40,12 +40,31 @@ The caller should write returned bytes atomically. The compiler itself performs
 no filesystem or network mutation.
 
 For runtime-generated tools, reuse their canonical metadata rather than copying
-schemas or hashes:
+schemas or hashes. `ToolSummary.from_runtime` also reuses compatible
+`ToolDiscoveryMetadata` summary, trigger, capabilities, examples, and deprecated
+lifecycle when it is already present. Pass typed authoring metadata only to add
+fields the core runtime contract does not carry or to override that projection:
 
 ```python
-from tesserix_mcp_manifest import ToolSummary
+from tesserix_mcp_manifest import (
+    DiscoveryRisk,
+    ManifestLifecycle,
+    SemanticMetadata,
+    ToolSummary,
+)
 
-summary = ToolSummary.from_runtime(runtime_tool_manifest)
+summary = ToolSummary.from_runtime(
+    runtime_tool_manifest,
+    semantic=SemanticMetadata(
+        summary="Return one order by its stable identifier.",
+        when_to_use=("look up one known customer order",),
+        not_for=("changing fulfillment state",),
+        capabilities=("cap/orders-read",),
+        requires=("arn:agentic:registry:tenant-orders:tools/tenant-orders/customer_lookup",),
+        risk=DiscoveryRisk.LOW,
+    ),
+    lifecycle=ManifestLifecycle.ACTIVE,
+)
 ```
 
 See `tests/goldens/` for complete remote, PyPI, OCI, public, internal, private,
@@ -68,6 +87,81 @@ secret-shaped keys recursively and accepts only the typed credential-reference
 shape.
 Compilation also rechecks dynamic ownership labels and annotations so a
 programmatically mutated model cannot bypass that boundary.
+
+## Semantic discovery authoring
+
+`SemanticMetadata` is the single source for server and tool intent. Summaries,
+trigger phrases, negative cues, examples, domains, keywords, capabilities,
+requirements, and risk are bounded and secret-safe. Capabilities use
+`cap/<lower-kebab-name>`. Requirements use canonical Registry ARNs:
+
+```text
+arn:agentic:registry:<tenant>:<plural>/<namespace>/<name>
+```
+
+The compiler emits only the four publisher annotations accepted by Agentic
+Registry issue 68:
+
+| Typed field | Registry annotation |
+|---|---|
+| `summary` | `discovery.agentic.dev/summary` |
+| `when_to_use` | `discovery.agentic.dev/when-to-use` |
+| `capabilities` | `discovery.agentic.dev/capabilities` |
+| `requires` | `discovery.agentic.dev/requires` |
+
+Negative cues, examples, risk, domains, and keywords remain structured under
+`spec.x-tesserix.semantic`; the compiler does not invent unaccepted annotation
+keys. `registry.agentic.dev/body-tokens` is Registry-managed and publishers
+cannot claim either reserved namespace.
+
+Each Tool projection contains its safe description, input property
+name/type/description/requiredness, capabilities, requirements, risk, and
+lifecycle. Credential-shaped properties are omitted. Defaults, example values,
+headers, environment values, and executable bodies are never copied. Unsafe
+descriptions or property names fail without echoing their content.
+
+### Author lint
+
+Compilation remains additive for older manifests. CI and publishing should run
+the stricter author linter:
+
+```python
+from tesserix_mcp_manifest import lint_semantic_manifest
+
+findings = lint_semantic_manifest(manifest)
+for finding in findings:
+    print(finding.code.value, finding.path)
+```
+
+Findings contain only a stable typed code and field path. They flag missing or
+vague intent, duplicated description/intent, marketing or model-control text,
+the 1,500-token aggregate discovery budget, and tool capabilities,
+requirements, risk, or lifecycle outside the server envelope.
+
+### Progressive disclosure and authority
+
+Discovery follows one fixed sequence:
+
+```text
+intent -> authorized Registry search -> bounded stubs -> exact authorized fetch
+       -> compatibility check -> policy authorization -> runtime invocation
+```
+
+Relevance selects candidates only. Compatibility determines whether schemas and
+protocols can interoperate. Policy authorization determines tenant, scope,
+approval, and egress access. Runtime invocation executes only after all three.
+Search failure may use the Registry's authorized lexical fallback; it never
+falls back to an unfiltered catalog or a runtime-owned vector index.
+
+### Retrieval evaluation
+
+`evaluate_discovery` accepts recorded ranked Registry results and reports
+precision at K, no-good-match accuracy, incompatible/deprecated recommendation
+counts, and every forbidden-tenant exposure. It embeds nothing and owns no
+catalog. The checked-in `evaluation/semantic-discovery.json` dataset covers
+ambiguous intent, near duplicates, wrong tenant, deprecated and incompatible
+candidates, and no good match. `architecture/check_semantic_discovery.py`
+lints all generated examples and enforces the recorded metric thresholds in CI.
 
 `extract_server_json(registry_manifest)` is a lossless envelope-to-official
 round trip. The reverse direction is intentionally lossy because official
@@ -103,5 +197,13 @@ The compatibility workflow additionally runs official `mcp-publisher validate`
 and pinned local `agentic validate -f` against every golden. Neither command in
 that workflow publishes or writes registry state.
 
+As of 2026-08-30, Agentic Registry issue 68 is still open and has no merged
+implementation PR. The pinned Agentic validator therefore proves the generated
+envelope remains accepted; local contract tests pin the reserved annotation and
+safe Tool projection proposed by issue 68. This is explicit pre-merge
+compatibility evidence, not a claim that Registry indexing support has shipped.
+
 The full rationale, field table, failure behavior, and rollback policy are in
-[ADR-0016](https://github.com/tesserix/tesserix-mcp-runtime/blob/main/docs/adr/0016-portable-and-agentic-registry-manifests.md).
+[ADR-0016](https://github.com/tesserix/tesserix-mcp-runtime/blob/main/docs/adr/0016-portable-and-agentic-registry-manifests.md)
+and
+[ADR-0017](https://github.com/tesserix/tesserix-mcp-runtime/blob/main/docs/adr/0017-bounded-semantic-discovery-authoring.md).

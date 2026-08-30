@@ -3,6 +3,9 @@
   "kind": "MCPServer",
   "metadata": {
     "annotations": {
+      "discovery.agentic.dev/capabilities": "cap/orders-read",
+      "discovery.agentic.dev/summary": "Locate customer orders by stable identifiers.",
+      "discovery.agentic.dev/when-to-use": "find a known customer order",
       "owner": "platform"
     },
     "labels": {
@@ -57,7 +60,7 @@
       },
       "semantic": {
         "capabilities": [
-          "orders.read"
+          "cap/orders-read"
         ],
         "domains": [
           "commerce"
@@ -65,17 +68,39 @@
         "keywords": [
           "orders",
           "read"
+        ],
+        "risk": "medium",
+        "summary": "Locate customer orders by stable identifiers.",
+        "whenToUse": [
+          "find a known customer order"
         ]
       },
       "tools": [
         {
+          "capabilities": [
+            "cap/orders-read"
+          ],
           "description": "Read one order.",
           "inputFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "inputSchema": {
+            "properties": {},
+            "required": [],
+            "type": "object"
+          },
           "name": "orders_get",
           "outputFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "requiredScopes": [
             "orders:read"
-          ]
+          ],
+          "requires": [],
+          "riskLevel": "low",
+          "semantic": {
+            "summary": "Return a single order by its stable identifier.",
+            "whenToUse": [
+              "look up one known order"
+            ]
+          },
+          "status": "active"
         }
       ]
     }

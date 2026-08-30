@@ -81,6 +81,8 @@ jobs:
           uv run --frozen python architecture/check_public_api.py \
             architecture/manifest-public-api.txt --package tesserix_mcp_manifest
           uv run --frozen python architecture/check_dependencies.py
+      - name: Lint semantic examples and record retrieval metrics
+        run: uv run --frozen python architecture/check_semantic_discovery.py
 
   package:
     name: Distribution artifacts

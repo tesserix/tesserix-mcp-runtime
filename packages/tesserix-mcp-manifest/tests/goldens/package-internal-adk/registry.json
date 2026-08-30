@@ -3,6 +3,9 @@
   "kind": "MCPServer",
   "metadata": {
     "annotations": {
+      "discovery.agentic.dev/capabilities": "cap/inventory-search",
+      "discovery.agentic.dev/summary": "Locate inventory records matching bounded stock criteria.",
+      "discovery.agentic.dev/when-to-use": "find stock by SKU or warehouse",
       "owner": "supply-platform"
     },
     "labels": {
@@ -56,7 +59,7 @@
       },
       "semantic": {
         "capabilities": [
-          "inventory.search"
+          "cap/inventory-search"
         ],
         "domains": [
           "supply-chain"
@@ -64,17 +67,39 @@
         "keywords": [
           "inventory",
           "search"
+        ],
+        "risk": "low",
+        "summary": "Locate inventory records matching bounded stock criteria.",
+        "whenToUse": [
+          "find stock by SKU or warehouse"
         ]
       },
       "tools": [
         {
+          "capabilities": [
+            "cap/inventory-search"
+          ],
           "description": "Search inventory.",
           "inputFingerprint": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "inputSchema": {
+            "properties": {},
+            "required": [],
+            "type": "object"
+          },
           "name": "inventory_search",
           "outputFingerprint": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
           "requiredScopes": [
             "inventory:read"
-          ]
+          ],
+          "requires": [],
+          "riskLevel": "low",
+          "semantic": {
+            "summary": "Search stock records by SKU or warehouse filters.",
+            "whenToUse": [
+              "locate matching inventory records"
+            ]
+          },
+          "status": "active"
         }
       ]
     }

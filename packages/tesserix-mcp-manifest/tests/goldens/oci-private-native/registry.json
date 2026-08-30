@@ -3,6 +3,9 @@
   "kind": "MCPServer",
   "metadata": {
     "annotations": {
+      "discovery.agentic.dev/capabilities": "cap/settlements-read",
+      "discovery.agentic.dev/summary": "Retrieve private settlement processing status.",
+      "discovery.agentic.dev/when-to-use": "check a known settlement status",
       "owner": "payments-platform"
     },
     "labels": {
@@ -54,7 +57,7 @@
       },
       "semantic": {
         "capabilities": [
-          "settlements.read"
+          "cap/settlements-read"
         ],
         "domains": [
           "payments"
@@ -62,17 +65,39 @@
         "keywords": [
           "settlements",
           "status"
+        ],
+        "risk": "medium",
+        "summary": "Retrieve private settlement processing status.",
+        "whenToUse": [
+          "check a known settlement status"
         ]
       },
       "tools": [
         {
+          "capabilities": [
+            "cap/settlements-read"
+          ],
           "description": "Read settlement status.",
           "inputFingerprint": "1111111111111111111111111111111111111111111111111111111111111111",
+          "inputSchema": {
+            "properties": {},
+            "required": [],
+            "type": "object"
+          },
           "name": "settlements_get",
           "outputFingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
           "requiredScopes": [
             "settlements:read"
-          ]
+          ],
+          "requires": [],
+          "riskLevel": "medium",
+          "semantic": {
+            "summary": "Return processing status for one settlement.",
+            "whenToUse": [
+              "inspect one known settlement"
+            ]
+          },
+          "status": "deprecated"
         }
       ]
     }

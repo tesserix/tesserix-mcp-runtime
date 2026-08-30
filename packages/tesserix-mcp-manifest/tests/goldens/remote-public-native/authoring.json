@@ -44,7 +44,7 @@
   },
   "semantic": {
     "capabilities": [
-      "orders.read"
+      "cap/orders-read"
     ],
     "domains": [
       "commerce"
@@ -52,6 +52,11 @@
     "keywords": [
       "orders",
       "read"
+    ],
+    "risk": "medium",
+    "summary": "Locate customer orders by stable identifiers.",
+    "when_to_use": [
+      "find a known customer order"
     ]
   },
   "title": "Orders MCP",
@@ -63,7 +68,17 @@
       "output_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "required_scopes": [
         "orders:read"
-      ]
+      ],
+      "semantic": {
+        "capabilities": [
+          "cap/orders-read"
+        ],
+        "risk": "low",
+        "summary": "Return a single order by its stable identifier.",
+        "when_to_use": [
+          "look up one known order"
+        ]
+      }
     }
   ],
   "version": "1.2.3"
