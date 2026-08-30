@@ -98,13 +98,23 @@ jobs:
             --offline --no-deps dist
       - name: Install and run the published test extra offline
         run: |
+          package_cache=$(mktemp -d)
+          seed_env=$(mktemp -d)
           sample_env=$(mktemp -d)
+          requirements=$(mktemp)
           runtime_wheel=$(find "$PWD/dist" -maxdepth 1 \
             -name 'tesserix_mcp_runtime-*.whl' -print -quit)
           testkit_wheel=$(find "$PWD/dist" -maxdepth 1 \
             -name 'tesserix_mcp_testkit-*.whl' -print -quit)
+          uv export --quiet --frozen --no-dev --extra testkit \
+            --no-emit-project --no-emit-workspace \
+            --format requirements.txt --output-file "$requirements"
+          uv venv --python 3.14 "$seed_env"
+          UV_CACHE_DIR="$package_cache" uv pip install \
+            --python "$seed_env/bin/python" --requirement "$requirements"
           uv venv --python 3.14 "$sample_env"
-          uv pip install --offline --python "$sample_env/bin/python" \
+          UV_CACHE_DIR="$package_cache" uv pip install --offline \
+            --python "$sample_env/bin/python" \
             --find-links "$PWD/dist" "${runtime_wheel}[testkit]" "$testkit_wheel"
           cd examples/conformance-server
           "$sample_env/bin/python" -m pytest -q

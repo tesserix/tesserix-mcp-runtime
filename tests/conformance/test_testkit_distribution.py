@@ -42,3 +42,12 @@ def test_quality_workflow_enforces_standalone_testkit_branch_coverage() -> None:
     assert "--source=tesserix_mcp_testkit -m pytest" in workflow
     assert "coverage report \\" in workflow
     assert "--show-missing --fail-under=90" in workflow
+
+
+def test_package_workflow_proves_offline_install_from_an_isolated_cache() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "quality.yml").read_text(encoding="utf-8")
+
+    assert "package_cache=$(mktemp -d)" in workflow
+    assert "--no-dev --extra testkit" in workflow
+    assert "--no-emit-project --no-emit-workspace" in workflow
+    assert 'UV_CACHE_DIR="$package_cache" uv pip install --offline' in workflow
