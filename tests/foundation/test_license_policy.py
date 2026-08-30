@@ -19,7 +19,10 @@ def test_runtime_license_scan_follows_requested_dependency_extras() -> None:
 
     assert completed.returncode == 0, completed.stderr
     report = json.loads(completed.stdout)
-    assert {"cffi", "cryptography", "pycparser"} <= set(report["packages"])
+    assert {"certifi", "cffi", "cryptography", "httpcore", "httpx", "pycparser"} <= set(
+        report["packages"]
+    )
+    assert "MPL-2.0" in report["allowed_licenses"]
 
 
 def test_forbidden_license_reports_the_dependency_path(tmp_path: Path) -> None:

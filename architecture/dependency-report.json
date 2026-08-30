@@ -27,6 +27,8 @@
         "tesserix-adk"
       ],
       "declared_dependencies": [
+        "PyJWT[crypto]>=2.13,<3",
+        "httpx>=0.28.1,<1",
         "mcp-types>=2.1.1,<3",
         "mcp>=2.1.1,<3",
         "tesserix-adk @ https://github.com/tesserix/agent-development-kit/releases/download/v0.53.1/tesserix_adk-0.53.1-py3-none-any.whl#sha256=eec6afc695518971f44723e520cf43f0997110d013ce4733f8d6d30ec96b8bdb",
@@ -73,6 +75,8 @@
     "core": {
       "allowed_forbidden_dependencies": [],
       "declared_dependencies": [
+        "PyJWT[crypto]>=2.13,<3",
+        "httpx>=0.28.1,<1",
         "mcp-types>=2.1.1,<3",
         "mcp>=2.1.1,<3",
         "uvicorn>=0.52.4,<1"
@@ -81,13 +85,16 @@
         "annotated-types==0.8.0",
         "anyio==4.14.2",
         "attrs==26.1.0",
+        "certifi==2026.7.22",
         "cffi==2.1.1 ; platform_python_implementation != 'PyPy'",
         "click==8.5.0",
         "cryptography==50.0.1",
         "h11==0.16.0",
         "httpcore2==2.12.0 ; sys_platform != 'emscripten'",
+        "httpcore==1.0.9",
         "httpx2-jsfetch==1.0 ; sys_platform == 'emscripten'",
         "httpx2==2.12.0",
+        "httpx==0.28.1",
         "idna==3.19",
         "jsonschema-specifications==2025.9.1",
         "jsonschema==4.26.0",

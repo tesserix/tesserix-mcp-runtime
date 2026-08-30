@@ -194,6 +194,22 @@ limits, gateway routing, failure responses, and verification commands.
 protocol authority, session model, cancellation ordering, SDK upgrade risk,
 alternatives, rollout, and rollback.
 
+## Gateway identity
+
+The runtime includes a fail-closed gateway JWT context provider. It requires a
+direct peer from an explicit trusted-proxy CIDR, independently verifies a
+fixed-algorithm runtime-audience token, derives immutable tenant, subject, and
+scope authority per request, and rejects forwarded-header or MCP-metadata
+disagreement before a tool runs. Bounded single-flight JWKS rotation supports a
+15-minute fresh window and an explicit one-hour maximum stale window for known
+keys only.
+
+See the [Gateway identity guide](docs/gateway-identity.md) for composition,
+claim and header contracts, JWKS outage behavior, network prerequisites, and
+verification commands. [ADR-0010](docs/adr/0010-gateway-jwt-and-tenant-context.md)
+records the trust hierarchy, quantitative tradeoffs, residual DNS and network
+risk, dependency cost, rollout, and safe rollback.
+
 ## ADK bridge
 
 An optional adapter now binds an existing ADK `AgentToolView` and explicit

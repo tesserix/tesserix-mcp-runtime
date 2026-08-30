@@ -38,11 +38,13 @@ def test_core_dependency_report_matches_frozen_resolution() -> None:
     assert result["passed"] is True
     assert result["violations"] == []
     assert result["profiles"]["core"]["declared_dependencies"] == [
+        "PyJWT[crypto]>=2.13,<3",
+        "httpx>=0.28.1,<1",
         "mcp-types>=2.1.1,<3",
         "mcp>=2.1.1,<3",
         "uvicorn>=0.52.4,<1",
     ]
-    assert result["profiles"]["core"]["distribution_count"] == 31
+    assert result["profiles"]["core"]["distribution_count"] == 34
     assert result["profiles"]["adk"]["declared_dependencies"][-2].startswith(
         "tesserix-adk @ https://github.com/tesserix/agent-development-kit/releases/"
     )

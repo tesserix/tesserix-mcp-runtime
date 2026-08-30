@@ -19,8 +19,10 @@ def test_adk_bridge_is_an_exact_optional_release_dependency() -> None:
     project = document["project"]
 
     assert project["dependencies"] == [
+        "httpx>=0.28.1,<1",
         "mcp>=2.1.1,<3",
         "mcp-types>=2.1.1,<3",
+        "PyJWT[crypto]>=2.13,<3",
         "uvicorn>=0.52.4,<1",
     ]
     assert project["optional-dependencies"] == {"adk": [ADK_WHEEL]}

@@ -9,10 +9,13 @@ from types import SimpleNamespace
 from typing import Any, ClassVar, cast
 
 import httpx2 as httpx
+import jwt
 import pytest
 import uvicorn
+from cryptography.hazmat.primitives.asymmetric import rsa
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+from jwt.algorithms import RSAAlgorithm
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import MCPError
@@ -40,8 +43,13 @@ from tesserix_mcp_runtime import (
     ToolMetadata,
     TraceContext,
 )
+from tesserix_mcp_runtime.adapters.gateway_identity import (
+    GatewayIdentityConfig,
+    GatewayJWTContextProvider,
+)
 from tesserix_mcp_runtime.adapters.streamable_http import (
     HTTPCallContextProvider,
+    HTTPRequestAuthenticationError,
     HTTPRequestMetadata,
     ProtocolCallResult,
     ProtocolTelemetryEvent,
@@ -304,6 +312,21 @@ class FailingContextProvider(StaticContextProvider):
     ) -> CallContext:
         del request, cancellation
         raise RuntimeError("private-authentication-detail")
+
+
+class RequestIDFailingContextProvider:
+    def __init__(self) -> None:
+        self.peers: list[str | None] = []
+
+    async def create(
+        self,
+        request: HTTPRequestMetadata,
+        *,
+        cancellation: Cancellation,
+    ) -> CallContext:
+        del cancellation
+        self.peers.append(request.peer_host)
+        raise HTTPRequestAuthenticationError(request_id="authentication-request")
 
 
 class HeaderTenantContextProvider(StaticContextProvider):
@@ -1231,6 +1254,66 @@ def test_protocol_endpoint_translates_initialize_list_call_and_close() -> None:
     asyncio.run(exercise())
 
 
+def test_mcp_authority_metadata_cannot_switch_the_verified_call_context() -> None:
+    async def exercise() -> None:
+        endpoint = FakeEndpoint((manifest("examples.echo"),))
+        listener = LifespanListener()
+        transport = StreamableHTTPTransport(
+            config=StreamableHTTPConfig(),
+            limits=StreamableHTTPLimits(),
+            context_provider=StaticContextProvider(),
+            telemetry=RecordingProtocolTelemetry(),
+            listener=listener,
+        )
+        await transport.start(endpoint)
+        assert listener.app is not None
+
+        async with (
+            httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=listener.app),
+                base_url="http://127.0.0.1:8000",
+            ) as http_client,
+            streamable_http_client(
+                "http://127.0.0.1:8000/mcp",
+                http_client=http_client,
+                terminate_on_close=False,
+            ) as streams,
+            ClientSession(streams[0], streams[1]) as session,
+        ):
+            await session.initialize()
+            for prefix in ("tesserix/runtime", "tesserix/adk"):
+                for field in (
+                    "tenant",
+                    "subject",
+                    "run",
+                    "scopes",
+                    "traceparent",
+                    "tracestate",
+                    "idempotency-key",
+                ):
+                    forged = f"forged-{field}"
+                    with pytest.raises(MCPError) as raised:
+                        await session.call_tool(
+                            "examples.echo",
+                            {"text": "hello"},
+                            meta=cast(
+                                RequestParamsMeta,
+                                {f"{prefix}/{field}": forged},
+                            ),
+                        )
+
+                    assert raised.value.error.data == {
+                        "code": "authority_mismatch",
+                        "request_id": "request-example",
+                    }
+                    assert forged not in str(raised.value)
+
+        assert endpoint.contexts == []
+        await transport.stop()
+
+    asyncio.run(exercise())
+
+
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
@@ -1939,6 +2022,178 @@ def test_context_and_header_failures_return_generic_bounded_responses() -> None:
             assert b"private" not in body
             assert b"fixture-value" not in body
             await transport.stop()
+
+    asyncio.run(exercise())
+
+
+def test_authentication_failure_carries_only_request_id_and_direct_peer() -> None:
+    async def exercise() -> None:
+        provider = RequestIDFailingContextProvider()
+        listener = LifespanListener()
+        transport = StreamableHTTPTransport(
+            config=StreamableHTTPConfig(),
+            limits=StreamableHTTPLimits(),
+            context_provider=provider,
+            telemetry=RecordingProtocolTelemetry(),
+            listener=listener,
+        )
+        await transport.start(FakeEndpoint((manifest("examples.echo"),)))
+        assert listener.app is not None
+
+        status, _, body = await call_asgi(
+            listener.app,
+            body=b'{"jsonrpc":"2.0","id":1,"method":"ping"}',
+        )
+
+        document = json.loads(body)
+        assert status == 401
+        assert document["error"]["data"] == {"request_id": "authentication-request"}
+        assert provider.peers == ["127.0.0.1"]
+        assert b"authentication failed" not in body
+        await transport.stop()
+
+    asyncio.run(exercise())
+
+
+def test_gateway_jwt_authenticates_before_parsing_and_isolates_tenants() -> None:
+    now = 1_800_000_000
+    private_key = rsa.generate_private_key(public_exponent=65_537, key_size=2_048)
+    raw_public_key: object = json.loads(RSAAlgorithm.to_jwk(private_key.public_key()))
+    assert isinstance(raw_public_key, dict)
+    public_key = cast(dict[str, JsonValue], raw_public_key)
+    public_key.update({"kid": "transport-key", "alg": "RS256", "use": "sig"})
+
+    class CountingJWKSFetcher:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def fetch(self) -> dict[str, JsonValue]:
+            self.calls += 1
+            return {"keys": [public_key]}
+
+    class TenantEchoEndpoint(FakeEndpoint):
+        async def invoke(
+            self,
+            name: str,
+            arguments: Mapping[str, JsonValue],
+            *,
+            context: CallContext,
+        ) -> InvocationResult:
+            self.contexts.append(context)
+            if name not in self.list_tools():
+                raise AssertionError("transport invoked an unknown fixture tool")
+            return InvocationResult.success(
+                {"text": f"{context.tenant}:{arguments.get('text', '')}"}
+            )
+
+    def token(*, subject: str, tenant: str, expires_at: int) -> str:
+        encoded = jwt.encode(
+            {
+                "iss": "https://identity.example.invalid",
+                "aud": "tesserix-mcp-runtime",
+                "sub": subject,
+                "tenant_id": tenant,
+                "scope": "examples:read",
+                "run_id": f"run-{tenant}",
+                "iat": now - 10,
+                "nbf": now - 10,
+                "exp": expires_at,
+            },
+            private_key,
+            algorithm="RS256",
+            headers={"kid": "transport-key"},
+        )
+        assert isinstance(encoded, str)
+        return encoded
+
+    def headers(encoded: str, *, subject: str, tenant: str) -> list[tuple[bytes, bytes]]:
+        return [
+            *modern_headers("tools/call", name="examples.echo"),
+            (b"authorization", f"Bearer {encoded}".encode("ascii")),
+            (b"x-request-id", f"request-{tenant}".encode("ascii")),
+            (b"x-jwt-claim-sub", subject.encode("ascii")),
+            (b"x-jwt-claim-tenant-id", tenant.encode("ascii")),
+            (b"x-jwt-claim-scope", b"examples:read"),
+        ]
+
+    async def exercise() -> None:
+        fetcher = CountingJWKSFetcher()
+        provider = GatewayJWTContextProvider(
+            GatewayIdentityConfig(
+                issuer="https://identity.example.invalid",
+                audience="tesserix-mcp-runtime",
+                jwks_url="https://identity.example.invalid/.well-known/jwks.json",
+                jwks_allowed_hosts=("identity.example.invalid",),
+                trusted_proxy_cidrs=("127.0.0.1/32",),
+                clock_skew_seconds=0,
+            ),
+            jwks_fetcher=fetcher,
+            wall_clock=lambda: float(now),
+            request_id_factory=lambda: "generated-request",
+        )
+        endpoint = TenantEchoEndpoint((manifest("examples.echo"),))
+        listener = LifespanListener()
+        transport = StreamableHTTPTransport(
+            config=StreamableHTTPConfig(),
+            limits=StreamableHTTPLimits(),
+            context_provider=provider,
+            telemetry=RecordingProtocolTelemetry(),
+            listener=listener,
+        )
+        await transport.start(endpoint)
+        assert listener.app is not None
+
+        expired_status, _, expired_body = await call_asgi(
+            listener.app,
+            headers=headers(
+                token(subject="expired-subject", tenant="expired-tenant", expires_at=now - 1),
+                subject="expired-subject",
+                tenant="expired-tenant",
+            ),
+            body=b"{",
+        )
+
+        requests = (
+            (
+                token(subject="subject-a", tenant="tenant-a", expires_at=now + 300),
+                "subject-a",
+                "tenant-a",
+                "first",
+            ),
+            (
+                token(subject="subject-b", tenant="tenant-b", expires_at=now + 300),
+                "subject-b",
+                "tenant-b",
+                "second",
+            ),
+        )
+        responses = await asyncio.gather(
+            *(
+                call_asgi(
+                    listener.app,
+                    headers=headers(encoded, subject=subject, tenant=tenant),
+                    body=modern_request(
+                        "tools/call",
+                        params={"name": "examples.echo", "arguments": {"text": text}},
+                    ),
+                )
+                for encoded, subject, tenant, text in requests
+            )
+        )
+
+        assert expired_status == 401
+        assert jsonrpc_code(expired_body) != PARSE_ERROR
+        assert [status for status, _, _ in responses] == [200, 200]
+        assert [json.loads(body)["result"]["structuredContent"] for _, _, body in responses] == [
+            {"text": "tenant-a:first"},
+            {"text": "tenant-b:second"},
+        ]
+        assert [(context.tenant, context.subject) for context in endpoint.contexts] == [
+            ("tenant-a", "subject-a"),
+            ("tenant-b", "subject-b"),
+        ]
+        assert fetcher.calls == 1
+        await transport.stop()
 
     asyncio.run(exercise())
 

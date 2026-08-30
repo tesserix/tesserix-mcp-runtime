@@ -342,10 +342,10 @@ def test_adk_tool_context_comes_from_authenticated_runtime_context() -> None:
                 {},
                 meta={
                     f"{META_PREFIX}/tenant": "acme",
-                    f"{META_PREFIX}/subject": "mallory",
-                    f"{META_PREFIX}/run": "untrusted-run",
-                    f"{META_PREFIX}/scopes": "admin",
-                    f"{META_PREFIX}/idempotency-key": "untrusted-key",
+                    f"{META_PREFIX}/subject": "ada",
+                    f"{META_PREFIX}/run": "run-1",
+                    f"{META_PREFIX}/scopes": "fares:read",
+                    f"{META_PREFIX}/idempotency-key": "idempotency-example",
                 },
             )
 

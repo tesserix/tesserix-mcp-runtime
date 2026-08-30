@@ -75,8 +75,10 @@ def test_project_metadata_excludes_unsupported_sdk_majors() -> None:
 
     assert project["requires-python"] == ">=3.12,<3.15"
     assert project["dependencies"] == [
+        "httpx>=0.28.1,<1",
         "mcp>=2.1.1,<3",
         "mcp-types>=2.1.1,<3",
+        "PyJWT[crypto]>=2.13,<3",
         "uvicorn>=0.52.4,<1",
     ]
 
