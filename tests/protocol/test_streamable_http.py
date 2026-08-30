@@ -61,6 +61,7 @@ from tesserix_mcp_runtime.adapters.streamable_http import (
     StreamableHTTPTransport,
     UvicornStreamableHTTPListener,
 )
+from tesserix_mcp_runtime.redaction import SecretRedactor, SecretValue
 
 
 def manifest(name: str) -> ToolManifest:
@@ -1578,6 +1579,27 @@ def test_telemetry_failure_does_not_fail_a_protocol_request() -> None:
         await transport.stop()
 
     asyncio.run(exercise())
+
+
+def test_protocol_telemetry_redacts_exact_known_values() -> None:
+    canary = "SyntheticProtocolCanary3Hp6"
+    telemetry = RecordingProtocolTelemetry()
+    transport = StreamableHTTPTransport(
+        config=StreamableHTTPConfig(),
+        limits=StreamableHTTPLimits(),
+        context_provider=StaticContextProvider(),
+        telemetry=telemetry,
+        listener=FakeListener(),
+        redactor=SecretRedactor(known_secrets=(SecretValue(canary),)),
+    )
+
+    transport.emit_protocol_event(
+        cast(Any, SimpleNamespace(method=canary, protocol_version=f"version-{canary}")),
+        outcome="failure",
+    )
+
+    assert len(telemetry.events) == 1
+    assert canary not in repr(telemetry.events[0])
 
 
 def test_tool_listing_uses_bounded_opaque_progressing_cursors() -> None:

@@ -45,6 +45,8 @@ jobs:
         run: uv run --frozen python security/check_licenses.py
       - name: Verify the cross-system threat model
         run: uv run --frozen python security/check_threat_model.py --model security/threat-model.json
+      - name: Run the isolated SSRF harness
+        run: uv run --frozen python security/ssrf_harness.py
       - name: Scan Git history for secrets
         env:
           GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb

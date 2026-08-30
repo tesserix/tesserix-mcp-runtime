@@ -32,6 +32,7 @@ from tesserix_mcp_runtime.contracts import (
     Telemetry,
     ToolEffect,
 )
+from tesserix_mcp_runtime.redaction import DEFAULT_REDACTION_POLICY, RedactionPolicy
 from tesserix_mcp_runtime.tool_manifest import ToolManifest
 
 type ASGIScope = dict[str, Any]
@@ -1057,6 +1058,7 @@ class StreamableHTTPTransport:
         context_provider: HTTPCallContextProvider,
         telemetry: Telemetry[ProtocolTelemetryEvent],
         listener: StreamableHTTPListener | None = None,
+        redactor: RedactionPolicy = DEFAULT_REDACTION_POLICY,
     ) -> None:
         resolved_listener = listener
         if resolved_listener is None:
@@ -1070,6 +1072,7 @@ class StreamableHTTPTransport:
             ("context_provider", context_provider, HTTPCallContextProvider),
             ("telemetry", telemetry, Telemetry),
             ("listener", resolved_listener, StreamableHTTPListener),
+            ("redactor", redactor, RedactionPolicy),
         )
         for path, dependency, expected in dependencies:
             if not _is_runtime_instance(dependency, expected):
@@ -1078,6 +1081,7 @@ class StreamableHTTPTransport:
         self._limits = limits
         self._context_provider = context_provider
         self._telemetry = telemetry
+        self._redactor = redactor
         self._listener = resolved_listener
         self._endpoint: ApplicationEndpoint | None = None
         self._protocol_endpoint: StreamableHTTPProtocolEndpoint | None = None
@@ -1435,17 +1439,21 @@ class StreamableHTTPTransport:
         *,
         outcome: str,
     ) -> None:
-        event = ProtocolTelemetryEvent(
-            method=_safe_observation(context.method, maximum=128, fallback="invalid"),
-            protocol_version=_safe_observation(
-                context.protocol_version,
-                maximum=64,
-                fallback="unknown",
-            ),
-            sdk_version=self.sdk_version,
-            outcome=outcome,
-        )
         try:
+            event = ProtocolTelemetryEvent(
+                method=self._redactor.redact_text(
+                    _safe_observation(context.method, maximum=128, fallback="invalid")
+                ),
+                protocol_version=self._redactor.redact_text(
+                    _safe_observation(
+                        context.protocol_version,
+                        maximum=64,
+                        fallback="unknown",
+                    )
+                ),
+                sdk_version=self._redactor.redact_text(self.sdk_version),
+                outcome=self._redactor.redact_text(outcome),
+            )
             self._telemetry.emit(event)
         except Exception:
             self._telemetry_failures += 1

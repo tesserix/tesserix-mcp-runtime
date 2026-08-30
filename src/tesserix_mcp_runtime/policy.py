@@ -19,6 +19,7 @@ from tesserix_mcp_runtime.contracts import (
 from tesserix_mcp_runtime.contracts import require_text as _require_text
 from tesserix_mcp_runtime.contracts import runtime_instance as _is_runtime_instance
 from tesserix_mcp_runtime.errors import RuntimeFailure
+from tesserix_mcp_runtime.redaction import DEFAULT_REDACTION_POLICY, RedactionPolicy
 from tesserix_mcp_runtime.tool import ToolCatalog
 from tesserix_mcp_runtime.tool_manifest import (
     ToolManifest,
@@ -268,12 +269,15 @@ class ToolPolicy:
         audit_sink: ToolPolicyAuditSink,
         approval_store: ApprovalStore | None = None,
         wall_clock: Callable[[], float] = time.time,
+        redactor: RedactionPolicy = DEFAULT_REDACTION_POLICY,
     ) -> None:
         _require_text_tuple("server_scopes", server_scopes)
         if not _is_runtime_instance(audit_sink, ToolPolicyAuditSink):
             raise TypeError("audit_sink must implement ToolPolicyAuditSink")
         if approval_store is not None and not _is_runtime_instance(approval_store, ApprovalStore):
             raise TypeError("approval_store must implement ApprovalStore")
+        if not _is_runtime_instance(redactor, RedactionPolicy):
+            raise TypeError("redactor must implement RedactionPolicy")
         resolved_rules = tuple(rules)
         if len({rule.tool_name for rule in resolved_rules}) != len(resolved_rules):
             raise ValueError("rules must not contain duplicate tool names")
@@ -329,6 +333,7 @@ class ToolPolicy:
         self._audit_sink = audit_sink
         self._approval_store = approval_store
         self._wall_clock = wall_clock
+        self._redactor = redactor
 
     def is_exported(self, tool_name: str) -> bool:
         rule = self._rules.get(tool_name)
@@ -515,20 +520,30 @@ class ToolPolicy:
             tool_fingerprint = tool_policy_fingerprint(manifest)
         return ToolPolicyAuditEvent(
             decision=decision,
-            request_id=context.request_id,
-            run_id=context.run_id,
-            tenant=context.tenant,
+            request_id=self._redact_audit_text(context.request_id),
+            run_id=self._redact_audit_text(context.run_id),
+            tenant=self._redact_audit_text(context.tenant),
             subject_hash=_digest(context.subject),
-            tool_name=manifest.metadata.name,
+            tool_name=self._redact_audit_text(manifest.metadata.name),
             tool_fingerprint=tool_fingerprint,
             effect=manifest.metadata.effect,
-            scopes=tuple(sorted(context.scopes)),
-            approval_id=context.approval_id,
+            scopes=tuple(self._redact_audit_text(scope) for scope in sorted(context.scopes)),
+            approval_id=(
+                self._redact_audit_text(context.approval_id)
+                if context.approval_id is not None
+                else None
+            ),
             idempotency_key_hash=(
                 _digest(context.idempotency_key) if context.idempotency_key is not None else None
             ),
             occurred_at=self._now(),
         )
+
+    def _redact_audit_text(self, value: str) -> str:
+        try:
+            return self._redactor.redact_text(value)
+        except Exception:
+            raise RuntimeFailure(ErrorCode.UNAVAILABLE) from None
 
     def _now(self) -> float:
         try:

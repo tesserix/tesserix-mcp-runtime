@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import math
 import re
 from collections.abc import Coroutine, Iterable, Mapping
@@ -33,6 +34,11 @@ from tesserix_mcp_runtime.execution import (
     validate_json_value,
 )
 from tesserix_mcp_runtime.lifecycle import LifecycleController
+from tesserix_mcp_runtime.redaction import (
+    DEFAULT_REDACTION_POLICY,
+    RedactionError,
+    RedactionPolicy,
+)
 from tesserix_mcp_runtime.tool import ToolCatalog
 from tesserix_mcp_runtime.tool_manifest import ToolManifest
 
@@ -280,6 +286,7 @@ class Application:
         limits: ApplicationLimits,
         clock: Clock,
         execution_limits: ExecutionLimits = _DEFAULT_EXECUTION_LIMITS,
+        redactor: RedactionPolicy = DEFAULT_REDACTION_POLICY,
         lifecycle: Iterable[Lifecycle] = (),
     ) -> None:
         components = tuple(lifecycle)
@@ -291,6 +298,7 @@ class Application:
             limits=limits,
             clock=clock,
             execution_limits=execution_limits,
+            redactor=redactor,
             lifecycle=components,
         )
         self._catalog = catalog
@@ -299,6 +307,7 @@ class Application:
         self._limits = limits
         self._clock = clock
         self._execution_limits = execution_limits
+        self._redactor = redactor
         self._execution = ExecutionController(execution_limits, clock=clock)
         self._telemetry_failures = 0
         self._invocations = _InvocationLifecycle()
@@ -320,6 +329,7 @@ class Application:
         limits: ApplicationLimits,
         clock: Clock,
         execution_limits: ExecutionLimits,
+        redactor: RedactionPolicy,
         lifecycle: tuple[Lifecycle, ...],
     ) -> None:
         dependencies: tuple[tuple[str, object, type[Any]], ...] = (
@@ -330,6 +340,7 @@ class Application:
             ("limits", limits, ApplicationLimits),
             ("clock", clock, Clock),
             ("execution_limits", execution_limits, ExecutionLimits),
+            ("redactor", redactor, RedactionPolicy),
         )
         for path, dependency, expected in dependencies:
             if not _is_runtime_instance(dependency, expected):
@@ -507,11 +518,14 @@ class Application:
     ) -> InvocationResult:
         if self.state is not LifecycleState.READY:
             return InvocationResult.failure(
-                ErrorResponse.from_code(ErrorCode.UNAVAILABLE, request_id=context.request_id)
+                ErrorResponse.from_code(
+                    ErrorCode.UNAVAILABLE,
+                    request_id=self._safe_request_id(context.request_id),
+                )
             )
         task = self._invocations.begin()
         try:
-            return await self._execution.execute(
+            result = await self._execution.execute(
                 lambda bounded_context: self._invoke(
                     name,
                     arguments,
@@ -519,6 +533,7 @@ class Application:
                 ),
                 context=context,
             )
+            return self._redact_result(result, request_id=context.request_id)
         except asyncio.CancelledError as error:
             return self._mapped_failure(error, request_id=context.request_id)
         except TimeoutError as error:
@@ -592,12 +607,64 @@ class Application:
             return self._mapped_failure(error, request_id=context.request_id)
 
     def _mapped_failure(self, error: BaseException, *, request_id: str) -> InvocationResult:
-        mapped = map_exception(error, request_id=request_id)
+        safe_request_id = self._safe_request_id(request_id)
+        mapped = map_exception(error, request_id=safe_request_id)
+        exception_type = mapped.audit.exception_type
         try:
-            self._telemetry.emit(mapped.audit)
+            redacted_type = self._redactor.redact_text(exception_type)
+            if redacted_type != exception_type:
+                exception_type = "RedactedException"
+            audit = ScrubbedError(
+                code=mapped.audit.code,
+                exception_type=exception_type,
+                request_id=safe_request_id,
+            )
+        except Exception:
+            audit = ScrubbedError(
+                code=mapped.audit.code,
+                exception_type="RedactionError",
+                request_id=safe_request_id,
+            )
+        try:
+            self._telemetry.emit(audit)
         except Exception:
             self._telemetry_failures += 1
         return InvocationResult.failure(mapped.response)
+
+    def _redact_result(self, result: InvocationResult, *, request_id: str) -> InvocationResult:
+        if result.error is not None:
+            return InvocationResult.failure(
+                ErrorResponse.from_code(
+                    result.error.code,
+                    request_id=self._safe_request_id(request_id),
+                )
+            )
+        try:
+            value = self._redactor.redact(result.value)
+            validate_json_value(
+                value,
+                limits=self._execution_limits,
+                maximum_bytes=self._execution_limits.max_result_bytes,
+            )
+        except ExecutionLimitExceeded:
+            return self._mapped_failure(
+                RuntimeFailure(ErrorCode.RESULT_TOO_LARGE),
+                request_id=request_id,
+            )
+        except Exception:
+            return self._mapped_failure(RedactionError(), request_id=request_id)
+        return InvocationResult.success(value)
+
+    def _safe_request_id(self, request_id: str) -> str:
+        try:
+            value = self._redactor.redact_text(request_id)
+            ErrorResponse.from_code(ErrorCode.INTERNAL_FAILURE, request_id=value)
+            return value
+        except Exception:
+            digest = hashlib.sha256(str(request_id).encode("utf-8", errors="replace")).hexdigest()[
+                :16
+            ]
+            return f"redaction-failed-{digest}"
 
     async def _run_before_deadline(
         self,
