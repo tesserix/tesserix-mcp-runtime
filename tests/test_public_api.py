@@ -65,6 +65,7 @@ def test_public_api_exports_only_the_stable_contract_surface() -> None:
         "ErrorResponse",
         "ExecutionLimits",
         "IdempotencyRequirement",
+        "InMemoryRegistryCache",
         "InvocationResult",
         "InvocationStatus",
         "JsonValue",
@@ -80,6 +81,32 @@ def test_public_api_exports_only_the_stable_contract_surface() -> None:
         "RedactionPolicy",
         "ReadinessCheck",
         "Retryability",
+        "RegistryADKServer",
+        "RegistryArtifact",
+        "RegistryArtifactCacheKey",
+        "RegistryArtifactRaceError",
+        "RegistryAuthenticationError",
+        "RegistryAuthorizationError",
+        "RegistryCachePolicy",
+        "RegistryCacheUnavailableError",
+        "RegistryCandidateDecision",
+        "RegistryCandidateExplanation",
+        "RegistryCandidateReason",
+        "RegistryContractError",
+        "RegistryDiscovery",
+        "RegistryDiscoveryCache",
+        "RegistryDiscoveryError",
+        "RegistryDigestMismatchError",
+        "RegistryResolution",
+        "RegistryResolutionPolicy",
+        "RegistryResolutionSource",
+        "RegistryResolver",
+        "RegistrySearchQuery",
+        "RegistrySearchCacheKey",
+        "RegistrySearchStub",
+        "RegistryToolRequirement",
+        "RegistryToolPin",
+        "RegistryUnavailableError",
         "RuntimeExporter",
         "RuntimeFailure",
         "RuntimeLimit",
@@ -124,6 +151,7 @@ def test_public_api_exports_only_the_stable_contract_surface() -> None:
         "classify_schema_change",
         "map_exception",
         "normalize_tool_name",
+        "registry_artifact_digest",
         "schema_fingerprint",
         "tool_policy_fingerprint",
     }
@@ -135,7 +163,7 @@ def test_checked_in_public_api_snapshot_matches_exports() -> None:
     completed = run_snapshot_check(SNAPSHOT)
 
     assert completed.returncode == 0
-    assert completed.stdout == "Public API snapshot matches (91 exports).\n"
+    assert completed.stdout == "Public API snapshot matches (119 exports).\n"
     assert completed.stderr == ""
 
 

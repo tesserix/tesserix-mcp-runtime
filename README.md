@@ -9,9 +9,10 @@ deterministic bounded lifecycle, stable safe errors, a validated tool catalog,
 typed-callable schema generation, handler-free manifest snapshots,
 process-signal handling, reusable in-process conformance support, and the
 official MCP v2 Streamable HTTP transport with a private bounded listener,
-finite execution, tenant bulkheads, deadlines, cancellation, and safe retries. It
-does not yet publish Registry versions or activate Gateway routes. No stable
-package release is implied by interfaces described as planned below.
+finite execution, tenant bulkheads, deadlines, cancellation, safe retries, and
+identity-scoped bounded Registry discovery. It does not yet publish Registry
+versions or activate Gateway routes. No stable package release is implied by
+interfaces described as planned below.
 
 The accepted ownership boundary and measurable design envelope are recorded
 in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
@@ -30,7 +31,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | Bounded JSON, concurrency, deadlines, cancellation, and safe retries | Implemented in source; pre-release |
 | [Bounded telemetry, health, and graceful drain](docs/observability.md) | Implemented in source; pre-release |
 | [Registry manifests](packages/tesserix-mcp-manifest/README.md) | Compilation is opt-in; publication and verification are planned |
-| Registry-backed semantic discovery and progressive disclosure | Planned; not implemented |
+| [Registry-backed semantic discovery and progressive disclosure](docs/registry-discovery.md) | Implemented as an opt-in bounded client; pre-release |
 | Automatic Gateway route pickup and activation status | Planned; not implemented |
 
 The version can be inspected without starting runtime behavior:
@@ -270,6 +271,20 @@ See [data safety and outbound HTTP](docs/data-safety-and-egress.md) and
 [ADR-0013](docs/adr/0013-redaction-and-connection-pinned-egress.md) for
 composition, limits, stable errors, residual risks, the isolated SSRF harness,
 rollout, and rollback.
+
+## Registry discovery
+
+An optional bounded client now consumes Agentic Registry's shipped authorized
+stub search, fetches at most one exact artifact, verifies its canonical digest,
+and projects only reviewed tools to the existing ADK MCP configuration. Search
+and exact caches are finite and partitioned by Registry origin plus a hash of
+issuer, tenant, subject, and scopes. Offline reuse is disabled by default.
+
+See the [Registry discovery guide](docs/registry-discovery.md) for the current
+Registry contract, composition, cache leases, typed failure behavior, exact
+dependency evidence, ADK ownership boundary, and publication/Gateway
+limitations. [ADR-0018](docs/adr/0018-identity-scoped-registry-discovery.md)
+records the decision, failure analysis, rollout, and rollback.
 
 ## ADK bridge
 
