@@ -61,6 +61,10 @@ def _is_runtime_instance(value: object, expected: type[Any]) -> bool:
     return isinstance(value, expected)
 
 
+require_text = _require_text
+runtime_instance = _is_runtime_instance
+
+
 def validate_deadline(value: object) -> None:
     if (
         isinstance(value, bool)
@@ -161,6 +165,7 @@ class CallContext:
     deadline: float | None = None
     cancellation: Cancellation = _NEVER_CANCELLED
     idempotency_key: str | None = None
+    approval_id: str | None = None
 
     def __post_init__(self) -> None:
         if not _is_runtime_instance(self.identity, AuthenticatedIdentity):
@@ -175,6 +180,8 @@ class CallContext:
             raise ValueError("cancellation must implement the cancellation contract")
         if self.idempotency_key is not None:
             _require_text("idempotency_key", self.idempotency_key, maximum=512)
+        if self.approval_id is not None:
+            _require_text("approval_id", self.approval_id, maximum=256)
 
     @property
     def tenant(self) -> str:
@@ -426,6 +433,11 @@ class ToolMetadata:
             and self.idempotency is not IdempotencyRequirement.REQUIRED
         ):
             raise ValueError("write and external effects require idempotency")
+        if (
+            self.effect is ToolEffect.EXTERNAL_EFFECT
+            and self.approval is not ApprovalRequirement.REQUIRED
+        ):
+            raise ValueError("external effects require per-call approval")
 
     def to_dict(self) -> dict[str, JsonValue]:
         document: dict[str, JsonValue] = {

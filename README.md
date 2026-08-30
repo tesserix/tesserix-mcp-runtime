@@ -25,6 +25,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | Typed callable authoring, schema fingerprints, compatibility classification, and handler-free metadata export | Implemented in source; pre-release |
 | MCP v2 Streamable HTTP serving, compatibility matrix, and bounded sessions | Implemented in source; pre-release |
 | ADK `AgentToolView` and `McpServer` bridge | Implemented as an exact optional profile |
+| Default-deny per-tool scopes, effects, approvals, idempotency, and audit | Implemented in source; pre-release |
 | Registry manifest compilation, signing, publication, and verification | Planned; not implemented |
 | Registry-backed semantic discovery and progressive disclosure | Planned; not implemented |
 | Automatic Gateway route pickup and activation status | Planned; not implemented |
@@ -209,6 +210,27 @@ claim and header contracts, JWKS outage behavior, network prerequisites, and
 verification commands. [ADR-0010](docs/adr/0010-gateway-jwt-and-tenant-context.md)
 records the trust hierarchy, quantitative tradeoffs, residual DNS and network
 risk, dependency cost, rollout, and safe rollback.
+
+## Tool policy
+
+Non-ADK servers can now compose `ToolPolicy` as the final default-deny
+authorizer. Only exact active reviewed rules are listed or invocable. Verified
+caller scopes are intersected with server and tool ceilings; writes require a
+trusted idempotency key; external effects always require an exact expiring
+approval. One-time approvals are atomically consumed through an injected
+store. Allowed and denied decisions append payload-free audit events.
+
+Product backing services remain authoritative for mutation idempotency and the
+original result. The runtime passes the same tenant and key rather than adding
+a replica-local store. Unknown and unexported tools are indistinguishable to
+callers. Policy or audit dependency failure stops the handler; a failed denial
+audit never changes the caller-visible denial code.
+
+See the [tool policy guide](docs/tool-policy.md) for composition, review,
+approval-store, idempotency, header, audit, and failure contracts.
+[ADR-0011](docs/adr/0011-default-deny-tool-policy.md) records the trust
+boundary, exact digest decision, distributed failure behavior, alternatives,
+cost, rollout, and rollback.
 
 ## ADK bridge
 

@@ -57,6 +57,10 @@ def _digest(document: str) -> str:
     return hashlib.sha256(document.encode("utf-8")).hexdigest()
 
 
+canonical_json = _canonical_json
+digest_text = _digest
+
+
 def schema_fingerprint(schema: Mapping[str, JsonValue]) -> str:
     """Fingerprint canonical UTF-8 JSON independently of mapping order."""
 

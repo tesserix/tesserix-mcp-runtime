@@ -162,6 +162,7 @@ def test_authenticated_identity_rejects_ambiguous_or_mutable_values(
         {"deadline": math.inf},
         {"deadline": math.nan},
         {"idempotency_key": ""},
+        {"approval_id": ""},
         {"cancellation": {"cancelled": False}},
     ],
     ids=[
@@ -173,6 +174,7 @@ def test_authenticated_identity_rejects_ambiguous_or_mutable_values(
         "infinite-deadline",
         "nan-deadline",
         "empty-idempotency-key",
+        "empty-approval-id",
         "invalid-cancellation",
     ],
 )

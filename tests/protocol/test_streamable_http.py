@@ -1290,6 +1290,7 @@ def test_mcp_authority_metadata_cannot_switch_the_verified_call_context() -> Non
                     "traceparent",
                     "tracestate",
                     "idempotency-key",
+                    "approval-id",
                 ):
                     forged = f"forged-{field}"
                     with pytest.raises(MCPError) as raised:
