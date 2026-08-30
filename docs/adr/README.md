@@ -19,6 +19,7 @@
 | [0015](0015-reusable-conformance-and-fault-testkit.md) | Accepted | Versioned reusable conformance and deterministic fault testkit |
 | [0016](0016-portable-and-agentic-registry-manifests.md) | Accepted | One deterministic source for official and Agentic Registry MCP manifests |
 | [0017](0017-bounded-semantic-discovery-authoring.md) | Accepted | Bounded semantic authoring, safe Registry projections, and measurable progressive discovery |
+| [0018](0018-identity-scoped-registry-discovery.md) | Accepted | Identity-scoped Registry search, one exact verified fetch, and ADK-ready policy projection |
 
 Architecture decisions are append-only. A later decision supersedes an
 accepted ADR instead of silently rewriting its history.
