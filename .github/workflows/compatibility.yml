@@ -116,12 +116,21 @@ jobs:
           printf 'WHEEL_PYTHON=%s/bin/python\n' "$wheel_env_dir" >> "$GITHUB_ENV"
       - name: Build and verify the core image artifact
         run: |
+          provenance_oci="$RUNNER_TEMP/core-provenance-oci"
           docker buildx build \
             --build-arg PACKAGE_VERSION=0.0.1.dev0 \
             --file deploy/container/core.Dockerfile \
-            --load \
             --metadata-file artifacts/compatibility/core-build.json \
+            --output "type=oci,dest=${provenance_oci},tar=false" \
             --provenance=mode=max \
+            .
+          uv run --frozen python -c \
+            'import json, re, sys; from pathlib import Path; root = Path(sys.argv[1]); index = json.loads((root / "index.json").read_text(encoding="utf-8")); documents = [index, *(json.loads((root / "blobs" / "sha256" / item["digest"][7:]).read_text(encoding="utf-8")) for item in index.get("manifests", []) if isinstance(item, dict) and isinstance(item.get("digest"), str) and re.fullmatch(r"sha256:[0-9a-f]{64}", item["digest"]))]; assert any(isinstance(item, dict) and isinstance(item.get("annotations"), dict) and item["annotations"].get("vnd.docker.reference.type") == "attestation-manifest" for document in documents for item in document.get("manifests", []))' \
+            "$provenance_oci"
+          docker buildx build \
+            --build-arg PACKAGE_VERSION=0.0.1.dev0 \
+            --file deploy/container/core.Dockerfile \
+            --load --provenance=false \
             --tag "$CORE_IMAGE" \
             .
           uv run --frozen python deploy/container/verify.py \

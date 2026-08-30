@@ -73,7 +73,10 @@ def test_compatibility_workflow_runs_pinned_artifact_and_devai_evidence() -> Non
     assert "uv sync --directory .compatibility/devai --frozen --no-dev" in workflow
     assert "uv build --wheel --out-dir dist/compatibility-wheel" in workflow
     assert "--file deploy/container/core.Dockerfile" in workflow
-    assert "--provenance=mode=max" in workflow
+    assert workflow.count("--provenance=mode=max") == 1
+    assert '--output "type=oci,dest=${provenance_oci},tar=false"' in workflow
+    assert "vnd.docker.reference.type" in workflow
+    assert "--load --provenance=false" in workflow
     assert "docker-compose-linux-x86_64" in workflow
     assert "c57ab918abd5b05ca7e7d0f275875dd1330a695074f309dc9eab1b49efafcd4b" in workflow
     assert "compatibility/run_matrix.py" in workflow
