@@ -177,6 +177,8 @@ def test_manifest_command_writes_exact_artifacts_and_refuses_overwrite(tmp_path:
     assert first == 0
     assert second == 2
     assert (output / "server.json").read_bytes().endswith(b"\n")
+    assert (output / "server.json").stat().st_mode & 0o777 == 0o600
+    assert (output / "mcpserver.json").stat().st_mode & 0o777 == 0o600
     registry = json.loads((output / "mcpserver.json").read_bytes())
     assert registry["spec"]["x-tesserix"]["publication"]["artifact"]["digest"] == (
         f"sha256:{'c' * 64}"

@@ -82,7 +82,7 @@ def test_evidence_file_rejects_replacement_between_identity_checks(
     def racing_open(
         path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
         flags: int,
-        mode: int = 0o777,
+        mode: int = 0o600,
         *,
         dir_fd: int | None = None,
     ) -> int:

@@ -178,7 +178,7 @@ def _write_manifests(output_directory: Path, prepared: PreparedPublication) -> N
         created: list[Path] = []
         try:
             for target, content in targets:
-                descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+                descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
                 with os.fdopen(descriptor, "wb", closefd=True) as destination:
                     destination.write(content)
                     destination.flush()
