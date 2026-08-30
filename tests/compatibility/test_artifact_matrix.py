@@ -9,6 +9,7 @@ ROOT = Path(__file__).parents[2]
 COMPOSE = ROOT / "compatibility" / "compose.yaml"
 GATEWAY_CONFIG = ROOT / "compatibility" / "agentgateway.yaml"
 WORKFLOW = ROOT / ".github" / "workflows" / "compatibility.yml"
+RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
 GATEWAY_IMAGE = (
     "cr.agentgateway.dev/agentgateway:v1.4.1@"
     "sha256:efd79355b89094a8225a9db465d9a01dc656b377f0bab458761b935a13231d29"
@@ -62,8 +63,11 @@ def test_compatibility_stack_uses_the_built_runtime_and_real_agentgateway() -> N
 
 def test_compatibility_workflow_runs_pinned_artifact_and_devai_evidence() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
+    release_workflow = RELEASE_WORKFLOW.read_text(encoding="utf-8")
 
-    assert '      - "v*-rc*"' in workflow
+    assert "  workflow_call:" in workflow
+    assert '    tags: ["v*"]' in release_workflow
+    assert "uses: ./.github/workflows/compatibility.yml" in release_workflow
     assert "  pull_request:" in workflow
     assert workflow.count("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1") == 3
     assert "docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e" in workflow

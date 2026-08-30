@@ -1,6 +1,7 @@
 name: Containers
 
 on:
+  workflow_call:
   pull_request:
     paths:
       - ".github/workflows/containers.yml"
@@ -8,6 +9,7 @@ on:
       - "compatibility/server.py"
       - "deploy/**"
       - "pyproject.toml"
+      - "release/**"
       - "src/**"
       - "tests/deployment/**"
       - "uv.lock"
@@ -20,6 +22,7 @@ on:
       - "compatibility/server.py"
       - "deploy/**"
       - "pyproject.toml"
+      - "release/**"
       - "src/**"
       - "tests/deployment/**"
       - "uv.lock"
@@ -110,17 +113,23 @@ jobs:
             --volume "$PWD/artifacts/trivy-cache:/root/.cache/trivy" \
             aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
             image --input "/artifacts/${{ matrix.variant }}-image.tar" \
-            --scanners vuln --pkg-types os --ignore-unfixed \
-            --severity HIGH,CRITICAL --exit-code 1 --format json \
+            --scanners vuln --pkg-types os \
+            --severity HIGH,CRITICAL --exit-code 0 --format json \
             --output "/artifacts/${{ matrix.variant }}-trivy-os.json"
+          uv run --frozen python -m release.vulnerabilities \
+            --report "artifacts/${{ matrix.variant }}-trivy-os.json" \
+            --output "artifacts/${{ matrix.variant }}-trivy-os-policy.json"
           docker run --rm \
             --volume "$PWD/artifacts:/artifacts" \
             --volume "$PWD/artifacts/trivy-cache:/root/.cache/trivy" \
             aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
             sbom "/artifacts/${{ matrix.variant }}.spdx.json" \
-            --scanners vuln --pkg-types library --ignore-unfixed \
-            --severity HIGH,CRITICAL --exit-code 1 --format json \
+            --scanners vuln --pkg-types library \
+            --severity HIGH,CRITICAL --exit-code 0 --format json \
             --output "/artifacts/${{ matrix.variant }}-trivy-library.json"
+          uv run --frozen python -m release.vulnerabilities \
+            --report "artifacts/${{ matrix.variant }}-trivy-library.json" \
+            --output "artifacts/${{ matrix.variant }}-trivy-library-policy.json"
       - name: Remove the local image archive
         if: ${{ always() }}
         run: rm -f "artifacts/${{ matrix.variant }}-image.tar"
@@ -134,7 +143,9 @@ jobs:
             artifacts/${{ matrix.variant }}.spdx.json
             artifacts/${{ matrix.variant }}.cdx.json
             artifacts/${{ matrix.variant }}-trivy-os.json
+            artifacts/${{ matrix.variant }}-trivy-os-policy.json
             artifacts/${{ matrix.variant }}-trivy-library.json
+            artifacts/${{ matrix.variant }}-trivy-library-policy.json
           if-no-files-found: warn
           retention-days: 7
 

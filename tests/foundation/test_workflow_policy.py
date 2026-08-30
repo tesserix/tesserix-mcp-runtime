@@ -6,6 +6,9 @@ from pathlib import Path
 ROOT = Path(__file__).parents[2]
 WORKFLOW_ROOT = ROOT / ".github" / "workflows"
 IMMUTABLE_ACTION = re.compile(r"^\s*uses:\s+[^\s@]+@([0-9a-f]{40})(?:\s+#.*)?$")
+LOCAL_REUSABLE_WORKFLOW = re.compile(
+    r"^\s*uses:\s+\./\.github/workflows/[a-z0-9][a-z0-9._-]*\.yml\s*$"
+)
 
 
 def test_workflows_are_pinned_and_least_privilege() -> None:
@@ -29,7 +32,9 @@ def test_workflows_are_pinned_and_least_privilege() -> None:
         action_lines = [line for line in document.splitlines() if "uses:" in line]
         assert action_lines, name
         for line in action_lines:
-            assert IMMUTABLE_ACTION.match(line), f"{name}: action is not pinned: {line.strip()}"
+            assert IMMUTABLE_ACTION.match(line) or LOCAL_REUSABLE_WORKFLOW.match(line), (
+                f"{name}: action is not pinned: {line.strip()}"
+            )
 
         if "actions/checkout@" in document:
             assert "persist-credentials: false" in document, name

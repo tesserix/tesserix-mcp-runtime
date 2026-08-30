@@ -27,8 +27,9 @@ USER root
 WORKDIR /app
 COPY --from=build --chown=10001:10001 /opt/app /opt/app
 COPY --chown=10001:10001 compatibility/server.py /app/server.py
-RUN rm -f /bin/sh /bin/dash /bin/bash /usr/bin/dash /usr/bin/bash \
-    && test ! -e /bin/sh
+RUN /usr/local/bin/python -m pip uninstall --yes pip \
+ && rm -f /bin/sh /bin/dash /bin/bash /usr/bin/dash /usr/bin/bash \
+ && test ! -e /bin/sh
 ENV HOME=/home/app \
     PATH=/opt/app/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     TMPDIR=/tmp \

@@ -63,6 +63,7 @@ def test_reference_dockerfiles_are_pinned_minimal_and_explicit_about_adk() -> No
     assert "COPY --from=build /wheels/ /tmp/wheels/" in adk
     assert "/tmp/wheels/tesserix_mcp_runtime-*.whl" in adk
     assert "/tmp/runtime.whl" not in adk
+    assert "/opt/adk-venv/bin/python -m pip uninstall --yes pip" in adk
     for document in (core, adk):
         assert "SETUPTOOLS_SCM_PRETEND_VERSION=${PACKAGE_VERSION}" in document
         assert "USER 10001:10001" in document
@@ -71,6 +72,7 @@ def test_reference_dockerfiles_are_pinned_minimal_and_explicit_about_adk() -> No
         assert '"--allowed-host", "127.0.0.1"' in document
         assert '"--allowed-origin", "https://gateway.invalid"' in document
         assert "rm -f /bin/sh /bin/dash /bin/bash /usr/bin/dash /usr/bin/bash" in document
+        assert "/usr/local/bin/python -m pip uninstall --yes pip" in document
         assert "COPY . ." not in document
         assert "ARG TOKEN" not in document
         assert "ARG SECRET" not in document
@@ -96,6 +98,16 @@ def test_adk_variant_preserves_the_verified_base_dependency_lane() -> None:
     assert "opentelemetry-api>=1.42.1,<2" in project["dependencies"]
     assert project["optional-dependencies"]["otel"] == ["opentelemetry-sdk>=1.42.1,<2"]
     assert "runtime-requirements.txt" not in adk
+
+
+def test_container_verifier_rejects_runtime_package_installers() -> None:
+    verifier = (CONTAINER_ROOT / "verify.py").read_text(encoding="utf-8")
+
+    assert "def _assert_no_runtime_pip" in verifier
+    assert '"pip",' in verifier
+    assert '"--version",' in verifier
+    assert "runtime image exposes pip" in verifier
+    assert '"runtime_pip": False' in verifier
 
 
 def test_container_server_requires_explicit_non_loopback_host_and_origin_policy() -> None:

@@ -28,10 +28,12 @@ WORKDIR /app
 COPY --from=build /wheels/ /tmp/wheels/
 COPY --chown=10001:10001 compatibility/server.py /app/server.py
 RUN test "$TESSERIX_ADK_VERSION" = "$EXPECTED_ADK_VERSION" \
-    && /opt/adk-venv/bin/python -m pip install --no-cache-dir --no-deps \
-        /tmp/wheels/tesserix_mcp_runtime-*.whl \
-    && /opt/adk-venv/bin/python -m pip check \
-    && rm -rf /tmp/wheels \
+ && /opt/adk-venv/bin/python -m pip install --no-cache-dir --no-deps \
+      /tmp/wheels/tesserix_mcp_runtime-*.whl \
+ && /opt/adk-venv/bin/python -m pip check \
+ && /opt/adk-venv/bin/python -m pip uninstall --yes pip \
+ && /usr/local/bin/python -m pip uninstall --yes pip \
+ && rm -rf /tmp/wheels \
     && rm -f /bin/sh /bin/dash /bin/bash /usr/bin/dash /usr/bin/bash \
     && test ! -e /bin/sh
 ENV HOME=/home/app \
