@@ -10,6 +10,7 @@ from typing import Any, Final, TypeGuard
 
 from tesserix_mcp_runtime.contracts import CallContext, Cancellation, Clock, ErrorCode
 from tesserix_mcp_runtime.errors import RuntimeFailure
+from tesserix_mcp_runtime.observability import RuntimeLimit, RuntimeObservability
 
 _INTEGER_MAXIMA: Final = (
     ("max_input_bytes", 65_536),
@@ -111,9 +112,20 @@ async def _cancel_tasks(*tasks: asyncio.Task[Any]) -> None:
 
 
 class ExecutionController:
-    def __init__(self, limits: ExecutionLimits, *, clock: Clock) -> None:
+    def __init__(
+        self,
+        limits: ExecutionLimits,
+        *,
+        clock: Clock,
+        observability: RuntimeObservability | None = None,
+    ) -> None:
         self._limits = limits
         self._clock = clock
+        self._observability = (
+            RuntimeObservability(server_name="tesserix-mcp-runtime")
+            if observability is None
+            else observability
+        )
         self._active = 0
         self._by_tool: dict[str, int] = {}
         self._by_tenant: dict[str, int] = {}
@@ -176,6 +188,7 @@ class ExecutionController:
         *,
         context: CallContext,
         safe: bool,
+        tool_name: str,
     ) -> ResultT:
         attempts = self._limits.max_attempts if safe else 1
         for attempt in range(1, attempts + 1):
@@ -192,6 +205,7 @@ class ExecutionController:
                 now = self._clock.now()
                 if context.deadline is None or now + delay >= context.deadline:
                     raise TimeoutError from error
+                self._observability.record_retry(tool_name=tool_name)
                 await self._clock.sleep(delay)
                 if context.cancelled:
                     raise asyncio.CancelledError from error
@@ -230,22 +244,39 @@ class ExecutionController:
     def admit(self, *, tool_name: str, tenant: str) -> _ExecutionLease | None:
         tool_active = self._by_tool.get(tool_name, 0)
         tenant_active = self._by_tenant.get(tenant, 0)
-        if (
-            self._active >= self._limits.max_global_concurrency
-            or self._active >= self._limits.max_server_concurrency
-            or tool_active >= self._limits.max_tool_concurrency
-            or tenant_active >= self._limits.max_tenant_concurrency
-        ):
+        limit = None
+        if self._active >= self._limits.max_global_concurrency:
+            limit = RuntimeLimit.GLOBAL
+        elif self._active >= self._limits.max_server_concurrency:
+            limit = RuntimeLimit.SERVER
+        elif tool_active >= self._limits.max_tool_concurrency:
+            limit = RuntimeLimit.TOOL
+        elif tenant_active >= self._limits.max_tenant_concurrency:
+            limit = RuntimeLimit.TENANT
+        if limit is not None:
+            self._observability.record_limit(tool_name=tool_name, limit=limit)
             return None
         self._active += 1
         self._by_tool[tool_name] = tool_active + 1
         self._by_tenant[tenant] = tenant_active + 1
+        self._observability.change_in_flight(
+            tool_name=tool_name,
+            delta=1,
+            server_capacity=self._limits.max_server_concurrency,
+            tool_capacity=self._limits.max_tool_concurrency,
+        )
         return _ExecutionLease(tool_name=tool_name, tenant=tenant)
 
     def release(self, lease: _ExecutionLease) -> None:
         self._active -= 1
         self._decrement(self._by_tool, lease.tool_name)
         self._decrement(self._by_tenant, lease.tenant)
+        self._observability.change_in_flight(
+            tool_name=lease.tool_name,
+            delta=-1,
+            server_capacity=self._limits.max_server_concurrency,
+            tool_capacity=self._limits.max_tool_concurrency,
+        )
 
     @staticmethod
     def _decrement(counts: dict[str, int], key: str) -> None:

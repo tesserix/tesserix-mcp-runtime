@@ -56,10 +56,24 @@ from tesserix_mcp_runtime.errors import (
     map_exception,
 )
 from tesserix_mcp_runtime.execution import ExecutionLimits
+from tesserix_mcp_runtime.health import ReadinessCheck, RuntimeOperationsEndpoint
 from tesserix_mcp_runtime.lifecycle import (
     LifecycleController,
     LifecycleFailure,
     LifecycleTransitionError,
+)
+from tesserix_mcp_runtime.observability import (
+    RuntimeExporter,
+    RuntimeLimit,
+    RuntimeLogEvent,
+    RuntimeLogName,
+    RuntimeObservability,
+    RuntimeOperation,
+    RuntimeOutcome,
+    RuntimeReason,
+    RuntimeSpan,
+    RuntimeSpanName,
+    RuntimeSpanSpec,
 )
 from tesserix_mcp_runtime.policy import (
     ApprovalRecord,
@@ -140,11 +154,24 @@ __all__ = [
     "LifecycleTransitionError",
     "MappedError",
     "MetadataPolicy",
+    "ReadinessCheck",
     "RedactionError",
     "RedactionLimits",
     "RedactionPolicy",
     "Retryability",
+    "RuntimeExporter",
     "RuntimeFailure",
+    "RuntimeLimit",
+    "RuntimeLogEvent",
+    "RuntimeLogName",
+    "RuntimeObservability",
+    "RuntimeOperation",
+    "RuntimeOperationsEndpoint",
+    "RuntimeOutcome",
+    "RuntimeReason",
+    "RuntimeSpan",
+    "RuntimeSpanName",
+    "RuntimeSpanSpec",
     "SchemaChange",
     "SchemaDirection",
     "SchemaPolicy",

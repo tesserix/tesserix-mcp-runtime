@@ -113,6 +113,11 @@ Timeout values that are empty, zero, non-decimal, non-ASCII, leading-zero, or
 longer than nine digits also fail closed. Values from tool arguments are never
 inspected as identity.
 
+Malformed optional trace context does not change verified identity or reject a
+tool call. It is discarded, the observation adapter starts a safe local trace,
+and only the stable `malformed_trace_context` reason is emitted. The supplied
+header value is never echoed into logs, spans, metrics, or errors.
+
 MCP metadata with the prefixes `tesserix/runtime/` and `tesserix/adk/` is never
 promoted to authority. Matching values are tolerated for compatibility;
 mismatched tenant, subject, run, scopes, trace, idempotency, or approval

@@ -43,6 +43,7 @@ def test_core_dependency_report_matches_frozen_resolution() -> None:
         "httpx>=0.28.1,<1",
         "mcp-types>=2.1.1,<3",
         "mcp>=2.1.1,<3",
+        "opentelemetry-api>=1.44,<2",
         "uvicorn>=0.52.4,<1",
     ]
     assert result["profiles"]["core"]["distribution_count"] == 34
@@ -53,6 +54,11 @@ def test_core_dependency_report_matches_frozen_resolution() -> None:
         "tesserix-adk @ https://github.com/tesserix/agent-development-kit/releases/"
     )
     assert result["profiles"]["adk"]["distribution_count"] == 35
+    assert result["profiles"]["otel"]["distribution_count"] == 36
+    assert result["profiles"]["otel"]["declared_dependencies"][-2:] == [
+        "opentelemetry-sdk>=1.44,<2",
+        "uvicorn>=0.52.4,<1",
+    ]
 
 
 def test_adk_is_forbidden_outside_its_explicit_dependency_profile(tmp_path: Path) -> None:

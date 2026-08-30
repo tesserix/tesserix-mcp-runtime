@@ -23,10 +23,14 @@ def test_adk_bridge_is_an_exact_optional_release_dependency() -> None:
         "httpx>=0.28.1,<1",
         "mcp>=2.1.1,<3",
         "mcp-types>=2.1.1,<3",
+        "opentelemetry-api>=1.44,<2",
         "PyJWT[crypto]>=2.13,<3",
         "uvicorn>=0.52.4,<1",
     ]
-    assert project["optional-dependencies"] == {"adk": [ADK_WHEEL]}
+    assert project["optional-dependencies"] == {
+        "adk": [ADK_WHEEL],
+        "otel": ["opentelemetry-sdk>=1.44,<2"],
+    }
     assert document["tool"]["hatch"]["metadata"] == {"allow-direct-references": True}
 
 

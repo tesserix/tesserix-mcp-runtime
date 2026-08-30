@@ -50,6 +50,10 @@ The safe default is loopback-only, stateless, and finite:
 | Host | `127.0.0.1` |
 | Port | `8000` |
 | Path | `/mcp` |
+| Startup path | `/startupz` |
+| Liveness path | `/livez` |
+| Readiness path | `/readyz` |
+| Metrics path | `/metrics` |
 | Stateful sessions | disabled |
 | Request body | 65,536 bytes |
 | Request headers | 128 / 32,768 bytes |
@@ -76,7 +80,8 @@ upstream path:
 client /gateway/runtime/mcp  ->  AgentGateway  ->  runtime /mcp
 ```
 
-One trailing slash is accepted. Other paths return a generic 404. The listener
+One trailing slash is accepted. Operational paths are explicit and must be
+distinct from the MCP path and from each other. Other paths return a generic 404. The listener
 does not trust `Forwarded` or `X-Forwarded-*` headers and does not infer an
 upstream path from them.
 
@@ -131,6 +136,18 @@ calls receive the application's bounded drain window; `stop()` then asks
 Uvicorn to exit gracefully and force-cancels it only after the listener grace
 period. Uvicorn signal handlers are disabled so the application remains the
 single process-signal owner.
+
+Lifecycle enters `draining` before transport admission closes, so `/readyz`
+returns 503 first. `/livez` and `/metrics` remain available until listener
+stop, and the in-flight metrics show accepted calls reaching zero. Startup and
+liveness never call dependencies. Readiness runs only configured application
+checks inside `ApplicationLimits.readiness_timeout`.
+
+Operational routes accept GET and HEAD without gateway identity, return no
+dependency or caller detail, and disable caching. Keep the listener private:
+the metrics contract contains registered tool names. See the
+[observability guide](observability.md) for the complete endpoint, metric,
+dashboard, and alert contract.
 
 ## Failure responses
 

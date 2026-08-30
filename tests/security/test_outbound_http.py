@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import gzip
+import hashlib
 import logging
 import ssl
 import traceback
@@ -11,8 +12,14 @@ from typing import Any
 
 import httpcore
 import pytest
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from tesserix_mcp_runtime import ErrorCode, JsonValue
+from tesserix_mcp_runtime.adapters.opentelemetry import OpenTelemetryRuntimeExporter
 from tesserix_mcp_runtime.adapters.outbound_http import (
     HostResolver,
     OutboundHTTPAuditEvent,
@@ -27,6 +34,13 @@ from tesserix_mcp_runtime.egress import (
     DeclaredEgressPolicy,
     EgressDestination,
     EgressManifest,
+)
+from tesserix_mcp_runtime.observability import (
+    RuntimeObservability,
+    RuntimeOperation,
+    RuntimeOutcome,
+    RuntimeSpanName,
+    RuntimeSpanSpec,
 )
 from tesserix_mcp_runtime.redaction import (
     RedactionLimits,
@@ -217,6 +231,7 @@ def client(
     limits: OutboundHTTPLimits | None = None,
     audit_sink: OutboundHTTPAuditSink | None = None,
     redactor: RedactionPolicy | None = None,
+    observability: RuntimeObservability | None = None,
 ) -> OutboundHTTPClient:
     return OutboundHTTPClient(
         policy=DeclaredEgressPolicy(
@@ -227,6 +242,7 @@ def client(
         limits=limits or OutboundHTTPLimits(),
         redactor=redactor or SecretRedactor(known_secrets=(SecretValue(CANARY),)),
         audit_sink=audit_sink,
+        observability=observability,
     )
 
 
@@ -251,6 +267,66 @@ def test_client_connects_to_the_validated_ip_with_original_tls_name() -> None:
         assert b"GET /v1/items?limit=2 HTTP/1.1" in written
         assert b"Host: api.example.test" in written
         await outbound.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_downstream_call_emits_a_child_span_and_red_metric_without_url_data() -> None:
+    async def exercise() -> None:
+        spans = InMemorySpanExporter()
+        tracer_provider = TracerProvider()
+        tracer_provider.add_span_processor(SimpleSpanProcessor(spans))
+        metric_reader = InMemoryMetricReader()
+        meter_provider = MeterProvider(metric_readers=(metric_reader,))
+        exporter = OpenTelemetryRuntimeExporter(
+            server_name="orders-mcp",
+            tracer=tracer_provider.get_tracer("test.outbound"),
+            meter=meter_provider.get_meter("test.outbound"),
+        )
+        observability = RuntimeObservability(server_name="orders-mcp", exporter=exporter)
+        backend = ScriptedNetworkBackend([ConnectionScript(raw_response(200, body=b"ok"))])
+        outbound = client(
+            backend,
+            StaticResolver({"api.example.test": (PUBLIC_V4,)}),
+            observability=observability,
+        )
+
+        with observability.start_span(
+            RuntimeSpanSpec(
+                name=RuntimeSpanName.MCP_REQUEST,
+                server_name="orders-mcp",
+                operation=RuntimeOperation.MCP_REQUEST,
+            )
+        ) as root:
+            response = await outbound.request(
+                "GET",
+                "https://api.example.test/private/items?account=internal",
+                request_id=f"request-{CANARY}",
+            )
+            root.set_outcome(RuntimeOutcome.SUCCESS)
+
+        assert response.status_code == 200
+        finished = spans.get_finished_spans()
+        assert [span.name for span in finished] == [
+            "mcp.client.request",
+            "mcp.server.request",
+        ]
+        assert finished[0].parent == finished[1].context
+        assert finished[0].attributes == {
+            "mcp.server.name": "orders-mcp",
+            "mcp.operation": "downstream",
+            "mcp.destination.fingerprint": hashlib.sha256(b"api.example.test:443").hexdigest(),
+            "mcp.outcome": "success",
+        }
+        assert CANARY not in str(finished[0].attributes)
+        assert "private/items" not in str(finished[0].attributes)
+        assert (
+            'mcp_server_request_count_total{operation="downstream",outcome="success",'
+            'server="orders-mcp",tool="none"} 1' in observability.render_prometheus()
+        )
+        await outbound.aclose()
+        tracer_provider.shutdown()
+        meter_provider.shutdown()
 
     asyncio.run(exercise())
 

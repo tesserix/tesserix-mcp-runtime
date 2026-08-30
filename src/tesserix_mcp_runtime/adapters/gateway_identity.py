@@ -27,6 +27,12 @@ from tesserix_mcp_runtime.contracts import (
     JsonValue,
     TraceContext,
 )
+from tesserix_mcp_runtime.observability import (
+    RuntimeLogEvent,
+    RuntimeLogName,
+    RuntimeObservability,
+    RuntimeReason,
+)
 
 _SUPPORTED_ALGORITHMS = frozenset({"RS256", "ES256", "EdDSA"})
 _RESERVED_TENANT_CLAIMS = frozenset(
@@ -230,17 +236,23 @@ class GatewayJWTContextProvider:
         wall_clock: Callable[[], float] = time.time,
         cache_clock: Callable[[], float] = time.monotonic,
         request_id_factory: Callable[[], str] = lambda: secrets.token_hex(16),
+        observability: RuntimeObservability | None = None,
     ) -> None:
         if not _is_runtime_instance(config, GatewayIdentityConfig):
             raise TypeError("config must be GatewayIdentityConfig")
         resolved_fetcher = jwks_fetcher or HTTPSJWKSFetcher(config)
         if not _is_runtime_instance(resolved_fetcher, JWKSFetcher):
             raise TypeError("jwks_fetcher must implement JWKSFetcher")
+        if observability is not None and not _is_runtime_instance(
+            observability, RuntimeObservability
+        ):
+            raise TypeError("observability must be RuntimeObservability")
         self._config = config
         self._fetcher = resolved_fetcher
         self._wall_clock = wall_clock
         self._cache_clock = cache_clock
         self._request_id_factory = request_id_factory
+        self._observability = observability
         self._trusted_networks = tuple(
             ipaddress.ip_network(item, strict=True) for item in config.trusted_proxy_cidrs
         )
@@ -305,10 +317,21 @@ class GatewayJWTContextProvider:
                 run_id = _bounded_claim(claimed_run, maximum=256)
                 if forwarded_run is not None and forwarded_run != run_id:
                     raise _IdentityRejected
-            trace_context = TraceContext(
-                traceparent=self._optional_header(request, "traceparent"),
-                tracestate=self._optional_header(request, "tracestate"),
-            )
+            try:
+                trace_context = TraceContext(
+                    traceparent=self._optional_header(request, "traceparent"),
+                    tracestate=self._optional_header(request, "tracestate"),
+                )
+            except ValueError:
+                trace_context = TraceContext()
+                if self._observability is not None:
+                    self._observability.emit_log(
+                        RuntimeLogEvent(
+                            name=RuntimeLogName.TRACE_CONTEXT_REJECTED,
+                            server_name=self._observability.server_name,
+                            reason=RuntimeReason.MALFORMED_TRACE_CONTEXT,
+                        )
+                    )
             idempotency_key = self._optional_header(request, "idempotency-key")
             approval_id = self._optional_header(request, "x-tesserix-approval-id")
             timeout_header = self._optional_header(request, "x-tesserix-timeout-ms")

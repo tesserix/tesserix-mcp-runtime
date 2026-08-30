@@ -32,6 +32,8 @@ from tesserix_mcp_runtime.contracts import (
     Telemetry,
     ToolEffect,
 )
+from tesserix_mcp_runtime.health import RuntimeOperationsEndpoint
+from tesserix_mcp_runtime.observability import RuntimeObservability
 from tesserix_mcp_runtime.redaction import DEFAULT_REDACTION_POLICY, RedactionPolicy
 from tesserix_mcp_runtime.tool_manifest import ToolManifest
 
@@ -294,6 +296,10 @@ class StreamableHTTPConfig:
     host: str = "127.0.0.1"
     port: int = 8_000
     path: str = "/mcp"
+    startup_path: str = "/startupz"
+    liveness_path: str = "/livez"
+    readiness_path: str = "/readyz"
+    metrics_path: str = "/metrics"
     stateless: bool = True
     allowed_hosts: tuple[str, ...] = ()
     allowed_origins: tuple[str, ...] = ()
@@ -322,7 +328,23 @@ class StreamableHTTPConfig:
                 raise ValueError("allowed_hosts must be explicit for non-loopback listeners")
             if not self.allowed_origins:
                 raise ValueError("allowed_origins must be explicit for non-loopback listeners")
-        object.__setattr__(self, "path", _normalize_path(self.path))
+        for field in (
+            "path",
+            "startup_path",
+            "liveness_path",
+            "readiness_path",
+            "metrics_path",
+        ):
+            object.__setattr__(self, field, _normalize_path(getattr(self, field)))
+        paths = {
+            self.path,
+            self.startup_path,
+            self.liveness_path,
+            self.readiness_path,
+            self.metrics_path,
+        }
+        if len(paths) != 5:
+            raise ValueError("MCP and operational paths must be distinct")
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -646,6 +668,28 @@ async def _send_json(
     await send({"type": "http.response.body", "body": body, "more_body": False})
 
 
+async def _send_metrics(send: ASGISend, *, body: bytes, head: bool) -> None:
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 200,
+            "headers": [
+                (b"content-type", b"text/plain; version=0.0.4; charset=utf-8"),
+                (b"content-length", str(len(body)).encode("ascii")),
+                (b"cache-control", b"no-store"),
+                (b"x-content-type-options", b"nosniff"),
+            ],
+        }
+    )
+    await send(
+        {
+            "type": "http.response.body",
+            "body": b"" if head else body,
+            "more_body": False,
+        }
+    )
+
+
 def _protocol_error_body(
     *,
     code: int,
@@ -782,6 +826,67 @@ class _ProtocolASGIApp:
         self._detached_streams.add(task)
         task.add_done_callback(self._detached_streams.discard)
 
+    async def _serve_operations(
+        self,
+        *,
+        path: str,
+        method: object,
+        send: ASGISend,
+    ) -> bool:
+        config = self._transport.config
+        normalized_path = path.removesuffix("/") or "/"
+        if normalized_path not in {
+            config.startup_path,
+            config.liveness_path,
+            config.readiness_path,
+            config.metrics_path,
+        }:
+            return False
+        if method not in {"GET", "HEAD"}:
+            await _send_json(
+                send,
+                status=405,
+                body=b'{"status":"method_not_allowed"}',
+            )
+            return True
+
+        endpoint = self._transport.operations_endpoint
+        if normalized_path == config.metrics_path:
+            metrics = (
+                endpoint.render_metrics()
+                if endpoint is not None
+                else self._transport.fallback_metrics()
+            )
+            await _send_metrics(
+                send,
+                body=metrics.encode("utf-8"),
+                head=method == "HEAD",
+            )
+            return True
+
+        if normalized_path == config.liveness_path:
+            healthy = endpoint.liveness_status() if endpoint is not None else True
+            status = 200 if healthy else 503
+            body = b'{"status":"live"}' if healthy else b'{"status":"not_live"}'
+        elif normalized_path == config.startup_path:
+            healthy = (
+                endpoint.startup_status() if endpoint is not None else self._transport.accepting
+            )
+            status = 200 if healthy else 503
+            body = b'{"status":"started"}' if healthy else b'{"status":"starting"}'
+        else:
+            healthy = self._transport.accepting and (
+                await endpoint.readiness_status() if endpoint is not None else True
+            )
+            status = 200 if healthy else 503
+            body = b'{"status":"ready"}' if healthy else b'{"status":"not_ready"}'
+        await _send_json(
+            send,
+            status=status,
+            body=b"" if method == "HEAD" else body,
+        )
+        return True
+
     async def __call__(
         self,
         scope: ASGIScope,
@@ -793,6 +898,12 @@ class _ProtocolASGIApp:
             return
         configured_path = self._transport.config.path
         request_path = scope.get("path")
+        if isinstance(request_path, str) and await self._serve_operations(
+            path=request_path,
+            method=scope.get("method"),
+            send=send,
+        ):
+            return
         if request_path not in {configured_path, f"{configured_path}/"}:
             await _send_json(
                 send,
@@ -1083,8 +1194,10 @@ class StreamableHTTPTransport:
         self._telemetry = telemetry
         self._redactor = redactor
         self._listener = resolved_listener
+        self._fallback_observability = RuntimeObservability(server_name="tesserix-mcp-runtime")
         self._endpoint: ApplicationEndpoint | None = None
         self._protocol_endpoint: StreamableHTTPProtocolEndpoint | None = None
+        self._operations_endpoint: RuntimeOperationsEndpoint | None = None
         self._manifests: tuple[ToolManifest, ...] = ()
         self._protocol_tools: tuple[ProtocolToolDescriptor, ...] = ()
         self._catalog_token = ""
@@ -1139,6 +1252,13 @@ class StreamableHTTPTransport:
     @property
     def limits(self) -> StreamableHTTPLimits:
         return self._limits
+
+    @property
+    def operations_endpoint(self) -> RuntimeOperationsEndpoint | None:
+        return self._operations_endpoint
+
+    def fallback_metrics(self) -> str:
+        return self._fallback_observability.render_prometheus()
 
     @property
     def context_provider(self) -> HTTPCallContextProvider:
@@ -1689,6 +1809,7 @@ class StreamableHTTPTransport:
         self,
         endpoint: ApplicationEndpoint | StreamableHTTPProtocolEndpoint,
     ) -> None:
+        operations_endpoint = endpoint if isinstance(endpoint, RuntimeOperationsEndpoint) else None
         if isinstance(endpoint, StreamableHTTPProtocolEndpoint):
             protocol_endpoint = endpoint
             protocol_tools = protocol_endpoint.protocol_tools()
@@ -1741,6 +1862,7 @@ class StreamableHTTPTransport:
             )
         self._endpoint = cast(ApplicationEndpoint, endpoint) if protocol_endpoint is None else None
         self._protocol_endpoint = protocol_endpoint
+        self._operations_endpoint = operations_endpoint
         self._manifests = manifests
         self._protocol_tools = protocol_tools
         catalog_entries = (
@@ -1773,6 +1895,7 @@ class StreamableHTTPTransport:
         self._active_protocol_requests.clear()
         self._endpoint = None
         self._protocol_endpoint = None
+        self._operations_endpoint = None
         self._manifests = ()
         self._protocol_tools = ()
         self._catalog_token = ""

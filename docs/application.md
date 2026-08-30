@@ -25,8 +25,9 @@ application = Application(
     authorizer=authorizer,
     transport=InProcessTransport(),
     telemetry=telemetry,
-    limits=ApplicationLimits(drain_timeout=20.0),
+    limits=ApplicationLimits(drain_timeout=20.0, readiness_timeout=1.0),
     clock=SystemClock(),
+    readiness_checks=(registry_check, backing_api_check),
 )
 
 result = asyncio.run(application.run(ProcessSignalSource()))
@@ -49,6 +50,7 @@ composition, conformance, and smoke tests.
 | `ApplicationTransport` | Bind last, reject after drain begins, stop first |
 | `Telemetry[ScrubbedError]` | Receive no payloads; sink failures are counted without changing the client result |
 | `ApplicationLimits` | Supply the positive finite global drain duration |
+| readiness checks | Return dependency ability to accept new work inside the bounded readiness timeout; never participate in liveness |
 | `Clock` | Supply monotonic time and cancellable deadline waits |
 | lifecycle tuple | Start in order and unwind in reverse |
 
@@ -57,6 +59,13 @@ composition, conformance, and smoke tests.
 sets the state before its first hook, so a concurrent second call cannot enter.
 Accepted work may finish until the deadline; remaining tasks are cancelled and
 joined before the deadline failure returns.
+
+`startup_status()`, `liveness_status()`, `readiness_status()`, and
+`render_metrics()` form the typed operational endpoint used by HTTP transports.
+Readiness is true only in lifecycle `ready` after every configured check returns
+exactly `True`. Checks run concurrently within a one-second default and
+five-second hard maximum. False, timeout, or exception returns false and emits
+only a stable reason. Liveness is dependency-free.
 
 ## Manual lifecycle in tests
 

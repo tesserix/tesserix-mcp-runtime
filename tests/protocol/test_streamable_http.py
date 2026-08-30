@@ -115,6 +115,27 @@ class FakeEndpoint:
         return InvocationResult.success({"text": str(arguments.get("text", ""))})
 
 
+class OperationalFakeEndpoint(FakeEndpoint):
+    def __init__(self, manifests: tuple[ToolManifest, ...]) -> None:
+        super().__init__(manifests)
+        self.started = False
+        self.ready = False
+        self.readiness_calls = 0
+
+    def startup_status(self) -> bool:
+        return self.started
+
+    def liveness_status(self) -> bool:
+        return True
+
+    async def readiness_status(self) -> bool:
+        self.readiness_calls += 1
+        return self.ready
+
+    def render_metrics(self) -> str:
+        return '# TYPE mcp_fixture gauge\nmcp_fixture{server="fixture"} 1\n'
+
+
 class FakeProtocolSession:
     def __init__(
         self,
@@ -595,6 +616,10 @@ def test_streamable_http_defaults_are_private_stateless_and_bounded() -> None:
     assert config.host == "127.0.0.1"
     assert config.port == 8000
     assert config.path == "/mcp"
+    assert config.startup_path == "/startupz"
+    assert config.liveness_path == "/livez"
+    assert config.readiness_path == "/readyz"
+    assert config.metrics_path == "/metrics"
     assert config.stateless is True
     assert config.allowed_hosts == ()
     assert config.allowed_origins == ()
@@ -633,6 +658,14 @@ def test_streamable_http_path_is_normalized_once(configured: str, normalized: st
 def test_streamable_http_path_rejects_ambiguous_routes(path: str) -> None:
     with pytest.raises(ValueError, match="path"):
         StreamableHTTPConfig(path=path)
+
+
+def test_operational_paths_must_be_distinct_from_each_other_and_mcp() -> None:
+    with pytest.raises(ValueError, match="distinct"):
+        StreamableHTTPConfig(readiness_path="/mcp")
+
+    with pytest.raises(ValueError, match="distinct"):
+        StreamableHTTPConfig(startup_path="/health", liveness_path="/health")
 
 
 @pytest.mark.parametrize(
@@ -2077,6 +2110,73 @@ def test_route_normalization_accepts_one_trailing_slash_and_hides_other_paths() 
         assert missing == 404
         assert b"tesserix" not in missing_body.lower()
         assert len(provider.requests) == 1
+        await transport.stop()
+
+    asyncio.run(exercise())
+
+
+def test_same_listener_operational_routes_remain_available_during_drain() -> None:
+    async def exercise() -> None:
+        listener = FakeListener()
+        provider = StaticContextProvider()
+        endpoint = OperationalFakeEndpoint((manifest("examples.echo"),))
+        transport = StreamableHTTPTransport(
+            config=StreamableHTTPConfig(),
+            limits=StreamableHTTPLimits(),
+            context_provider=provider,
+            telemetry=RecordingProtocolTelemetry(),
+            listener=listener,
+        )
+        await transport.start(endpoint)
+        assert listener.app is not None
+
+        startup, startup_headers, startup_body = await call_asgi(
+            listener.app,
+            method="GET",
+            path="/startupz",
+        )
+        liveness, _, liveness_body = await call_asgi(
+            listener.app,
+            method="GET",
+            path="/livez",
+        )
+        readiness, _, readiness_body = await call_asgi(
+            listener.app,
+            method="GET",
+            path="/readyz",
+        )
+        metrics, metrics_headers, metrics_body = await call_asgi(
+            listener.app,
+            method="GET",
+            path="/metrics",
+        )
+
+        assert startup == 503
+        assert json.loads(startup_body) == {"status": "starting"}
+        assert (b"cache-control", b"no-store") in startup_headers
+        assert liveness == 200
+        assert json.loads(liveness_body) == {"status": "live"}
+        assert readiness == 503
+        assert json.loads(readiness_body) == {"status": "not_ready"}
+        assert metrics == 200
+        assert metrics_body == b'# TYPE mcp_fixture gauge\nmcp_fixture{server="fixture"} 1\n'
+        assert any(
+            name == b"content-type" and value.startswith(b"text/plain")
+            for name, value in metrics_headers
+        )
+        assert provider.requests == []
+
+        endpoint.started = True
+        endpoint.ready = True
+        assert (await call_asgi(listener.app, method="GET", path="/startupz"))[0] == 200
+        assert (await call_asgi(listener.app, method="GET", path="/readyz"))[0] == 200
+
+        await transport.drain(deadline=10.0)
+
+        assert (await call_asgi(listener.app, method="GET", path="/readyz"))[0] == 503
+        assert (await call_asgi(listener.app, method="GET", path="/livez"))[0] == 200
+        assert (await call_asgi(listener.app, method="GET", path="/metrics"))[0] == 200
+        assert endpoint.readiness_calls == 2
         await transport.stop()
 
     asyncio.run(exercise())

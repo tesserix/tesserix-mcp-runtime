@@ -8,6 +8,7 @@ import ipaddress
 import re
 import socket
 import ssl
+import time
 from collections.abc import AsyncIterable, AsyncIterator, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol, cast, runtime_checkable
@@ -23,6 +24,13 @@ from tesserix_mcp_runtime.egress import (
     EgressPolicyViolation,
 )
 from tesserix_mcp_runtime.errors import RuntimeFailure
+from tesserix_mcp_runtime.observability import (
+    RuntimeObservability,
+    RuntimeOperation,
+    RuntimeOutcome,
+    RuntimeSpanName,
+    RuntimeSpanSpec,
+)
 from tesserix_mcp_runtime.redaction import (
     REDACTED_TEXT,
     RedactionError,
@@ -335,6 +343,32 @@ def _destination_fingerprint(destination: EgressDestination | None) -> str:
     return hashlib.sha256(authority.encode("ascii")).hexdigest()
 
 
+def _downstream_error_outcome(error: BaseException) -> RuntimeOutcome:
+    if isinstance(error, asyncio.CancelledError):
+        return RuntimeOutcome.CANCELLATION
+    if isinstance(error, EgressPolicyViolation):
+        return RuntimeOutcome.POLICY_REFUSAL
+    if isinstance(error, TimeoutError | httpcore.TimeoutException | httpx.TimeoutException):
+        return RuntimeOutcome.TIMEOUT
+    if isinstance(error, OutboundHTTPError):
+        return {
+            ErrorCode.FORBIDDEN: RuntimeOutcome.POLICY_REFUSAL,
+            ErrorCode.TIMEOUT: RuntimeOutcome.TIMEOUT,
+            ErrorCode.UNAVAILABLE: RuntimeOutcome.DEPENDENCY_OUTAGE,
+            ErrorCode.INVALID_INPUT: RuntimeOutcome.INVALID_INPUT,
+            ErrorCode.RESULT_TOO_LARGE: RuntimeOutcome.LIMIT_EXCEEDED,
+        }.get(error.error.code, RuntimeOutcome.TOOL_FAILURE)
+    return RuntimeOutcome.DEPENDENCY_OUTAGE
+
+
+def _downstream_response_outcome(status_code: int) -> RuntimeOutcome:
+    if status_code >= 500:
+        return RuntimeOutcome.DEPENDENCY_OUTAGE
+    if status_code >= 400:
+        return RuntimeOutcome.TOOL_FAILURE
+    return RuntimeOutcome.SUCCESS
+
+
 def _safe_request_id(redactor: RedactionPolicy, request_id: str) -> str:
     if not _is_runtime_instance(request_id, str):
         return "redaction-failed-invalid"
@@ -430,6 +464,7 @@ class OutboundHTTPClient:
         network_backend: httpcore.AsyncNetworkBackend | None = None,
         audit_sink: OutboundHTTPAuditSink | None = None,
         ssl_context: ssl.SSLContext | None = None,
+        observability: RuntimeObservability | None = None,
     ) -> None:
         resolver = resolver or SystemHostResolver()
         network_backend = network_backend or cast(
@@ -445,6 +480,10 @@ class OutboundHTTPClient:
             or (
                 audit_sink is not None
                 and not _is_runtime_instance(audit_sink, OutboundHTTPAuditSink)
+            )
+            or (
+                observability is not None
+                and not _is_runtime_instance(observability, RuntimeObservability)
             )
             or (
                 ssl_context is not None
@@ -474,6 +513,11 @@ class OutboundHTTPClient:
         self._redactor = redactor
         self._limits = limits
         self._audit_sink = audit_sink
+        self._observability = (
+            RuntimeObservability(server_name="tesserix-mcp-runtime")
+            if observability is None
+            else observability
+        )
         self._audit_failures = 0
         self._closed = False
         self._transport = _CoreTransport(pool)
@@ -560,7 +604,7 @@ class OutboundHTTPClient:
 
         try:
             async with asyncio.timeout(self._limits.request_timeout):
-                response = await self._follow_redirects(
+                response = await self._observed_follow_redirects(
                     method=audit_method,
                     url=current_url,
                     destination=audit_destination,
@@ -636,6 +680,51 @@ class OutboundHTTPClient:
             status_code=response.status_code,
         )
         return response
+
+    async def _observed_follow_redirects(
+        self,
+        *,
+        method: str,
+        url: httpx.URL,
+        destination: EgressDestination,
+        headers: dict[str, str],
+        content: bytes,
+        protected_secrets: tuple[str, ...],
+    ) -> OutboundHTTPResponse:
+        started_at = time.perf_counter()
+        outcome = RuntimeOutcome.TOOL_FAILURE
+        with self._observability.start_span(
+            RuntimeSpanSpec(
+                name=RuntimeSpanName.DOWNSTREAM,
+                server_name=self._observability.server_name,
+                operation=RuntimeOperation.DOWNSTREAM,
+                destination_fingerprint=_destination_fingerprint(destination),
+            )
+        ) as span:
+            try:
+                response = await self._follow_redirects(
+                    method=method,
+                    url=url,
+                    destination=destination,
+                    headers=headers,
+                    content=content,
+                    protected_secrets=protected_secrets,
+                )
+            except BaseException as error:
+                outcome = _downstream_error_outcome(error)
+                span.set_outcome(outcome)
+                raise
+            else:
+                outcome = _downstream_response_outcome(response.status_code)
+                span.set_outcome(outcome)
+                return response
+            finally:
+                self._observability.record_call(
+                    operation=RuntimeOperation.DOWNSTREAM,
+                    tool_name=None,
+                    outcome=outcome,
+                    duration_seconds=max(0.0, time.perf_counter() - started_at),
+                )
 
     def _request_headers(
         self,

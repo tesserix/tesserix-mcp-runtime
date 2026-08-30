@@ -28,6 +28,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | ADK `AgentToolView` and `McpServer` bridge | Implemented as an exact optional profile |
 | Default-deny per-tool scopes, effects, approvals, idempotency, and audit | Implemented in source; pre-release |
 | Bounded JSON, concurrency, deadlines, cancellation, and safe retries | Implemented in source; pre-release |
+| [Bounded telemetry, health, and graceful drain](docs/observability.md) | Implemented in source; pre-release |
 | Registry manifest compilation, signing, publication, and verification | Planned; not implemented |
 | Registry-backed semantic discovery and progressive disclosure | Planned; not implemented |
 | Automatic Gateway route pickup and activation status | Planned; not implemented |

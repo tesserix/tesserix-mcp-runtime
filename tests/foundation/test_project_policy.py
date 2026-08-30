@@ -56,6 +56,7 @@ def test_project_declares_the_hermetic_quality_policy() -> None:
         "import-linter==2.14",
         "jsonschema==4.26.0",
         "mypy==2.3.1",
+        "opentelemetry-sdk==1.44.0",
         "pip-audit==2.10.1",
         "pyright==1.1.411",
         "pytest==9.0.3",

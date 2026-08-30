@@ -15,6 +15,7 @@
 | [0011](0011-default-deny-tool-policy.md) | Accepted | Default-deny tool activation, exact approvals, and backing-owned idempotency |
 | [0012](0012-finite-execution-and-tenant-bulkheads.md) | Accepted | Finite JSON execution, tenant bulkheads, earliest deadlines, cancellation, and safe retries |
 | [0013](0013-redaction-and-connection-pinned-egress.md) | Accepted | Final-boundary redaction and manifest-bound connection-pinned HTTPS egress |
+| [0014](0014-observability-health-and-graceful-drain.md) | Accepted | Bounded observability, dependency-safe health, and readiness-first graceful drain |
 
 Architecture decisions are append-only. A later decision supersedes an
 accepted ADR instead of silently rewriting its history.
