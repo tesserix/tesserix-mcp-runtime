@@ -68,6 +68,7 @@ class GatewayIdentityConfig:
     max_jwks_keys: int = 32
     clock_skew_seconds: float = 30.0
     max_token_lifetime_seconds: float = 3_600.0
+    request_timeout_seconds: float = 30.0
 
     def __post_init__(self) -> None:
         for name, value, maximum in (
@@ -118,14 +119,16 @@ class GatewayIdentityConfig:
             ipaddress.ip_network(network, strict=True)
         if self.algorithm not in _SUPPORTED_ALGORITHMS:
             raise ValueError("algorithm must be an approved fixed asymmetric algorithm")
-        for duration_name, duration_value in (
-            ("jwks_fresh_seconds", self.jwks_fresh_seconds),
-            ("jwks_stale_seconds", self.jwks_stale_seconds),
-            ("jwks_timeout_seconds", self.jwks_timeout_seconds),
-            ("jwks_retry_seconds", self.jwks_retry_seconds),
-            ("max_token_lifetime_seconds", self.max_token_lifetime_seconds),
+        for duration_name, duration_value, maximum in (
+            ("jwks_fresh_seconds", self.jwks_fresh_seconds, 86_400),
+            ("jwks_stale_seconds", self.jwks_stale_seconds, 604_800),
+            ("jwks_timeout_seconds", self.jwks_timeout_seconds, 30),
+            ("jwks_retry_seconds", self.jwks_retry_seconds, 300),
+            ("max_token_lifetime_seconds", self.max_token_lifetime_seconds, 86_400),
         ):
             _require_positive_number(duration_name, duration_value)
+            if duration_value > maximum:
+                raise ValueError(f"{duration_name} must not exceed {maximum}")
         if self.jwks_stale_seconds < self.jwks_fresh_seconds:
             raise ValueError("jwks_stale_seconds must cover the fresh window")
         if isinstance(self.max_jwks_bytes, bool) or not 1_024 <= self.max_jwks_bytes <= 1_048_576:
@@ -137,6 +140,12 @@ class GatewayIdentityConfig:
             self.clock_skew_seconds,
             minimum=0,
             maximum=300,
+        )
+        _require_bounded_number(
+            "request_timeout_seconds",
+            self.request_timeout_seconds,
+            minimum=0.001,
+            maximum=30,
         )
 
 
@@ -302,6 +311,18 @@ class GatewayJWTContextProvider:
             )
             idempotency_key = self._optional_header(request, "idempotency-key")
             approval_id = self._optional_header(request, "x-tesserix-approval-id")
+            timeout_header = self._optional_header(request, "x-tesserix-timeout-ms")
+            timeout_seconds = self._config.request_timeout_seconds
+            if timeout_header is not None:
+                if (
+                    not timeout_header.isascii()
+                    or not timeout_header.isdecimal()
+                    or timeout_header.startswith("0")
+                    or len(timeout_header) > 9
+                ):
+                    raise _IdentityRejected
+                timeout_seconds = min(timeout_seconds, int(timeout_header) / 1_000)
+            deadline = self._cache_clock() + timeout_seconds
             identity = AuthenticatedIdentity(
                 tenant=tenant,
                 subject=subject,
@@ -313,6 +334,7 @@ class GatewayJWTContextProvider:
                 request_id=request_id,
                 run_id=run_id,
                 trace_context=trace_context,
+                deadline=deadline,
                 cancellation=cancellation,
                 idempotency_key=idempotency_key,
                 approval_id=approval_id,

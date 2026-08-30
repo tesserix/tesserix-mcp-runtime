@@ -13,6 +13,7 @@
 | [0009](0009-adk-exported-session-bridge.md) | Accepted | Exact optional ADK exported-session bridge, trusted context mapping, and attested compatibility |
 | [0010](0010-gateway-jwt-and-tenant-context.md) | Accepted | Gateway JWT verification, immutable tenant context, and bounded JWKS rotation |
 | [0011](0011-default-deny-tool-policy.md) | Accepted | Default-deny tool activation, exact approvals, and backing-owned idempotency |
+| [0012](0012-finite-execution-and-tenant-bulkheads.md) | Accepted | Finite JSON execution, tenant bulkheads, earliest deadlines, cancellation, and safe retries |
 
 Architecture decisions are append-only. A later decision supersedes an
 accepted ADR instead of silently rewriting its history.

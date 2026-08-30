@@ -339,22 +339,33 @@ class StreamableHTTPLimits:
     max_sessions: int = 128
     session_lifetime_seconds: float = 1_800.0
     startup_timeout_seconds: float = 2.0
+    max_stream_seconds: float = 300.0
 
     def __post_init__(self) -> None:
-        for name in (
-            "max_request_body_bytes",
-            "max_request_headers",
-            "max_request_header_bytes",
-            "max_response_body_bytes",
-            "max_schema_bytes",
-            "max_tools",
-            "tool_page_size",
-            "max_tool_pages",
-            "max_sessions",
+        for name, integer_maximum in (
+            ("max_request_body_bytes", 65_536),
+            ("max_request_headers", 256),
+            ("max_request_header_bytes", 65_536),
+            ("max_response_body_bytes", 524_288),
+            ("max_schema_bytes", 262_144),
+            ("max_tools", 128),
+            ("tool_page_size", 128),
+            ("max_tool_pages", 128),
+            ("max_sessions", 256),
         ):
-            _positive_integer(name, getattr(self, name))
-        for name in ("session_lifetime_seconds", "startup_timeout_seconds"):
-            _positive_finite(name, getattr(self, name))
+            integer_value = getattr(self, name)
+            _positive_integer(name, integer_value)
+            if integer_value > integer_maximum:
+                raise ValueError(f"{name} must not exceed {integer_maximum}")
+        for name, duration_maximum in (
+            ("session_lifetime_seconds", 3_600.0),
+            ("startup_timeout_seconds", 30.0),
+            ("max_stream_seconds", 300.0),
+        ):
+            duration_value = getattr(self, name)
+            _positive_finite(name, duration_value)
+            if duration_value > duration_maximum:
+                raise ValueError(f"{name} must not exceed {duration_maximum}")
         if self.tool_page_size * self.max_tool_pages < self.max_tools:
             raise ValueError("tool_page_size and max_tool_pages must cover max_tools")
 
@@ -665,8 +676,11 @@ class _AtomicResponseLimiter:
         self.ready = False
         self.committed = False
         self.completed = False
+        self._discarded = False
 
     async def __call__(self, message: ASGIMessage) -> None:
+        if self._discarded:
+            return
         message_type = message.get("type")
         if message_type == "http.response.start":
             self._start = dict(message)
@@ -729,6 +743,11 @@ class _AtomicResponseLimiter:
         )
         self.completed = True
 
+    def discard(self) -> None:
+        self._discarded = True
+        self._start = None
+        self._body.clear()
+
 
 class _ProtocolTelemetryMiddleware:
     def __init__(self, transport: StreamableHTTPTransport) -> None:
@@ -756,6 +775,11 @@ class _ProtocolASGIApp:
     def __init__(self, transport: StreamableHTTPTransport, sdk_app: ASGIApplication) -> None:
         self._transport = transport
         self._sdk_app = sdk_app
+        self._detached_streams: set[asyncio.Task[None]] = set()
+
+    def _detach(self, task: asyncio.Task[None]) -> None:
+        self._detached_streams.add(task)
+        task.add_done_callback(self._detached_streams.discard)
 
     async def __call__(
         self,
@@ -889,8 +913,37 @@ class _ProtocolASGIApp:
             return message
 
         lease_completed = False
+        sdk_task: asyncio.Task[None] | None = None
         try:
-            await self._sdk_app(adapted_scope, receive_with_cancellation, limiter)
+            sdk_task = asyncio.create_task(
+                self._sdk_app(adapted_scope, receive_with_cancellation, limiter)
+            )
+            done, _ = await asyncio.wait(
+                {sdk_task},
+                timeout=self._transport.limits.max_stream_seconds,
+            )
+            if sdk_task not in done:
+                cancellation.cancel()
+                sdk_task.cancel()
+                limiter.discard()
+                self._detach(sdk_task)
+                await self._transport.abort_session(lease)
+                lease_completed = True
+                await _send_json(
+                    send,
+                    status=504,
+                    body=_protocol_error_body(
+                        code=types.INTERNAL_ERROR,
+                        message="Request timeout",
+                        data={
+                            "code": "timeout",
+                            "request_id": context.request_id,
+                            "retryable": True,
+                        },
+                    ),
+                )
+                return
+            await sdk_task
             if cancellation.cancelled:
                 await self._transport.abort_session(lease)
                 lease_completed = True
@@ -906,6 +959,10 @@ class _ProtocolASGIApp:
             await limiter.flush()
         except asyncio.CancelledError:
             cancellation.cancel()
+            if sdk_task is not None and not sdk_task.done():
+                sdk_task.cancel()
+                limiter.discard()
+                self._detach(sdk_task)
             if not lease_completed:
                 await self._transport.abort_session(lease)
             raise

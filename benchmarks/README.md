@@ -42,3 +42,20 @@ paths are not subtracted.
 The checker deliberately does not collect measurements. Load generation and
 process supervision arrive with the runtime and reliability slices; keeping
 the target contract separate prevents each tool from redefining success.
+
+## Execution-limit ceiling benchmark
+
+`measure_execution_limits.py` exercises the default input bytes, result bytes,
+JSON depth, object properties, array items, and total-node ceilings. Each case
+is validated once for warmup, measured repeatedly without allocation tracing
+for latency, then measured once with `tracemalloc` for peak temporary Python
+allocation:
+
+    uv run --frozen python benchmarks/measure_execution_limits.py --samples 100
+
+The report records the configured ceiling and independently constructed units,
+encoded bytes, p50/p99/maximum latency, Python version, platform, and peak
+temporary bytes. The committed
+`execution-limits-observations.json` is local regression evidence from Python
+3.14 on arm64 macOS. It is not a production throughput, RSS, pod-shape, or SLO
+claim; issue #29 owns those load and soak measurements.

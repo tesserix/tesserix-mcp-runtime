@@ -46,6 +46,7 @@ def test_public_api_exports_only_the_stable_contract_surface() -> None:
         "DuplicateToolName",
         "ErrorCode",
         "ErrorResponse",
+        "ExecutionLimits",
         "IdempotencyRequirement",
         "InvocationResult",
         "InvocationStatus",
@@ -99,7 +100,7 @@ def test_checked_in_public_api_snapshot_matches_exports() -> None:
     completed = run_snapshot_check(SNAPSHOT)
 
     assert completed.returncode == 0
-    assert completed.stdout == "Public API snapshot matches (67 exports).\n"
+    assert completed.stdout == "Public API snapshot matches (68 exports).\n"
     assert completed.stderr == ""
 
 

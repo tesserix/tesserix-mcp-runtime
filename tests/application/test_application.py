@@ -582,6 +582,11 @@ def test_application_limits_reject_non_positive_or_non_finite_timeouts(
         ApplicationLimits(drain_timeout=drain_timeout)
 
 
+def test_application_limits_reject_drain_timeout_above_hard_maximum() -> None:
+    with pytest.raises(ValueError, match="drain_timeout"):
+        ApplicationLimits(drain_timeout=300.001)
+
+
 def test_application_diagnostics_and_run_results_reject_invalid_combinations() -> None:
     with pytest.raises(ValueError, match="exception_type must be a bounded type name"):
         ApplicationDiagnostic(

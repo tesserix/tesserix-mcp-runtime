@@ -118,7 +118,7 @@
       ],
       "max_distribution_count": 36,
       "max_installed_bytes": 67108864,
-      "max_wheel_bytes": 65536
+      "max_wheel_bytes": 98304
     }
   }
 }

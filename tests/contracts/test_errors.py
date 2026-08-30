@@ -34,7 +34,9 @@ def test_every_stable_error_code_matches_the_golden_public_shape() -> None:
         "conflict",
         "timeout",
         "cancelled",
+        "overloaded",
         "unavailable",
+        "result_too_large",
         "internal_failure",
     }
     expected = json.loads((FIXTURES / "error-responses.json").read_text(encoding="utf-8"))
@@ -110,7 +112,9 @@ def test_mapped_error_requires_matching_public_and_audit_identity() -> None:
         (RuntimeFailure(ErrorCode.CONFLICT), ErrorCode.CONFLICT),
         (TimeoutError(), ErrorCode.TIMEOUT),
         (asyncio.CancelledError(), ErrorCode.CANCELLED),
+        (RuntimeFailure(ErrorCode.OVERLOADED), ErrorCode.OVERLOADED),
         (RuntimeFailure(ErrorCode.UNAVAILABLE), ErrorCode.UNAVAILABLE),
+        (RuntimeFailure(ErrorCode.RESULT_TOO_LARGE), ErrorCode.RESULT_TOO_LARGE),
     ],
 )
 def test_known_failures_map_to_their_stable_code(

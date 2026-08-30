@@ -17,19 +17,28 @@ from tesserix_mcp_runtime.contracts import (
     Clock,
     ErrorCode,
     ErrorResponse,
+    IdempotencyRequirement,
     InvocationResult,
     JsonValue,
     Lifecycle,
     LifecycleState,
     Telemetry,
+    ToolEffect,
 )
-from tesserix_mcp_runtime.errors import ScrubbedError, map_exception
+from tesserix_mcp_runtime.errors import RuntimeFailure, ScrubbedError, map_exception
+from tesserix_mcp_runtime.execution import (
+    ExecutionController,
+    ExecutionLimitExceeded,
+    ExecutionLimits,
+    validate_json_value,
+)
 from tesserix_mcp_runtime.lifecycle import LifecycleController
 from tesserix_mcp_runtime.tool import ToolCatalog
 from tesserix_mcp_runtime.tool_manifest import ToolManifest
 
 _COMPONENT_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{0,127}\Z")
 _EXCEPTION_TYPE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,255}\Z")
+_DEFAULT_EXECUTION_LIMITS = ExecutionLimits()
 
 
 class _Named(Protocol):
@@ -66,9 +75,9 @@ class ApplicationLimits:
                 or _is_runtime_instance(self.drain_timeout, float)
             )
             or not math.isfinite(self.drain_timeout)
-            or self.drain_timeout <= 0
+            or not 0 < self.drain_timeout <= 300
         ):
-            raise ValueError("drain_timeout must be a positive finite number")
+            raise ValueError("drain_timeout must be a positive finite number at most 300 seconds")
 
 
 class ApplicationDeadlineExceeded(TimeoutError):
@@ -270,6 +279,7 @@ class Application:
         telemetry: Telemetry[ScrubbedError],
         limits: ApplicationLimits,
         clock: Clock,
+        execution_limits: ExecutionLimits = _DEFAULT_EXECUTION_LIMITS,
         lifecycle: Iterable[Lifecycle] = (),
     ) -> None:
         components = tuple(lifecycle)
@@ -280,6 +290,7 @@ class Application:
             telemetry=telemetry,
             limits=limits,
             clock=clock,
+            execution_limits=execution_limits,
             lifecycle=components,
         )
         self._catalog = catalog
@@ -287,6 +298,8 @@ class Application:
         self._telemetry = telemetry
         self._limits = limits
         self._clock = clock
+        self._execution_limits = execution_limits
+        self._execution = ExecutionController(execution_limits, clock=clock)
         self._telemetry_failures = 0
         self._invocations = _InvocationLifecycle()
         self._lifecycle = LifecycleController(
@@ -306,6 +319,7 @@ class Application:
         telemetry: Telemetry[ScrubbedError],
         limits: ApplicationLimits,
         clock: Clock,
+        execution_limits: ExecutionLimits,
         lifecycle: tuple[Lifecycle, ...],
     ) -> None:
         dependencies: tuple[tuple[str, object, type[Any]], ...] = (
@@ -315,6 +329,7 @@ class Application:
             ("telemetry", telemetry, Telemetry),
             ("limits", limits, ApplicationLimits),
             ("clock", clock, Clock),
+            ("execution_limits", execution_limits, ExecutionLimits),
         )
         for path, dependency, expected in dependencies:
             if not _is_runtime_instance(dependency, expected):
@@ -322,6 +337,12 @@ class Application:
                     code="invalid_dependency",
                     path=path,
                 )
+
+        if len(catalog) > execution_limits.max_tools:
+            raise ApplicationConfigurationError(
+                code="tool_limit_exceeded",
+                path="catalog",
+            )
 
         names = {_InvocationLifecycle.name}
         transport_name = Application._validated_component_name(
@@ -375,6 +396,10 @@ class Application:
     @property
     def telemetry_failures(self) -> int:
         return self._telemetry_failures
+
+    @property
+    def detached_invocations(self) -> int:
+        return self._execution.detached_count
 
     async def start(self) -> None:
         await self._lifecycle.start()
@@ -486,7 +511,18 @@ class Application:
             )
         task = self._invocations.begin()
         try:
-            return await self._invoke(name, arguments, context=context)
+            return await self._execution.execute(
+                lambda bounded_context: self._invoke(
+                    name,
+                    arguments,
+                    context=bounded_context,
+                ),
+                context=context,
+            )
+        except asyncio.CancelledError as error:
+            return self._mapped_failure(error, request_id=context.request_id)
+        except TimeoutError as error:
+            return self._mapped_failure(error, request_id=context.request_id)
         finally:
             self._invocations.finish(task)
 
@@ -497,6 +533,16 @@ class Application:
         *,
         context: CallContext,
     ) -> InvocationResult:
+        try:
+            validate_json_value(
+                arguments,
+                limits=self._execution_limits,
+                maximum_bytes=self._execution_limits.max_input_bytes,
+            )
+        except ExecutionLimitExceeded:
+            return InvocationResult.failure(
+                ErrorResponse.from_code(ErrorCode.INVALID_INPUT, request_id=context.request_id)
+            )
         tool = self._catalog.get(name)
         if tool is None:
             return InvocationResult.failure(
@@ -509,15 +555,39 @@ class Application:
                 ErrorResponse.from_code(ErrorCode.INVALID_INPUT, request_id=context.request_id)
             )
         try:
-            await self._authorizer.authorize(
-                tool=tool,
-                arguments=arguments,
-                context=context,
+            lease = self._execution.admit(
+                tool_name=tool.metadata.name,
+                tenant=context.tenant,
             )
-            output_model = await tool.handler(input_model, context=context)
-            return InvocationResult.success(tool.serialize_output(output_model))
-        except asyncio.CancelledError as error:
-            return self._mapped_failure(error, request_id=context.request_id)
+            if lease is None:
+                raise RuntimeFailure(ErrorCode.OVERLOADED)
+            try:
+                await self._authorizer.authorize(
+                    tool=tool,
+                    arguments=arguments,
+                    context=context,
+                )
+                retry_safe = tool.metadata.effect is ToolEffect.READ or (
+                    tool.metadata.idempotency is IdempotencyRequirement.REQUIRED
+                    and context.idempotency_key is not None
+                )
+                output_model = await self._execution.retry(
+                    lambda: tool.handler(input_model, context=context),
+                    context=context,
+                    safe=retry_safe,
+                )
+                output = tool.serialize_output(output_model)
+                try:
+                    validate_json_value(
+                        output,
+                        limits=self._execution_limits,
+                        maximum_bytes=self._execution_limits.max_result_bytes,
+                    )
+                except ExecutionLimitExceeded:
+                    raise RuntimeFailure(ErrorCode.RESULT_TOO_LARGE) from None
+                return InvocationResult.success(output)
+            finally:
+                self._execution.release(lease)
         except Exception as error:
             return self._mapped_failure(error, request_id=context.request_id)
 

@@ -166,6 +166,16 @@ def test_jwks_destination_rejects_ip_literals_and_alternate_ports(
         lambda: replace(_config(), jwks_timeout_seconds=float("inf")),
         lambda: replace(_config(), jwks_retry_seconds=True),
         lambda: replace(_config(), max_token_lifetime_seconds=0),
+        lambda: replace(
+            _config(),
+            jwks_fresh_seconds=86_401,
+            jwks_stale_seconds=86_401,
+        ),
+        lambda: replace(_config(), jwks_stale_seconds=604_801),
+        lambda: replace(_config(), jwks_timeout_seconds=30.001),
+        lambda: replace(_config(), jwks_retry_seconds=300.001),
+        lambda: replace(_config(), max_token_lifetime_seconds=86_400.001),
+        lambda: replace(_config(), request_timeout_seconds=30.001),
         lambda: replace(_config(), max_jwks_bytes=1_023),
         lambda: replace(_config(), max_jwks_bytes=1_048_577),
         lambda: replace(_config(), max_jwks_keys=0),
@@ -189,6 +199,12 @@ def test_jwks_destination_rejects_ip_literals_and_alternate_ports(
         "infinite-timeout",
         "boolean-retry-window",
         "zero-token-lifetime",
+        "fresh-window-above-maximum",
+        "stale-window-above-maximum",
+        "jwks-timeout-above-maximum",
+        "retry-window-above-maximum",
+        "token-lifetime-above-maximum",
+        "request-timeout-above-maximum",
         "jwks-bytes-below-minimum",
         "jwks-bytes-above-maximum",
         "jwks-keys-below-minimum",
@@ -215,6 +231,12 @@ def test_gateway_identity_config_accepts_inclusive_numeric_boundaries() -> None:
     )
     upper = replace(
         _config(),
+        jwks_fresh_seconds=86_400,
+        jwks_stale_seconds=604_800,
+        jwks_timeout_seconds=30,
+        jwks_retry_seconds=300,
+        max_token_lifetime_seconds=86_400,
+        request_timeout_seconds=30,
         max_jwks_bytes=1_048_576,
         max_jwks_keys=128,
         clock_skew_seconds=300,
@@ -226,6 +248,7 @@ def test_gateway_identity_config_accepts_inclusive_numeric_boundaries() -> None:
     assert upper.max_jwks_bytes == 1_048_576
     assert upper.max_jwks_keys == 128
     assert upper.clock_skew_seconds == 300
+    assert upper.request_timeout_seconds == 30
 
 
 def test_identity_adapter_constructors_reject_incompatible_runtime_objects() -> None:
@@ -348,6 +371,34 @@ def test_authenticated_gateway_propagates_bounded_call_control_identifiers() -> 
 
 
 @pytest.mark.parametrize(
+    ("timeout_ms", "expected_deadline"),
+    [("1250", 101.25), ("60000", 130.0)],
+    ids=["caller-shortens", "gateway-clamps"],
+)
+def test_authenticated_gateway_sets_a_bounded_monotonic_deadline(
+    timeout_ms: str,
+    expected_deadline: float,
+) -> None:
+    private, public = _key_pair("key-a")
+    request = _request(_token(private, kid="key-a"))
+    request = HTTPRequestMetadata(
+        method=request.method,
+        path=request.path,
+        headers=(*request.headers, ("x-tesserix-timeout-ms", timeout_ms)),
+        peer_host=request.peer_host,
+    )
+
+    context = asyncio.run(
+        _provider(_JWKS({"keys": [public]}), cache_clock=lambda: 100.0).create(
+            request,
+            cancellation=_Cancellation(),
+        )
+    )
+
+    assert context.deadline == expected_deadline
+
+
+@pytest.mark.parametrize(
     ("header", "value"),
     [
         ("idempotency-key", "i" * 513),
@@ -379,7 +430,10 @@ def test_gateway_rejects_unbounded_call_control_identifiers(
     assert value not in repr(raised.value)
 
 
-@pytest.mark.parametrize("header", ["idempotency-key", "x-tesserix-approval-id"])
+@pytest.mark.parametrize(
+    "header",
+    ["idempotency-key", "x-tesserix-approval-id", "x-tesserix-timeout-ms"],
+)
 def test_gateway_rejects_ambiguous_call_control_identifiers(header: str) -> None:
     private, public = _key_pair("key-a")
     request = _request(_token(private, kid="key-a"))
@@ -399,6 +453,42 @@ def test_gateway_rejects_ambiguous_call_control_identifiers(header: str) -> None
         )
 
     assert raised.value.request_id == "request-a"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "0",
+        "01",
+        "-1",
+        "1.5",
+        "\N{FULLWIDTH DIGIT ONE}\N{FULLWIDTH DIGIT TWO}",
+        "1000000000",
+    ],
+    ids=["empty", "zero", "leading-zero", "negative", "decimal", "non-ascii", "too-long"],
+)
+def test_gateway_rejects_invalid_timeout_header(value: str) -> None:
+    private, public = _key_pair("key-a")
+    request = _request(_token(private, kid="key-a"))
+    request = HTTPRequestMetadata(
+        method=request.method,
+        path=request.path,
+        headers=(*request.headers, ("x-tesserix-timeout-ms", value)),
+        peer_host=request.peer_host,
+    )
+
+    with pytest.raises(HTTPRequestAuthenticationError) as raised:
+        asyncio.run(
+            _provider(_JWKS({"keys": [public]})).create(
+                request,
+                cancellation=_Cancellation(),
+            )
+        )
+
+    assert raised.value.request_id == "request-a"
+    if value:
+        assert value not in repr(raised.value)
 
 
 @pytest.mark.parametrize(

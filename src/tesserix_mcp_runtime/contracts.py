@@ -232,7 +232,9 @@ class ErrorCode(StrEnum):
     CONFLICT = "conflict"
     TIMEOUT = "timeout"
     CANCELLED = "cancelled"
+    OVERLOADED = "overloaded"
     UNAVAILABLE = "unavailable"
+    RESULT_TOO_LARGE = "result_too_large"
     INTERNAL_FAILURE = "internal_failure"
 
 
@@ -261,13 +263,15 @@ _ERROR_MESSAGES = {
     ErrorCode.CONFLICT: "The operation conflicts with current state.",
     ErrorCode.TIMEOUT: "The operation timed out.",
     ErrorCode.CANCELLED: "The operation was cancelled.",
+    ErrorCode.OVERLOADED: "The runtime is at capacity.",
     ErrorCode.UNAVAILABLE: "A required dependency is unavailable.",
+    ErrorCode.RESULT_TOO_LARGE: "The tool result exceeds the allowed size.",
     ErrorCode.INTERNAL_FAILURE: "The operation failed.",
 }
 _ERROR_RETRYABILITY = {
     code: (
         Retryability.SAFE_OR_IDEMPOTENT
-        if code in {ErrorCode.TIMEOUT, ErrorCode.UNAVAILABLE}
+        if code in {ErrorCode.TIMEOUT, ErrorCode.OVERLOADED, ErrorCode.UNAVAILABLE}
         else Retryability.NEVER
     )
     for code in ErrorCode

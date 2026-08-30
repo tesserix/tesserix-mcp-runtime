@@ -21,6 +21,7 @@ CredentialProvider = tesserix_mcp_runtime.contracts.CredentialProvider
 DuplicateToolName = tesserix_mcp_runtime.tool.DuplicateToolName
 ErrorCode = tesserix_mcp_runtime.contracts.ErrorCode
 ErrorResponse = tesserix_mcp_runtime.contracts.ErrorResponse
+ExecutionLimits = tesserix_mcp_runtime.execution.ExecutionLimits
 IdempotencyRequirement = tesserix_mcp_runtime.contracts.IdempotencyRequirement
 InvocationResult = tesserix_mcp_runtime.contracts.InvocationResult
 InvocationStatus = tesserix_mcp_runtime.contracts.InvocationStatus
