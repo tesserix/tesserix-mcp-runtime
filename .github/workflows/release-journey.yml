@@ -1,0 +1,162 @@
+name: Release integration journey
+
+on:
+  push:
+    tags:
+      - "v*-rc*"
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-journey-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AGENTGATEWAY_IMAGE: cr.agentgateway.dev/agentgateway:v1.4.1@sha256:efd79355b89094a8225a9db465d9a01dc656b377f0bab458761b935a13231d29
+  COMPOSE_SHA256: c57ab918abd5b05ca7e7d0f275875dd1330a695074f309dc9eab1b49efafcd4b
+  COMPOSE_VERSION: v5.5.0
+  CORE_IMAGE: tesserix-mcp-runtime:journey-core
+  JOURNEY_IMAGE: tesserix-mcp-runtime:journey
+  REGISTRY_COMMIT: 6921474591b6c59e89025370c310c7f85859246f
+  REGISTRY_DOCKERFILE_FRONTEND: docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+  REGISTRY_IMAGE: tesserix-agentic-registry:6921474
+
+jobs:
+  journey:
+    name: Pinned publish to invocation journey
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out runtime source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check out pinned Agentic Registry source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: tesserix/agentic-registry
+          ref: 6921474591b6c59e89025370c310c7f85859246f
+          path: .journey/agentic-registry
+          persist-credentials: false
+      - name: Install Python 3.14
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.7"
+          enable-cache: true
+      - name: Install pinned Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        with:
+          version: v0.36.1
+      - name: Verify the frozen Python environment
+        run: |
+          uv lock --check
+          uv sync --frozen
+      - name: Install checksum-verified Compose
+        run: |
+          mkdir -p .journey/tools artifacts/journey
+          compose_bin="$PWD/.journey/tools/docker-compose-linux-x86_64"
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            --output "$compose_bin" \
+            "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-x86_64"
+          printf '%s  %s\n' "$COMPOSE_SHA256" "$compose_bin" \
+            | sha256sum --check --strict
+          chmod 0755 "$compose_bin"
+      - name: Record immutable workflow inputs
+        run: |
+          test "$(git -C .journey/agentic-registry rev-parse HEAD)" = "$REGISTRY_COMMIT"
+          jq -n \
+            --arg gateway "$AGENTGATEWAY_IMAGE" \
+            --arg ref "$GITHUB_REF" \
+            --arg registry_commit "$REGISTRY_COMMIT" \
+            --arg runtime_commit "$GITHUB_SHA" \
+            '{gateway: $gateway, ref: $ref, registry_commit: $registry_commit, runtime_commit: $runtime_commit}' \
+            > artifacts/workflow-context.json
+          {
+            python --version
+            uv --version
+            docker version --format '{{json .}}'
+            docker buildx version
+            .journey/tools/docker-compose-linux-x86_64 version
+          } > artifacts/tool-versions.txt
+      - name: Build the core and journey images
+        run: |
+          docker buildx build \
+            --build-arg PACKAGE_VERSION=0.0.1.dev0 \
+            --file deploy/container/core.Dockerfile \
+            --load \
+            --metadata-file artifacts/core-build.json \
+            --provenance=mode=max \
+            --tag "$CORE_IMAGE" \
+            .
+          core_digest="$(jq -er '."containerimage.digest" | select(test("^sha256:[0-9a-f]{64}$"))' artifacts/core-build.json)"
+          docker buildx build \
+            --build-arg "CORE_IMAGE=${CORE_IMAGE}@${core_digest}" \
+            --file integration/journey/Dockerfile \
+            --load \
+            --metadata-file artifacts/runtime-build.json \
+            --provenance=mode=max \
+            --tag "$JOURNEY_IMAGE" \
+            .
+          uv run --frozen python deploy/container/verify.py \
+            --image "$CORE_IMAGE" \
+            --variant core \
+            --base-image ghcr.io/tesserix/base-python-runtime-3.14:20260829@sha256:3854f5d9d00705b14077bf6715feb9c3bd6d1ad2e41d5594b3c09c0a74c22add \
+            --expected-sdk 2.1.1 \
+            --output artifacts/core-runtime.json
+      - name: Build the pinned Registry image
+        run: |
+          registry_dockerfile=.journey/agentic-registry/deploy/Dockerfile
+          test "$(sed -n '1p' "$registry_dockerfile")" = '# syntax=docker/dockerfile:1'
+          sed -i "1c# syntax=${REGISTRY_DOCKERFILE_FRONTEND}" "$registry_dockerfile"
+          docker buildx build \
+            --build-arg VERSION=6921474 \
+            --file "$registry_dockerfile" \
+            --load \
+            --metadata-file artifacts/registry-build.json \
+            --provenance=mode=max \
+            --tag "$REGISTRY_IMAGE" \
+            .journey/agentic-registry
+          grep -Fq ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32 \
+            artifacts/registry-build.json
+      - name: Pull the digest-pinned AgentGateway image
+        run: |
+          docker pull "$AGENTGATEWAY_IMAGE"
+          docker image inspect "$AGENTGATEWAY_IMAGE" \
+            --format '{{json .RepoDigests}}' > artifacts/agentgateway-image.json
+      - name: Run the release integration journey
+        run: |
+          runtime_digest="$(jq -er '."containerimage.digest" | select(test("^sha256:[0-9a-f]{64}$"))' artifacts/runtime-build.json)"
+          uv run --frozen python -m integration.journey.run \
+            --runtime-image "$JOURNEY_IMAGE" \
+            --registry-image "$REGISTRY_IMAGE" \
+            --runtime-artifact-digest "$runtime_digest" \
+            --output-dir artifacts/journey \
+            --compose-standalone .journey/tools/docker-compose-linux-x86_64 \
+            --run-id "journey-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+      - name: Sanitize all retained evidence
+        id: sanitize
+        if: ${{ always() }}
+        run: >-
+          uv run --frozen python -c
+          'from pathlib import Path; from integration.journey.backing import JOURNEY_CANARY;
+          from tesserix_mcp_testkit import scan_journey_surfaces; root = Path("artifacts");
+          surfaces = [path.read_bytes() for path in sorted(root.rglob("*")) if path.is_file()];
+          scan_journey_surfaces(surfaces, canaries=(JOURNEY_CANARY,));
+          print(f"sanitized_files={len(surfaces)}")'
+      - name: Upload sanitized journey evidence
+        if: ${{ always() && steps.sanitize.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: release-journey-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 7

@@ -24,6 +24,7 @@
 | [0020](0020-digest-bound-gateway-activation.md) | Accepted | Digest-bound Gateway activation, actor-owned status, and bounded observation |
 | [0021](0021-identity-scoped-tenant-gateway-reconciliation.md) | Accepted | Identity-scoped tenant eligibility, collision-safe routes, and complete paginated reconciliation |
 | [0022](0022-container-and-gitops-deployment.md) | Accepted | Digest-pinned core and ADK images, fail-closed Kubernetes contract, and one-revision GitOps rollback |
+| [0023](0023-release-integration-journey.md) | Accepted | Hermetic and digest-pinned release journey with fail-closed sanitized evidence |
 
 Architecture decisions are append-only. A later decision supersedes an
 accepted ADR instead of silently rewriting its history.

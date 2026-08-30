@@ -1426,6 +1426,7 @@ class RegistryResolver:
             return None, RegistryCandidateReason.CAPABILITY
         input_schema = _schema(tool.get("inputSchema"))
         input_fingerprint = tool.get("inputFingerprint")
+        input_schema_fingerprint = tool.get("inputSchemaFingerprint")
         output_fingerprint = tool.get("outputFingerprint")
         if (
             input_schema is None
@@ -1435,7 +1436,15 @@ class RegistryResolver:
             or _FINGERPRINT.fullmatch(output_fingerprint) is None
         ):
             return None, RegistryCandidateReason.CONTRACT
-        if schema_fingerprint(input_schema) != input_fingerprint:
+        if input_schema_fingerprint is not None and (
+            not isinstance(input_schema_fingerprint, str)
+            or _FINGERPRINT.fullmatch(input_schema_fingerprint) is None
+        ):
+            return None, RegistryCandidateReason.FINGERPRINT
+        projected_fingerprint = (
+            input_fingerprint if input_schema_fingerprint is None else input_schema_fingerprint
+        )
+        if schema_fingerprint(input_schema) != projected_fingerprint:
             return None, RegistryCandidateReason.FINGERPRINT
         if (
             requirement.expected_input_fingerprint is not None
