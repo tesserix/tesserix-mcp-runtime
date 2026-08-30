@@ -105,10 +105,13 @@ example, it cannot alias `sub`.
 | `traceparent`, `tracestate` | Optional trace attribution from the trusted path |
 | `Idempotency-Key` | Optional bounded mutation replay key; never identity or authorization |
 | `X-Tesserix-Approval-Id` | Optional bounded approval lookup reference; never approval by itself |
+| `X-Tesserix-Timeout-Ms` | Optional positive decimal caller budget; may shorten but never extend the 30-second gateway maximum |
 
 If neither the token nor the trusted gateway supplies a run ID, the request ID
-is used. Duplicate identity or attribution headers fail closed. Values from
-tool arguments are never inspected as identity.
+is used. Duplicate identity, attribution, or call-control headers fail closed.
+Timeout values that are empty, zero, non-decimal, non-ASCII, leading-zero, or
+longer than nine digits also fail closed. Values from tool arguments are never
+inspected as identity.
 
 MCP metadata with the prefixes `tesserix/runtime/` and `tesserix/adk/` is never
 promoted to authority. Matching values are tolerated for compatibility;

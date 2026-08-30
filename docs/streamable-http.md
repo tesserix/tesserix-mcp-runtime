@@ -59,6 +59,7 @@ The safe default is loopback-only, stateless, and finite:
 | Tool page | 32 tools, at most four pages |
 | Optional sessions | 128, 1,800-second absolute lifetime |
 | Startup readiness | 2 seconds |
+| Request/response stream | 300 seconds |
 
 Tool and aggregate schema limits are checked before the listener binds. Request
 bodies are limited before SDK parsing. Responses are buffered and committed
@@ -119,6 +120,12 @@ request-scoped `Cancellation` object before handler cleanup. Handlers and
 downstream adapters should await or poll that object and release resources in a
 `finally` block.
 
+Every SDK request/response stream has a 300-second default and hard maximum.
+At expiry the runtime signals cancellation before cancelling SDK work, aborts
+the session lease, discards any uncommitted buffered response, and prevents a
+detached SDK task from sending late output. If no response was committed, the
+caller receives one bounded 504 with stable `timeout` data.
+
 `Application.drain()` stops new admission immediately. Existing application
 calls receive the application's bounded drain window; `stop()` then asks
 Uvicorn to exit gracefully and force-cancels it only after the listener grace
@@ -134,6 +141,7 @@ Boundary failures are deliberately non-disclosing:
 - 431 for malformed or over-limit headers;
 - 413 for over-limit request bodies;
 - 500 for atomic serialization or response overflow;
+- 504 when the finite stream duration expires;
 - 503 after drain begins.
 
 Malformed JSON-RPC, unknown methods, invalid IDs, bad parameters, and

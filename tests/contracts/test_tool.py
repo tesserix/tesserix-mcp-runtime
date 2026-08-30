@@ -17,6 +17,7 @@ from tesserix_mcp_runtime import (
     ContractViolation,
     IdempotencyRequirement,
     JsonValue,
+    MetadataPolicy,
     SchemaPolicy,
     ToolCatalog,
     ToolDefinition,
@@ -530,6 +531,51 @@ def test_schema_policy_enforces_reviewed_registration_limits(
 
     assert captured.value.code == code
     assert captured.value.path == path
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("max_schema_bytes", 262_145),
+        ("max_depth", 33),
+        ("max_properties", 257),
+        ("max_string_length", 65_537),
+        ("max_array_items", 4_097),
+        ("max_definitions", 257),
+        ("max_schema_nodes", 16_385),
+        ("max_union_variants", 65),
+    ],
+)
+def test_schema_policy_rejects_values_above_server_enforced_maxima(
+    field: str,
+    value: int,
+) -> None:
+    with pytest.raises(ValueError, match=field):
+        SchemaPolicy(**{field: value})
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("max_description_bytes", 4_097),
+        ("max_description_tokens", 513),
+        ("max_summary_bytes", 513),
+        ("max_summary_tokens", 129),
+        ("max_when_to_use_bytes", 2_049),
+        ("max_when_to_use_tokens", 257),
+        ("max_examples", 9),
+        ("max_example_bytes", 1_025),
+        ("max_example_tokens", 129),
+        ("max_total_example_bytes", 4_097),
+        ("max_total_example_tokens", 513),
+    ],
+)
+def test_metadata_policy_rejects_values_above_server_enforced_maxima(
+    field: str,
+    value: int,
+) -> None:
+    with pytest.raises(ValueError, match=field):
+        MetadataPolicy(**{field: value})
 
 
 def test_schema_policy_enforces_the_serialized_byte_budget() -> None:

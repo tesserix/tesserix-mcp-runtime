@@ -8,7 +8,7 @@ import re
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, TypeGuard
+from typing import Any, Final, TypeGuard
 
 from tesserix_mcp_runtime.contracts import JsonValue, ToolDefinition, ToolHandler, ToolMetadata
 from tesserix_mcp_runtime.tool_manifest import ToolManifest
@@ -94,6 +94,18 @@ def normalize_tool_name(name: str) -> str:
     return name.casefold()
 
 
+_SCHEMA_POLICY_MAXIMA: Final = (
+    ("max_schema_bytes", 262_144),
+    ("max_depth", 32),
+    ("max_properties", 256),
+    ("max_string_length", 65_536),
+    ("max_array_items", 4_096),
+    ("max_definitions", 256),
+    ("max_schema_nodes", 16_384),
+    ("max_union_variants", 64),
+)
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class SchemaPolicy:
     """Registration limits for the supported closed JSON Schema subset."""
@@ -108,22 +120,28 @@ class SchemaPolicy:
     max_union_variants: int = 16
 
     def __post_init__(self) -> None:
-        for name in (
-            "max_schema_bytes",
-            "max_depth",
-            "max_properties",
-            "max_string_length",
-            "max_array_items",
-            "max_definitions",
-            "max_schema_nodes",
-            "max_union_variants",
-        ):
+        for name, maximum in _SCHEMA_POLICY_MAXIMA:
             value = getattr(self, name)
-            if not isinstance(value, int) or isinstance(value, bool) or value < 1:
-                raise ValueError(f"{name} must be a positive integer")
+            if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= maximum:
+                raise ValueError(f"{name} must be a positive integer at most {maximum}")
 
 
 _DEFAULT_SCHEMA_POLICY = SchemaPolicy()
+
+
+_METADATA_POLICY_MAXIMA: Final = (
+    ("max_description_bytes", 4_096),
+    ("max_description_tokens", 512),
+    ("max_summary_bytes", 512),
+    ("max_summary_tokens", 128),
+    ("max_when_to_use_bytes", 2_048),
+    ("max_when_to_use_tokens", 256),
+    ("max_examples", 8),
+    ("max_example_bytes", 1_024),
+    ("max_example_tokens", 128),
+    ("max_total_example_bytes", 4_096),
+    ("max_total_example_tokens", 512),
+)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -143,22 +161,10 @@ class MetadataPolicy:
     max_total_example_tokens: int = 512
 
     def __post_init__(self) -> None:
-        for name in (
-            "max_description_bytes",
-            "max_description_tokens",
-            "max_summary_bytes",
-            "max_summary_tokens",
-            "max_when_to_use_bytes",
-            "max_when_to_use_tokens",
-            "max_examples",
-            "max_example_bytes",
-            "max_example_tokens",
-            "max_total_example_bytes",
-            "max_total_example_tokens",
-        ):
+        for name, maximum in _METADATA_POLICY_MAXIMA:
             value = getattr(self, name)
-            if not isinstance(value, int) or isinstance(value, bool) or value < 1:
-                raise ValueError(f"{name} must be a positive integer")
+            if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= maximum:
+                raise ValueError(f"{name} must be a positive integer at most {maximum}")
 
     def validate(self, metadata: ToolMetadata) -> None:
         _validate_text_budget(

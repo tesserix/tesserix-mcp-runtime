@@ -608,6 +608,7 @@ def test_streamable_http_defaults_are_private_stateless_and_bounded() -> None:
     assert limits.max_sessions == 128
     assert limits.session_lifetime_seconds == 1_800.0
     assert limits.startup_timeout_seconds == 2.0
+    assert limits.max_stream_seconds == 300.0
 
 
 @pytest.mark.parametrize(
@@ -645,6 +646,7 @@ def test_streamable_http_path_rejects_ambiguous_routes(path: str) -> None:
         ("max_sessions", 0),
         ("session_lifetime_seconds", math.inf),
         ("startup_timeout_seconds", math.nan),
+        ("max_stream_seconds", math.inf),
     ],
     ids=[
         "request-bytes",
@@ -656,6 +658,7 @@ def test_streamable_http_path_rejects_ambiguous_routes(path: str) -> None:
         "session-count",
         "session-lifetime",
         "startup-timeout",
+        "stream-timeout",
     ],
 )
 def test_streamable_http_limits_reject_non_positive_or_non_finite_values(
@@ -669,6 +672,31 @@ def test_streamable_http_limits_reject_non_positive_or_non_finite_values(
 def test_streamable_http_limits_require_pages_to_cover_the_tool_ceiling() -> None:
     with pytest.raises(ValueError, match="tool_page_size"):
         StreamableHTTPLimits(max_tools=65, tool_page_size=16, max_tool_pages=4)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("max_request_body_bytes", 65_537),
+        ("max_request_headers", 257),
+        ("max_request_header_bytes", 65_537),
+        ("max_response_body_bytes", 524_289),
+        ("max_schema_bytes", 262_145),
+        ("max_tools", 129),
+        ("tool_page_size", 129),
+        ("max_tool_pages", 129),
+        ("max_sessions", 257),
+        ("session_lifetime_seconds", 3_600.001),
+        ("startup_timeout_seconds", 30.001),
+        ("max_stream_seconds", 300.001),
+    ],
+)
+def test_streamable_http_limits_reject_values_above_hard_maxima(
+    field: str,
+    value: int | float,
+) -> None:
+    with pytest.raises(ValueError, match=field):
+        StreamableHTTPLimits(**{field: value})  # type: ignore[arg-type]
 
 
 def test_non_loopback_listener_requires_explicit_host_and_origin_allowlists() -> None:
@@ -1881,6 +1909,51 @@ def test_client_disconnect_cancels_long_running_tool_and_releases_handler() -> N
 
         assert endpoint.observed_cancellation is True
         assert len(provider.cancellations) == 1
+        assert provider.cancellations[0].cancelled is True
+        await transport.stop()
+
+    asyncio.run(exercise())
+
+
+def test_stream_duration_cancels_work_and_returns_a_bounded_timeout() -> None:
+    async def exercise() -> None:
+        listener = LifespanListener()
+        provider = StaticContextProvider()
+        endpoint = DisconnectingEndpoint((manifest("examples.echo"),))
+        transport = StreamableHTTPTransport(
+            config=StreamableHTTPConfig(),
+            limits=StreamableHTTPLimits(max_stream_seconds=0.01),
+            context_provider=provider,
+            telemetry=RecordingProtocolTelemetry(),
+            listener=listener,
+        )
+        await transport.start(endpoint)
+        assert listener.app is not None
+
+        request = asyncio.create_task(
+            call_asgi(
+                listener.app,
+                headers=modern_headers("tools/call", name="examples.echo"),
+                body=modern_request(
+                    "tools/call",
+                    params={"name": "examples.echo", "arguments": {"text": "hello"}},
+                ),
+            )
+        )
+        await asyncio.wait_for(endpoint.started.wait(), timeout=1.0)
+        status, _, response = await asyncio.wait_for(request, timeout=1.0)
+        await asyncio.wait_for(endpoint.released.wait(), timeout=1.0)
+
+        assert status == 504
+        assert jsonrpc_code(response) == INTERNAL_ERROR
+        document = json.loads(response)
+        assert document["error"]["data"] == {
+            "code": "timeout",
+            "request_id": "request-example",
+            "retryable": True,
+        }
+        assert len(response) < 512
+        assert endpoint.observed_cancellation is True
         assert provider.cancellations[0].cancelled is True
         await transport.stop()
 

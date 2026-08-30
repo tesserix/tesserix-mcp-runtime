@@ -48,6 +48,7 @@ from tesserix_mcp_runtime.errors import (
     TerminalEmitter,
     map_exception,
 )
+from tesserix_mcp_runtime.execution import ExecutionLimits
 from tesserix_mcp_runtime.lifecycle import (
     LifecycleController,
     LifecycleFailure,
@@ -108,6 +109,7 @@ __all__ = [
     "DuplicateToolName",
     "ErrorCode",
     "ErrorResponse",
+    "ExecutionLimits",
     "IdempotencyRequirement",
     "InvocationResult",
     "InvocationStatus",

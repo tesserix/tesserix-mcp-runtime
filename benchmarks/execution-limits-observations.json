@@ -1,0 +1,99 @@
+{
+  "cases": [
+    {
+      "configured_ceiling": 65536,
+      "encoded_bytes": 65536,
+      "latency_milliseconds": {
+        "maximum": 0.210167,
+        "p50": 0.162916,
+        "p99": 0.204834
+      },
+      "name": "input_bytes",
+      "observed_units": 65536,
+      "peak_temporary_bytes": 149254
+    },
+    {
+      "configured_ceiling": 524288,
+      "encoded_bytes": 524288,
+      "latency_milliseconds": {
+        "maximum": 1.377125,
+        "p50": 1.230167,
+        "p99": 1.373417
+      },
+      "name": "result_bytes",
+      "observed_units": 524288,
+      "peak_temporary_bytes": 1181398
+    },
+    {
+      "configured_ceiling": 16,
+      "encoded_bytes": 151,
+      "latency_milliseconds": {
+        "maximum": 0.021584,
+        "p50": 0.014583,
+        "p99": 0.018958
+      },
+      "name": "json_depth",
+      "observed_units": 16,
+      "peak_temporary_bytes": 4920
+    },
+    {
+      "configured_ceiling": 128,
+      "encoded_bytes": 1683,
+      "latency_milliseconds": {
+        "maximum": 0.194917,
+        "p50": 0.11625,
+        "p99": 0.159542
+      },
+      "name": "object_properties",
+      "observed_units": 128,
+      "peak_temporary_bytes": 12688
+    },
+    {
+      "configured_ceiling": 1024,
+      "encoded_bytes": 4011,
+      "latency_milliseconds": {
+        "maximum": 11.954459,
+        "p50": 0.841791,
+        "p99": 3.647416
+      },
+      "name": "array_items",
+      "observed_units": 1024,
+      "peak_temporary_bytes": 79800
+    },
+    {
+      "configured_ceiling": 4096,
+      "encoded_bytes": 8191,
+      "latency_milliseconds": {
+        "maximum": 3.253,
+        "p50": 2.93475,
+        "p99": 3.225292
+      },
+      "name": "json_nodes",
+      "observed_units": 4096,
+      "peak_temporary_bytes": 83112
+    }
+  ],
+  "limits": {
+    "cancellation_grace_seconds": 1.0,
+    "max_array_items": 1024,
+    "max_attempts": 3,
+    "max_call_seconds": 30.0,
+    "max_global_concurrency": 64,
+    "max_input_bytes": 65536,
+    "max_json_depth": 16,
+    "max_json_nodes": 4096,
+    "max_object_properties": 128,
+    "max_result_bytes": 524288,
+    "max_server_concurrency": 64,
+    "max_tenant_concurrency": 16,
+    "max_tool_concurrency": 32,
+    "max_tool_seconds": 30.0,
+    "max_tools": 128,
+    "retry_base_delay_seconds": 0.05,
+    "retry_max_delay_seconds": 0.5
+  },
+  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "python": "3.14.7",
+  "samples_per_case": 100,
+  "schema_version": 1
+}

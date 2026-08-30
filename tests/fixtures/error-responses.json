@@ -42,10 +42,22 @@
     "retryability": "never"
   },
   {
+    "code": "overloaded",
+    "message": "The runtime is at capacity.",
+    "request_id": "request-example",
+    "retryability": "safe_or_idempotent"
+  },
+  {
     "code": "unavailable",
     "message": "A required dependency is unavailable.",
     "request_id": "request-example",
     "retryability": "safe_or_idempotent"
+  },
+  {
+    "code": "result_too_large",
+    "message": "The tool result exceeds the allowed size.",
+    "request_id": "request-example",
+    "retryability": "never"
   },
   {
     "code": "internal_failure",

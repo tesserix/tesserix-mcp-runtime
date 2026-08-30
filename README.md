@@ -8,7 +8,8 @@ provides typed contracts, an explicit application composition root,
 deterministic bounded lifecycle, stable safe errors, a validated tool catalog,
 typed-callable schema generation, handler-free manifest snapshots,
 process-signal handling, reusable in-process conformance support, and the
-official MCP v2 Streamable HTTP transport with a private bounded listener. It
+official MCP v2 Streamable HTTP transport with a private bounded listener,
+finite execution, tenant bulkheads, deadlines, cancellation, and safe retries. It
 does not yet publish Registry versions or activate Gateway routes. No stable
 package release is implied by interfaces described as planned below.
 
@@ -26,6 +27,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | MCP v2 Streamable HTTP serving, compatibility matrix, and bounded sessions | Implemented in source; pre-release |
 | ADK `AgentToolView` and `McpServer` bridge | Implemented as an exact optional profile |
 | Default-deny per-tool scopes, effects, approvals, idempotency, and audit | Implemented in source; pre-release |
+| Bounded JSON, concurrency, deadlines, cancellation, and safe retries | Implemented in source; pre-release |
 | Registry manifest compilation, signing, publication, and verification | Planned; not implemented |
 | Registry-backed semantic discovery and progressive disclosure | Planned; not implemented |
 | Automatic Gateway route pickup and activation status | Planned; not implemented |
@@ -231,6 +233,23 @@ approval-store, idempotency, header, audit, and failure contracts.
 [ADR-0011](docs/adr/0011-default-deny-tool-policy.md) records the trust
 boundary, exact digest decision, distributed failure behavior, alternatives,
 cost, rollout, and rollback.
+
+## Runtime resource safety
+
+`ExecutionLimits` applies transport-independent byte, JSON structure, tool,
+process, server, tool, tenant, deadline, cancellation, attempt, and backoff
+ceilings. Saturated work is shed immediately without an internal queue. The
+earliest authenticated caller, gateway, runtime, and tool deadline reaches the
+handler; work that ignores cancellation remains counted after detachment.
+Reads and explicitly idempotent mutations retry only transient failures inside
+the original deadline.
+
+See the [runtime safety guide](docs/runtime-safety.md) for every default and
+hard maximum, handler and downstream cancellation contract, retry matrix,
+stable outcomes, and the checked-in memory/latency observation.
+[ADR-0012](docs/adr/0012-finite-execution-and-tenant-bulkheads.md) records the
+threat boundary, quantitative tradeoffs, failure behavior, alternatives,
+rollout, and rollback.
 
 ## ADK bridge
 
