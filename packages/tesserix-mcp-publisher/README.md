@@ -14,7 +14,11 @@ publication is a separate explicit option and never replaces the Tesserix
 result. Authentication, tenant policy, immutable storage, and signatures remain
 owned by the corresponding publisher tools and registries.
 
-The full command contract, exit-code recovery matrix, and credential guidance
-are in the [Registry publication guide](../../docs/registry-publication.md).
-The architecture and failure-state decision is
-[ADR-0019](../../docs/adr/0019-delegated-immutable-registry-publication.md).
+The full publication command contract, exit-code recovery matrix, and
+credential guidance are in the
+[Registry publication guide](../../docs/registry-publication.md). Digest-bound
+activation observation is in the
+[Gateway activation guide](../../docs/gateway-activation.md). The architecture
+and failure-state decisions are
+[ADR-0019](../../docs/adr/0019-delegated-immutable-registry-publication.md) and
+[ADR-0020](../../docs/adr/0020-digest-bound-gateway-activation.md).

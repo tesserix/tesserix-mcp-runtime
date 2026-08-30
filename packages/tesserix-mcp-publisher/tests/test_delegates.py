@@ -8,6 +8,8 @@ from typing import cast
 
 import pytest
 from tesserix_mcp_publisher import (
+    ActivationPhase,
+    ActivationTarget,
     AgenticCLIPublisher,
     CommandLimits,
     CommandResult,
@@ -111,6 +113,38 @@ def published_document(prepared: PreparedPublication) -> bytes:
     return json.dumps(document, separators=(",", ":"), sort_keys=True).encode()
 
 
+def activation_document(prepared: PreparedPublication) -> bytes:
+    document = json.loads(published_document(prepared))
+    document["status"] = {
+        "activation": {
+            "schemaVersion": "v1alpha1",
+            "ref": prepared.ref,
+            "registryDigest": prepared.registry_digest,
+            "artifactDigest": prepared.evidence.artifact.digest,
+            "generation": 7,
+            "desiredState": "published",
+            "phase": "published",
+            "publishedAt": "2026-08-30T11:59:00Z",
+            "activeAt": None,
+            "observedAt": "2026-08-30T12:00:00Z",
+            "conditions": [
+                {
+                    "type": "Published",
+                    "status": "True",
+                    "actor": "registry",
+                    "reason": "PublicationCommitted",
+                    "observedGeneration": 7,
+                    "registryDigest": prepared.registry_digest,
+                    "artifactDigest": prepared.evidence.artifact.digest,
+                    "lastTransitionTime": "2026-08-30T12:00:00Z",
+                    "requestId": "request-publication",
+                }
+            ],
+        }
+    }
+    return json.dumps(document, separators=(",", ":"), sort_keys=True).encode()
+
+
 def test_agentic_dry_run_performs_status_read_and_remote_validation() -> None:
     prepared = prepared_publication()
     runner = FakeRunner(
@@ -194,6 +228,81 @@ def test_agentic_publish_fetch_and_verify_use_exact_version() -> None:
         prepared.version,
     )
     assert all("SECRET" not in argument.upper() for argv in runner.arguments for argument in argv)
+
+
+def test_agentic_fetches_digest_bound_activation_for_a_slash_name() -> None:
+    prepared = prepared_publication()
+    runner = FakeRunner([result(activation_document(prepared))])
+    publisher = AgenticCLIPublisher(runner=runner, redactor=SecretRedactor())
+    target = ActivationTarget(
+        ref=prepared.ref,
+        registry_digest=prepared.registry_digest,
+        artifact_digest=prepared.evidence.artifact.digest,
+    )
+
+    status = asyncio.run(publisher.fetch_activation(target, request_id="request-activation"))
+
+    assert status.phase is ActivationPhase.PUBLISHED
+    assert status.generation == 7
+    assert runner.arguments == [
+        (
+            "agentic",
+            "pull",
+            "mcpservers",
+            prepared.name,
+            "--tag",
+            prepared.version,
+        )
+    ]
+
+
+def test_agentic_activation_rejects_moved_artifact_and_payload_status() -> None:
+    prepared = prepared_publication()
+    moved_target = ActivationTarget(
+        ref=prepared.ref,
+        registry_digest=prepared.registry_digest,
+        artifact_digest=f"sha256:{'f' * 64}",
+    )
+    publisher = AgenticCLIPublisher(
+        runner=FakeRunner([result(activation_document(prepared))]),
+        redactor=SecretRedactor(),
+    )
+
+    with pytest.raises(PublicationError) as moved:
+        asyncio.run(
+            publisher.fetch_activation(
+                moved_target,
+                request_id="request-moved-activation",
+            )
+        )
+
+    assert moved.value.code is PublicationErrorCode.ACTIVATION_SUPERSEDED
+    assert moved.value.retryable is False
+
+    malformed = json.loads(activation_document(prepared))
+    malformed["status"]["activation"] = {
+        "message": "Bearer CCCCCCCCCCCCCCCC",
+    }
+    publisher = AgenticCLIPublisher(
+        runner=FakeRunner([result(json.dumps(malformed).encode())]),
+        redactor=SecretRedactor(),
+    )
+    target = ActivationTarget(
+        ref=prepared.ref,
+        registry_digest=prepared.registry_digest,
+        artifact_digest=prepared.evidence.artifact.digest,
+    )
+
+    with pytest.raises(PublicationError) as invalid:
+        asyncio.run(
+            publisher.fetch_activation(
+                target,
+                request_id="request-invalid-activation",
+            )
+        )
+
+    assert invalid.value.code is PublicationErrorCode.ACTIVATION_CONTRACT_INVALID
+    assert "CCCCCCCCCCCCCCCC" not in str(invalid.value)
 
 
 def test_official_target_only_uses_validate_and_publish_with_server_json() -> None:

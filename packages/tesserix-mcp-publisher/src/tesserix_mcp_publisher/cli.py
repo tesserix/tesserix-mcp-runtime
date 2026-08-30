@@ -16,6 +16,13 @@ from typing import Any, Never, TextIO, cast
 
 from tesserix_mcp_runtime import SecretRedactor, SecretValue
 
+from .activation import (
+    ActivationClock,
+    ActivationPhase,
+    ActivationTarget,
+    ActivationWaiter,
+    SystemActivationClock,
+)
 from .commands import CommandRunner, SubprocessCommandRunner
 from .delegates import AgenticCLIPublisher, OfficialMCPPublisherCLI
 from .errors import PublicationError, PublicationErrorCode, PublicationValidationError
@@ -70,6 +77,15 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("--request-id")
             command.add_argument("--dry-run", action="store_true")
             command.add_argument("--official", action="store_true")
+    activation = commands.add_parser("activation")
+    activation.add_argument("--ref", required=True)
+    activation.add_argument("--registry-digest", required=True)
+    activation.add_argument("--artifact-digest", required=True)
+    activation.add_argument("--generation", type=int)
+    activation.add_argument("--request-id")
+    activation.add_argument("--wait-for", choices=tuple(ActivationPhase))
+    activation.add_argument("--timeout-seconds", type=float, default=120.0)
+    activation.add_argument("--poll-interval-seconds", type=float, default=2.0)
     return parser
 
 
@@ -212,10 +228,16 @@ def _exit_code(error: PublicationError) -> int:
         return 2
     if error.code is PublicationErrorCode.CONFLICT:
         return 3
+    if error.code is PublicationErrorCode.ACTIVATION_SUPERSEDED:
+        return 3
     if error.code is PublicationErrorCode.UNAVAILABLE:
         return 4
     if error.code is PublicationErrorCode.UNKNOWN_OUTCOME:
         return 5
+    if error.code is PublicationErrorCode.ACTIVATION_FAILED:
+        return 7
+    if error.code is PublicationErrorCode.ACTIVATION_TIMEOUT:
+        return 8
     return 1
 
 
@@ -223,6 +245,7 @@ def run(
     argv: list[str],
     *,
     runner: CommandRunner | None = None,
+    clock: ActivationClock | None = None,
     environ: Mapping[str, str] | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
@@ -234,8 +257,45 @@ def run(
     environment = os.environ if environ is None else environ
     try:
         arguments = _parser().parse_args(argv)
-        prepared = _prepare(arguments)
         command = cast(str, arguments.command)
+        if command == "activation":
+            redactor = _redactor(environment)
+            resolved_runner = (
+                SubprocessCommandRunner(redactor=redactor) if runner is None else runner
+            )
+            target = ActivationTarget(
+                ref=cast(str, arguments.ref),
+                registry_digest=cast(str, arguments.registry_digest),
+                artifact_digest=cast(str, arguments.artifact_digest),
+                generation=cast(int | None, arguments.generation),
+            )
+            request_id_value = cast(str | None, arguments.request_id)
+            request_id = request_id_value or f"activation-{uuid.uuid4()}"
+            client = AgenticCLIPublisher(runner=resolved_runner, redactor=redactor)
+            waiter = ActivationWaiter(
+                client=client,
+                clock=SystemActivationClock() if clock is None else clock,
+            )
+            wait_for = cast(str | None, arguments.wait_for)
+            if wait_for is None:
+                status = asyncio.run(waiter.observe(target, request_id=request_id))
+            else:
+                status = asyncio.run(
+                    waiter.wait(
+                        target,
+                        target_phase=ActivationPhase(wait_for),
+                        timeout_seconds=cast(float, arguments.timeout_seconds),
+                        poll_interval_seconds=cast(
+                            float,
+                            arguments.poll_interval_seconds,
+                        ),
+                        request_id=request_id,
+                    )
+                )
+            _write_json(output, status.explain(request_id=request_id))
+            return 0
+
+        prepared = _prepare(arguments)
         if command in {"validate", "inspect"}:
             _write_json(
                 output,

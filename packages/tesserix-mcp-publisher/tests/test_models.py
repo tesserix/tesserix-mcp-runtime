@@ -149,6 +149,7 @@ def test_publication_outcome_rejects_inconsistent_external_state() -> None:
         idempotency_key="publish-run-42",
         ref=artifact().ref,
         digest=artifact().digest,
+        artifact_digest=f"sha256:{'c' * 64}",
         version=artifact().version,
         created=True,
         artifact=artifact(),

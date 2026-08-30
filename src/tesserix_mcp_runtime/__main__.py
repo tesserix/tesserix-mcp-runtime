@@ -1,4 +1,4 @@
-"""Expose metadata and optional publication commands without starting a server."""
+"""Expose metadata, publication, and activation reads without starting a server."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Protocol, cast
 
 from tesserix_mcp_runtime import __version__
 
-_PUBLISHER_COMMANDS = frozenset({"inspect", "manifest", "publish", "validate"})
+_PUBLISHER_COMMANDS = frozenset({"activation", "inspect", "manifest", "publish", "validate"})
 
 
 class _PublisherCLI(Protocol):
@@ -32,7 +32,7 @@ def _run_publisher(argv: list[str]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run metadata commands or lazily delegate publication workflows."""
+    """Run metadata commands or lazily delegate release-control workflows."""
     arguments = sys.argv[1:] if argv is None else argv
     if arguments and arguments[0] in _PUBLISHER_COMMANDS:
         return _run_publisher(arguments)

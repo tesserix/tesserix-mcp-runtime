@@ -10,6 +10,10 @@ from tesserix_mcp_runtime import JsonValue
 class PublicationErrorCode(StrEnum):
     """Stable public publication failure codes."""
 
+    ACTIVATION_CONTRACT_INVALID = "activation_contract_invalid"
+    ACTIVATION_FAILED = "activation_failed"
+    ACTIVATION_SUPERSEDED = "activation_superseded"
+    ACTIVATION_TIMEOUT = "activation_timeout"
     ARTIFACT_DIGEST_MISMATCH = "artifact_digest_mismatch"
     COMMAND_FAILED = "command_failed"
     COMMAND_OUTPUT_INVALID = "command_output_invalid"
@@ -24,6 +28,10 @@ class PublicationErrorCode(StrEnum):
 
 
 _MESSAGES: dict[PublicationErrorCode, str] = {
+    PublicationErrorCode.ACTIVATION_CONTRACT_INVALID: "Activation status contract is invalid.",
+    PublicationErrorCode.ACTIVATION_FAILED: "Gateway activation reached a terminal state.",
+    PublicationErrorCode.ACTIVATION_SUPERSEDED: "Activation target was superseded.",
+    PublicationErrorCode.ACTIVATION_TIMEOUT: "Gateway activation did not complete before deadline.",
     PublicationErrorCode.ARTIFACT_DIGEST_MISMATCH: "Artifact evidence does not match delivery.",
     PublicationErrorCode.COMMAND_FAILED: "Delegated publisher command failed.",
     PublicationErrorCode.COMMAND_OUTPUT_INVALID: "Delegated publisher returned invalid output.",
