@@ -42,7 +42,7 @@ def test_adk_compatibility_verifies_provenance_before_the_optional_install() -> 
     assert "attestations: read" in workflow
     attestation = workflow.index("gh attestation verify")
     compatibility = workflow.index(
-        "uv run --isolated --frozen --extra adk pytest",
+        "uv run --isolated --frozen --extra adk --extra testkit pytest",
     )
     assert attestation < compatibility
     assert "eec6afc695518971f44723e520cf43f0997110d013ce4733f8d6d30ec96b8bdb" in workflow

@@ -63,6 +63,7 @@ def test_project_declares_the_hermetic_quality_policy() -> None:
         "pytest-cov==7.1.0",
         "pytest-socket==0.8.1",
         "ruff==0.16.5",
+        "tesserix-mcp-testkit",
         "twine==7.0.0",
         "types-jsonschema==4.26.0.20260518",
     }
@@ -71,6 +72,8 @@ def test_project_declares_the_hermetic_quality_policy() -> None:
     assert tool["uv"] == {
         "required-version": ">=0.12,<0.13",
         "default-groups": ["dev"],
+        "sources": {"tesserix-mcp-testkit": {"workspace": True}},
+        "workspace": {"members": ["packages/tesserix-mcp-testkit"]},
     }
     assert tool["mypy"] == {
         "python_version": "3.12",
@@ -97,6 +100,8 @@ def test_project_declares_the_hermetic_quality_policy() -> None:
         "--strict-config",
         "--strict-markers",
         "-q",
+        "-p",
+        "no:tesserix_mcp_testkit",
     } <= addopts
     assert pytest_options["testpaths"] == ["tests"]
     assert pytest_options["xfail_strict"] is True

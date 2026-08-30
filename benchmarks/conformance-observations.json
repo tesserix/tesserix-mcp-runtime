@@ -1,0 +1,44 @@
+{
+  "contract_version": "1.0",
+  "lanes": [
+    {
+      "deselected": 2,
+      "duration_seconds": 0.19,
+      "name": "core",
+      "passed": 24,
+      "skipped": 0
+    },
+    {
+      "deselected": 0,
+      "duration_seconds": 0.24,
+      "name": "sdk",
+      "passed": 2,
+      "skipped": 0
+    },
+    {
+      "deselected": 0,
+      "duration_seconds": 0.13,
+      "name": "external",
+      "passed": 2,
+      "skipped": 22
+    }
+  ],
+  "mutations": [
+    {
+      "duration_seconds": 0.13,
+      "name": "timeout_error_mapping_to_internal",
+      "status": "killed"
+    },
+    {
+      "duration_seconds": 0.12,
+      "name": "policy_default_deny_bypass",
+      "status": "killed"
+    }
+  ],
+  "passed": true,
+  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "python": "3.14.7",
+  "schema_version": 1,
+  "target_total_seconds": 10.0,
+  "total_duration_seconds": 0.56
+}

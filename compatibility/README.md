@@ -11,7 +11,7 @@ Run it from the repository root:
     uv lock --check --script compatibility/client_2_1.py
     uv run --frozen python compatibility/run_matrix.py
     uv run --frozen python compatibility/run_inspector.py
-    uv run --isolated --frozen --extra adk pytest -q -o addopts='' \
+    uv run --isolated --frozen --extra adk --extra testkit pytest -q -o addopts='' \
       compatibility/adk/test_bridge.py
 
 The runner starts one loopback-only `tesserix-mcp-runtime` server process,
@@ -48,7 +48,8 @@ The separate ADK lane downloads only the exact optional release pinned in
 attestation before creating the isolated extra environment. It ports ADK's
 same-tool local-versus-MCP behavior through the actual runtime transport and
 also covers export narrowing, tenant mismatch, approvals, redaction, and the
-modern protocol revision.
+modern protocol revision. The official SDK and ADK lanes also run contract
+1.0's same two applicable discovery and invocation cases; core runs all 24.
 
 ## Updating a lane
 

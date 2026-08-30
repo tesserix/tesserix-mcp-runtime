@@ -16,6 +16,14 @@ from tesserix_adk.core.errors import ToolRefusal, ToolTimedOutError
 from tesserix_adk.core.hooks import ApprovalPolicy
 from tesserix_adk.mcp import META_PREFIX
 from tesserix_adk.tools import ToolContext, ToolRegistry, tool
+from tesserix_mcp_testkit import (
+    CONFORMANCE_CASES,
+    CONFORMANCE_TOOL_NAME,
+    REQUIRED_CAPABILITIES,
+    ConformanceCase,
+    ConformanceObservation,
+    assert_conformance_case,
+)
 
 from tesserix_mcp_runtime import AuthenticatedIdentity, CallContext, TraceContext
 from tesserix_mcp_runtime.adapters.adk import ADKStreamableHTTPBridge
@@ -491,3 +499,44 @@ def test_exact_adk_release_accepts_the_modern_protocol_revision() -> None:
         await session.close()
 
     asyncio.run(exercise())
+
+
+class AdkBridgeConformanceTarget:
+    capabilities = REQUIRED_CAPABILITIES
+
+    async def observe(self, case: ConformanceCase) -> ConformanceObservation:
+        @tool(name=CONFORMANCE_TOOL_NAME)
+        def echo(value: str) -> dict[str, object]:
+            """Return one bounded synthetic value."""
+            return {"echo": value}
+
+        view = ToolRegistry((echo,)).view(
+            allow=(CONFORMANCE_TOOL_NAME,),
+            agent="conformance",
+        )
+        bridge = ADKStreamableHTTPBridge(view, exports=(CONFORMANCE_TOOL_NAME,))
+        async with _remote_session(bridge) as session:
+            if case.id == "discovery.tools":
+                listed = await session.list_tools()
+                return ConformanceObservation(
+                    tool_names=tuple(descriptor.name for descriptor in listed.tools)
+                )
+            result = await session.call_tool(CONFORMANCE_TOOL_NAME, {"value": "ok"})
+
+        content = result.structured_content
+        if result.is_error or not isinstance(content, Mapping):
+            return ConformanceObservation()
+        value = content.get("echo")
+        if not isinstance(value, str):
+            return ConformanceObservation()
+        return ConformanceObservation(value={"echo": value})
+
+
+ADK_CONFORMANCE_CASES = tuple(
+    case for case in CONFORMANCE_CASES if case.capability in REQUIRED_CAPABILITIES
+)
+
+
+@pytest.mark.parametrize("case", ADK_CONFORMANCE_CASES, ids=lambda case: case.id)
+def test_adk_bridge_conforms_to_every_applicable_case(case: ConformanceCase) -> None:
+    asyncio.run(assert_conformance_case(AdkBridgeConformanceTarget(), case))

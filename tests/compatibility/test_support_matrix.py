@@ -64,7 +64,7 @@ def test_support_matrix_names_every_evidence_backed_lane() -> None:
     assert matrix["adk"] == {
         "release": "0.53.1",
         "locked_mcp_sdk": "2.1.0",
-        "bridge_status": "planned",
+        "bridge_status": "implemented",
     }
     assert matrix["nonexistent_versions"] == ["1.34", "1.34.0"]
 

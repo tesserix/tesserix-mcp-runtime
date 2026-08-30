@@ -76,3 +76,17 @@ runtime budget. `observability-observations.json` records a 0.313 ms local p99
 on Python 3.14 arm64 macOS. This is instrumentation regression evidence, not a
 production throughput or end-to-end network SLO claim; issue #29 still owns
 load and soak proof.
+
+## Conformance PR-lane measurement
+
+`measure_conformance.py` runs the core, official SDK, and external published
+contract lanes with network sockets disabled. It then runs two mutation probes
+that corrupt timeout error mapping and bypass policy default-deny:
+
+    uv run --frozen python benchmarks/measure_conformance.py
+
+The command fails if a lane or mutation probe fails or if the three default
+lanes exceed 10 seconds of pytest-reported time. The checked-in
+`conformance-observations.json` records 0.56 seconds on Python 3.14 arm64 macOS
+and both mutants killed. It is PR regression evidence, not a production
+invocation-latency claim.

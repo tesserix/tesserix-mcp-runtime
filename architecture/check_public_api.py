@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import argparse
 import importlib
 import sys
 from difflib import unified_diff
 from pathlib import Path
 from types import ModuleType
 
-PACKAGE = "tesserix_mcp_runtime"
+DEFAULT_PACKAGE = "tesserix_mcp_runtime"
 
 
 def exported_owner(module: ModuleType, name: str) -> str:
@@ -25,10 +26,17 @@ def current_snapshot(module: ModuleType) -> str:
 
 
 def main() -> int:
-    snapshot_path = (
-        Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).with_name("public-api.txt")
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "snapshot",
+        nargs="?",
+        type=Path,
+        default=Path(__file__).with_name("public-api.txt"),
     )
-    module = importlib.import_module(PACKAGE)
+    parser.add_argument("--package", default=DEFAULT_PACKAGE)
+    arguments = parser.parse_args()
+    snapshot_path = arguments.snapshot
+    module = importlib.import_module(arguments.package)
     expected = snapshot_path.read_text(encoding="utf-8")
     actual = current_snapshot(module)
     if expected == actual:
@@ -40,7 +48,7 @@ def main() -> int:
             expected.splitlines(keepends=True),
             actual.splitlines(keepends=True),
             fromfile=str(snapshot_path),
-            tofile=f"current {PACKAGE} exports",
+            tofile=f"current {arguments.package} exports",
         )
     )
     return 1
