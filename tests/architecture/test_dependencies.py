@@ -49,7 +49,7 @@ def test_core_dependency_report_matches_frozen_resolution() -> None:
     assert result["profiles"]["core"]["distribution_count"] == 34
     assert result["profiles"]["core"]["wheel_bytes"] is None
     policy = json.loads(REPORT.read_text(encoding="utf-8"))
-    assert policy["profiles"]["core"]["max_wheel_bytes"] == 98_304
+    assert policy["profiles"]["core"]["max_wheel_bytes"] == 131_072
     assert result["profiles"]["adk"]["declared_dependencies"][-2].startswith(
         "tesserix-adk @ https://github.com/tesserix/agent-development-kit/releases/"
     )

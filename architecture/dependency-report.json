@@ -122,7 +122,7 @@
       ],
       "max_distribution_count": 36,
       "max_installed_bytes": 67108864,
-      "max_wheel_bytes": 98304
+      "max_wheel_bytes": 131072
     },
     "manifest": {
       "allowed_forbidden_dependencies": [],

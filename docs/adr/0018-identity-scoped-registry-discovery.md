@@ -125,6 +125,23 @@ Contract fixtures and upstream tests therefore pin only the shipped GET and
 exact-fetch behavior; later ETag/hybrid/bundle support requires a new additive
 decision and cross-repository matrix evidence.
 
+### Dependency envelope review
+
+The Registry core, HTTP adapter, and optional ADK bridge use only the standard
+library and dependencies already present in their respective profiles. The
+universal core resolution therefore remains 34 distributions and the clean CI
+installation is 31,395,397 bytes, below the existing 64 MiB ceiling. The
+additive source raises the pure-Python runtime wheel from the previous 96 KiB
+budget to 114,518 bytes in CI (114,640 bytes in the local reproducible build).
+
+Following ADR-0003's measured-review rule, the wheel ceiling becomes 128 KiB
+(131,072 bytes), leaving 16,432 bytes above the larger observation. No
+dependency-count or installed-size budget changes, and this is not an
+unbounded exemption. Splitting these runtime-owned protocols into a new
+distribution would add release and compatibility coupling without reducing
+installed code, while adding a Registry, vector, database, or ADK dependency
+to core would violate the ownership boundary.
+
 ## Alternatives considered
 
 - Add embeddings, Qdrant, or an in-memory full catalog: rejected because it
