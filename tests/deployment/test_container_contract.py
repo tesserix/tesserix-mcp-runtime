@@ -27,6 +27,8 @@ DOCKER_CONTEXT_ALLOWLIST = {
     "!README.md",
     "!compatibility/",
     "!compatibility/server.py",
+    "!integration/",
+    "!integration/**",
     "!packages/",
     "!packages/tesserix-mcp-manifest/",
     "!packages/tesserix-mcp-manifest/pyproject.toml",

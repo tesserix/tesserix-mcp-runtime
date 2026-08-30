@@ -1,0 +1,224 @@
+{
+  "adapter": "native",
+  "description": "Exercise the complete tenant-scoped MCP release lifecycle.",
+  "egress_hosts": [],
+  "lifecycle": "active",
+  "manifest_version": "1.0",
+  "name": "io.github.tesserix/journey",
+  "ownership": {
+    "annotations": {
+      "owner": "mcp-platform"
+    },
+    "labels": {
+      "domain": "release-integration"
+    },
+    "namespace": "tenant-a",
+    "org_id": "tesserix",
+    "tenant_id": "tenant-a",
+    "visibility": "private"
+  },
+  "package": {
+    "identifier": "ghcr.io/tesserix/tesserix-mcp-journey:1.0.0",
+    "image_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "registry_type": "oci",
+    "runtime_hint": "docker",
+    "transport": {
+      "type": "stdio"
+    }
+  },
+  "protocol_versions": [
+    "2025-11-25"
+  ],
+  "remote": {
+    "url": "https://runtime.journey.invalid/mcp"
+  },
+  "repository": {
+    "source": "github",
+    "url": "https://github.com/tesserix/tesserix-mcp-runtime"
+  },
+  "required_scopes": [
+    "journey:approve",
+    "journey:read",
+    "journey:write"
+  ],
+  "route_policy": {
+    "direct_access": false,
+    "gateway_path": "/mcp/tenant-a/io-github-tesserix-journey"
+  },
+  "semantic": {
+    "capabilities": [
+      "cap/deadline-proof",
+      "cap/order-approval",
+      "cap/order-read",
+      "cap/order-write",
+      "cap/redaction-proof",
+      "cap/safe-failure"
+    ],
+    "domains": [
+      "release-integration"
+    ],
+    "keywords": [
+      "idempotent",
+      "order",
+      "replay",
+      "tenant"
+    ],
+    "risk": "high",
+    "summary": "Prove replay-safe tenant-scoped order tools through AgentGateway.",
+    "when_to_use": [
+      "verify publication discovery activation invocation and rollback"
+    ]
+  },
+  "title": "Tesserix MCP release journey",
+  "tools": [
+    {
+      "description": "Approve one known order after explicit review.",
+      "input_fingerprint": "8c19b4d80d20e413502dfc6cbc2fbfb3a6e89551a238baad79285d124c71cc3a",
+      "inputs": [
+        {
+          "json_type": "string",
+          "name": "order_id",
+          "required": true
+        }
+      ],
+      "name": "journey.approve_order",
+      "output_fingerprint": "060ac885cfee0b4470f9bfef51737c1d9d74b2269395dc90e77f04653af0abd2",
+      "required_scopes": [
+        "journey:approve",
+        "journey:write"
+      ],
+      "semantic": {
+        "capabilities": [
+          "cap/order-approval"
+        ],
+        "risk": "high",
+        "summary": "Approve one order after an explicit approval record.",
+        "when_to_use": [
+          "prove approval-bound external effects"
+        ]
+      }
+    },
+    {
+      "description": "Return one deterministic safe failure.",
+      "input_fingerprint": "d746974fa9afd5e951f76f9af38954b0ad7f436f2120dc974da65e5ee39f856f",
+      "name": "journey.fail",
+      "output_fingerprint": "abd806c033a1a627f7649107e9c082ed846efa8f1172d73cd02025f164d16ced",
+      "required_scopes": [
+        "journey:read"
+      ],
+      "semantic": {
+        "capabilities": [
+          "cap/safe-failure"
+        ],
+        "risk": "low",
+        "summary": "Return a payload-free deterministic error.",
+        "when_to_use": [
+          "verify safe failure mapping"
+        ]
+      }
+    },
+    {
+      "description": "Read one tenant-scoped order.",
+      "input_fingerprint": "8c19b4d80d20e413502dfc6cbc2fbfb3a6e89551a238baad79285d124c71cc3a",
+      "inputs": [
+        {
+          "json_type": "string",
+          "name": "order_id",
+          "required": true
+        }
+      ],
+      "name": "journey.read_order",
+      "output_fingerprint": "060ac885cfee0b4470f9bfef51737c1d9d74b2269395dc90e77f04653af0abd2",
+      "required_scopes": [
+        "journey:read"
+      ],
+      "semantic": {
+        "capabilities": [
+          "cap/order-read"
+        ],
+        "risk": "low",
+        "summary": "Return one order from the caller tenant.",
+        "when_to_use": [
+          "read a known synthetic order"
+        ]
+      }
+    },
+    {
+      "description": "Prove final-boundary result redaction.",
+      "input_fingerprint": "d746974fa9afd5e951f76f9af38954b0ad7f436f2120dc974da65e5ee39f856f",
+      "name": "journey.secret_canary",
+      "output_fingerprint": "8de55800b76346a00c91ed0049b30ab3df0cb0b4130360d3dbc96fc6b625cecc",
+      "required_scopes": [
+        "journey:read"
+      ],
+      "semantic": {
+        "capabilities": [
+          "cap/redaction-proof"
+        ],
+        "risk": "medium",
+        "summary": "Return a synthetic protected field for final redaction.",
+        "when_to_use": [
+          "verify protected result values never escape"
+        ]
+      }
+    },
+    {
+      "description": "Exercise one bounded invocation deadline.",
+      "input_fingerprint": "04f4a9bc91096b5ec13e4b3f9ee41c8796cb652a8589663bdd0289c2ba451acd",
+      "inputs": [
+        {
+          "json_type": "integer",
+          "name": "delay_ms",
+          "required": true
+        }
+      ],
+      "name": "journey.slow",
+      "output_fingerprint": "e04928d8170f6a414e4203fdceff61534a4ea9332f5eca1498ba43fd8a973a8e",
+      "required_scopes": [
+        "journey:read"
+      ],
+      "semantic": {
+        "capabilities": [
+          "cap/deadline-proof"
+        ],
+        "risk": "low",
+        "summary": "Wait long enough to exercise a caller deadline.",
+        "when_to_use": [
+          "verify bounded timeout cancellation"
+        ]
+      }
+    },
+    {
+      "description": "Write one order with replay-safe idempotency.",
+      "input_fingerprint": "bce37fce8d7bc49b672ee9f20a77a29c6209f1d717e6ac8fff50fe290a11a542",
+      "inputs": [
+        {
+          "json_type": "string",
+          "name": "order_id",
+          "required": true
+        },
+        {
+          "json_type": "string",
+          "name": "status",
+          "required": true
+        }
+      ],
+      "name": "journey.write_order",
+      "output_fingerprint": "060ac885cfee0b4470f9bfef51737c1d9d74b2269395dc90e77f04653af0abd2",
+      "required_scopes": [
+        "journey:write"
+      ],
+      "semantic": {
+        "capabilities": [
+          "cap/order-write"
+        ],
+        "risk": "medium",
+        "summary": "Write one order and preserve the original replay result.",
+        "when_to_use": [
+          "prove one write effect under replay"
+        ]
+      }
+    }
+  ],
+  "version": "1.0.0"
+}

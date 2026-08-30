@@ -59,15 +59,19 @@ def test_project_declares_the_hermetic_quality_policy() -> None:
         "opentelemetry-sdk==1.44.0",
         "pip-audit==2.10.1",
         "pyright==1.1.411",
+        "pytest-asyncio>=1,<2",
         "pytest==9.0.3",
         "pytest-cov==7.1.0",
         "pytest-socket==0.8.1",
         "ruff==0.16.5",
+        "starlette==1.6.0",
         "tesserix-mcp-manifest",
         "tesserix-mcp-publisher",
         "tesserix-mcp-testkit",
         "twine==7.0.0",
         "types-jsonschema==4.26.0.20260518",
+        "types-pyyaml>=6.0.12,<7",
+        "pyyaml>=6.0.3,<7",
     }
 
     tool = table(document["tool"])

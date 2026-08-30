@@ -25,7 +25,7 @@ from tesserix_mcp_manifest.errors import (
     ManifestVersionMismatchError,
 )
 from tesserix_mcp_manifest.models import PackageIdentity, ServerAuthoringManifest, ToolSummary
-from tesserix_mcp_runtime import JsonValue
+from tesserix_mcp_runtime import JsonValue, schema_fingerprint
 
 _JSON_OBJECT_ADAPTER = TypeAdapter(dict[str, JsonValue])
 
@@ -113,16 +113,18 @@ def _tool_document(tool: ToolSummary) -> dict[str, JsonValue]:
         )
         if input_field.required:
             required.append(input_field.name)
+    input_schema: dict[str, JsonValue] = {
+        "properties": properties,
+        "required": required,
+        "type": "object",
+    }
     return _without_none(
         {
             "capabilities": _sorted_strings(tool.semantic.capabilities),
             "description": tool.description,
             "inputFingerprint": tool.input_fingerprint,
-            "inputSchema": {
-                "properties": properties,
-                "required": required,
-                "type": "object",
-            },
+            "inputSchema": input_schema,
+            "inputSchemaFingerprint": schema_fingerprint(input_schema),
             "name": tool.name,
             "outputFingerprint": tool.output_fingerprint,
             "requires": _sorted_strings(tool.semantic.requires),

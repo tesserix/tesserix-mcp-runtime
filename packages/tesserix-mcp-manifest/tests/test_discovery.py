@@ -27,6 +27,7 @@ from tesserix_mcp_runtime import (
     ToolEffect,
     ToolManifest,
     ToolMetadata,
+    schema_fingerprint,
 )
 
 
@@ -280,6 +281,9 @@ def test_runtime_tool_intent_compiles_to_bounded_safe_registry_attributes(
         "required": ["order_id"],
         "type": "object",
     }
+    assert document["inputSchemaFingerprint"] == schema_fingerprint(document["inputSchema"])
+    assert document["inputFingerprint"] == runtime_tool.input_fingerprint
+    assert document["inputSchemaFingerprint"] != document["inputFingerprint"]
     assert document["capabilities"] == ["cap/orders-read"]
     assert document["requires"] == [dependency]
     assert document["riskLevel"] == "low"

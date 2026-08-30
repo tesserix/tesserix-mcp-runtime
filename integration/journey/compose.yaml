@@ -1,0 +1,213 @@
+x-hardened: &hardened
+  cap_drop:
+    - ALL
+  read_only: true
+  restart: "no"
+  security_opt:
+    - no-new-privileges:true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=67108864
+
+x-journey-runtime: &journey-runtime
+  <<: *hardened
+  image: ${JOURNEY_RUNTIME_IMAGE:?set JOURNEY_RUNTIME_IMAGE}
+  user: "10001:10001"
+
+x-gateway: &gateway
+  <<: *hardened
+  command:
+    - -f
+    - /etc/agentgateway/config.yaml
+  image: cr.agentgateway.dev/agentgateway:v1.4.1@sha256:efd79355b89094a8225a9db465d9a01dc656b377f0bab458761b935a13231d29
+  user: "65532:65532"
+
+services:
+  identity:
+    <<: *journey-runtime
+    command:
+      - integration.journey.identity
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8081"
+      - --audience
+      - https://registry.journey.invalid
+    healthcheck:
+      test:
+        - CMD
+        - /opt/app/bin/python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health', timeout=2).read(4096)
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    networks:
+      journey:
+        ipv4_address: 172.30.0.10
+    ports:
+      - host_ip: 127.0.0.1
+        protocol: tcp
+        target: 8081
+
+  backing:
+    <<: *journey-runtime
+    command:
+      - integration.journey.backing
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8082"
+    healthcheck:
+      test:
+        - CMD
+        - /opt/app/bin/python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8082/health/ready', timeout=2).read(4096)
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    networks:
+      journey:
+        ipv4_address: 172.30.0.11
+    ports:
+      - host_ip: 127.0.0.1
+        protocol: tcp
+        target: 8082
+
+  runtime-good:
+    <<: *journey-runtime
+    command:
+      - integration.journey.reference_server
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --allowed-host
+      - runtime-good:8080
+      - --allowed-host
+      - runtime-good
+      - --allowed-origin
+      - http://gateway-good:3000
+      - --backing-endpoint
+      - http://backing:8082
+      - --jwks-endpoint
+      - http://identity:8081/jwks.json
+      - --audience
+      - https://registry.journey.invalid
+      - --gateway-cidr
+      - 172.30.0.40/32
+    depends_on:
+      backing:
+        condition: service_healthy
+      identity:
+        condition: service_healthy
+    networks:
+      journey:
+        ipv4_address: 172.30.0.20
+    ports:
+      - host_ip: 127.0.0.1
+        protocol: tcp
+        target: 8080
+
+  runtime-bad:
+    <<: *journey-runtime
+    command:
+      - integration.journey.reference_server
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --allowed-host
+      - runtime-bad:8080
+      - --allowed-host
+      - runtime-bad
+      - --allowed-origin
+      - http://gateway-candidate:3000
+      - --backing-endpoint
+      - http://backing:8082
+      - --jwks-endpoint
+      - http://identity:8081/jwks.json
+      - --audience
+      - https://registry.journey.invalid
+      - --gateway-cidr
+      - 172.30.0.41/32
+      - --reject-all
+    depends_on:
+      backing:
+        condition: service_healthy
+      identity:
+        condition: service_healthy
+    networks:
+      journey:
+        ipv4_address: 172.30.0.21
+    ports:
+      - host_ip: 127.0.0.1
+        protocol: tcp
+        target: 8080
+
+  registry:
+    <<: *hardened
+    image: ${JOURNEY_REGISTRY_IMAGE:?set JOURNEY_REGISTRY_IMAGE}
+    user: "1000:1000"
+    environment:
+      ADDR: ":8080"
+      AUTH_AUDIENCE: https://registry.journey.invalid
+      AUTH_GROUPS_CLAIM: groups
+      AUTH_ISSUER: https://identity.journey.invalid
+      AUTH_JWKS_URL: http://identity:8081/jwks.json
+      AUTH_MODE: jwks
+      AUTH_TENANT_CLAIM: tenant_id
+      AUTO_VERSION: "false"
+      IMMUTABLE_TAGS: "true"
+      PUBLIC_BASE_URL: http://registry:8080
+      SEED_EXAMPLES: "false"
+      SIGNING_DEV: "true"
+      STORE_BACKEND: memory
+      WEB_DIR: ""
+    depends_on:
+      identity:
+        condition: service_healthy
+    networks:
+      journey:
+        ipv4_address: 172.30.0.30
+    ports:
+      - host_ip: 127.0.0.1
+        protocol: tcp
+        target: 8080
+
+  gateway-good:
+    <<: *gateway
+    depends_on:
+      runtime-good:
+        condition: service_started
+    networks:
+      journey:
+        ipv4_address: 172.30.0.40
+    ports:
+      - host_ip: 127.0.0.1
+        protocol: tcp
+        target: 3000
+    volumes:
+      - ${JOURNEY_OUTPUT_DIR:?set JOURNEY_OUTPUT_DIR}/gateway-good.yaml:/etc/agentgateway/config.yaml:ro
+
+  gateway-candidate:
+    <<: *gateway
+    depends_on:
+      runtime-bad:
+        condition: service_started
+    networks:
+      journey:
+        ipv4_address: 172.30.0.41
+    ports:
+      - host_ip: 127.0.0.1
+        protocol: tcp
+        target: 3000
+    volumes:
+      - ${JOURNEY_OUTPUT_DIR:?set JOURNEY_OUTPUT_DIR}/gateway-candidate.yaml:/etc/agentgateway/config.yaml:ro
+
+networks:
+  journey:
+    internal: false
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
