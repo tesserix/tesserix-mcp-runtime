@@ -86,6 +86,7 @@
             "required": [],
             "type": "object"
           },
+          "inputSchemaFingerprint": "c8a1ac469a826ea3547ac220c7bbfdcd6b58080d4ec596ff2a0149c5ccb9b699",
           "name": "inventory_search",
           "outputFingerprint": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
           "requiredScopes": [

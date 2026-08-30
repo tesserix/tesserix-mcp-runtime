@@ -84,6 +84,7 @@
             "required": [],
             "type": "object"
           },
+          "inputSchemaFingerprint": "c8a1ac469a826ea3547ac220c7bbfdcd6b58080d4ec596ff2a0149c5ccb9b699",
           "name": "settlements_get",
           "outputFingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
           "requiredScopes": [

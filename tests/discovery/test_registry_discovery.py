@@ -73,6 +73,8 @@ def exact_artifact(
     gateway_path: str = "/gateway/orders/mcp",
     input_schema: dict[str, JsonValue] | None = None,
     input_fingerprint: str | None = None,
+    input_schema_fingerprint: str | None = None,
+    include_input_schema_fingerprint: bool = True,
     output_fingerprint: str = "b" * 64,
     tool_status: str = "active",
     tool_scopes: tuple[str, ...] = ("orders:read",),
@@ -83,6 +85,19 @@ def exact_artifact(
         "registry.agentic.dev/tenant": "tenant-orders",
         "registry.agentic.dev/visibility": "internal",
     }
+    tool: dict[str, JsonValue] = {
+        "name": "orders_get",
+        "status": tool_status,
+        "capabilities": list(tool_capabilities),
+        "requiredScopes": list(tool_scopes),
+        "inputSchema": input_schema,
+        "inputFingerprint": input_fingerprint or schema_fingerprint(input_schema),
+        "outputFingerprint": output_fingerprint,
+    }
+    if include_input_schema_fingerprint:
+        tool["inputSchemaFingerprint"] = input_schema_fingerprint or schema_fingerprint(
+            input_schema
+        )
     spec: dict[str, JsonValue] = {
         "version": "1.2.3",
         "x-tesserix": {
@@ -94,17 +109,7 @@ def exact_artifact(
                 "gatewayPath": gateway_path,
             },
             "semantic": {"capabilities": ["cap/orders-read"]},
-            "tools": [
-                {
-                    "name": "orders_get",
-                    "status": tool_status,
-                    "capabilities": list(tool_capabilities),
-                    "requiredScopes": list(tool_scopes),
-                    "inputSchema": input_schema,
-                    "inputFingerprint": input_fingerprint or schema_fingerprint(input_schema),
-                    "outputFingerprint": output_fingerprint,
-                }
-            ],
+            "tools": [tool],
         },
     }
     computed = registry_artifact_digest(
@@ -467,8 +472,8 @@ def test_registry_adk_server_rejects_ambiguous_gateway_endpoints(endpoint: str) 
 
 
 def test_resolver_fetches_one_exact_match_and_projects_only_reviewed_adk_tools() -> None:
-    stub = search_stub()
-    artifact = exact_artifact()
+    artifact = exact_artifact(include_input_schema_fingerprint=False)
+    stub = search_stub(artifact=artifact)
 
     class Discovery:
         origin = "https://registry.example.com"
@@ -1305,6 +1310,11 @@ def test_cache_failure_degrades_to_registry_without_reducing_availability() -> N
             RegistryCandidateReason.FINGERPRINT,
         ),
         (
+            exact_artifact(input_schema_fingerprint="c" * 64),
+            matching_policy(),
+            RegistryCandidateReason.FINGERPRINT,
+        ),
+        (
             exact_artifact(input_schema=order_input_schema(max_length=32)),
             matching_policy(
                 pin_input=False,
@@ -1334,6 +1344,7 @@ def test_cache_failure_degrades_to_registry_without_reducing_availability() -> N
         "server-scope",
         "tool-scope",
         "fingerprint",
+        "projection-fingerprint",
         "schema",
         "tool-capability",
         "gateway",
