@@ -110,6 +110,7 @@ class HTTPRequestMetadata:
     method: str
     path: str
     headers: tuple[tuple[str, str], ...]
+    peer_host: str | None = None
 
     def header_values(self, name: str) -> tuple[str, ...]:
         normalized = name.casefold()
@@ -131,6 +132,22 @@ class HTTPCallContextProvider(Protocol):
         *,
         cancellation: Cancellation,
     ) -> CallContext: ...
+
+
+class HTTPRequestAuthenticationError(Exception):
+    """Reject one HTTP request while retaining only its safe correlation ID."""
+
+    def __init__(self, *, request_id: str) -> None:
+        if (
+            not _is_runtime_instance(request_id, str)
+            or not request_id
+            or request_id != request_id.strip()
+            or len(request_id) > 256
+            or any(ord(character) < 32 or ord(character) == 127 for character in request_id)
+        ):
+            raise ValueError("request_id must be bounded visible text")
+        self.request_id = request_id
+        super().__init__("request authentication failed")
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -556,6 +573,27 @@ def _headers(scope: ASGIScope, limits: StreamableHTTPLimits) -> tuple[tuple[str,
     return tuple(parsed)
 
 
+def _peer_host(scope: ASGIScope) -> str | None:
+    value: object = scope.get("client")
+    if not _is_runtime_instance(value, tuple):
+        return None
+    parts = cast(tuple[object, ...], value)
+    if len(parts) != 2:
+        return None
+    host = parts[0]
+    if not _is_runtime_instance(host, str):
+        return None
+    host_text = cast(str, host)
+    if (
+        not host_text
+        or host_text != host_text.strip()
+        or len(host_text) > 255
+        or any(ord(character) < 32 or ord(character) == 127 for character in host_text)
+    ):
+        return None
+    return host_text
+
+
 def _response_header_pairs(value: object) -> list[tuple[bytes, bytes]]:
     if value is None:
         return []
@@ -596,12 +634,22 @@ async def _send_json(
     await send({"type": "http.response.body", "body": body, "more_body": False})
 
 
-def _protocol_error_body(*, code: int, message: str) -> bytes:
+def _protocol_error_body(
+    *,
+    code: int,
+    message: str,
+    data: dict[str, JsonValue] | None = None,
+) -> bytes:
+    error = (
+        types.ErrorData(code=code, message=message)
+        if data is None
+        else types.ErrorData(code=code, message=message, data=data)
+    )
     return (
         types.JSONRPCError(
             jsonrpc="2.0",
             id=None,
-            error=types.ErrorData(code=code, message=message),
+            error=error,
         )
         .model_dump_json(by_alias=True, exclude_unset=True)
         .encode("utf-8")
@@ -756,6 +804,7 @@ class _ProtocolASGIApp:
                 method=_safe_observation(scope.get("method"), maximum=16, fallback="UNKNOWN"),
                 path=configured_path,
                 headers=headers,
+                peer_host=_peer_host(scope),
             )
             cancellation = _RequestCancellation()
             context = await self._transport.context_provider.create(
@@ -767,6 +816,17 @@ class _ProtocolASGIApp:
                 or context.cancellation is not cancellation
             ):
                 raise ValueError("context provider returned an invalid context")
+        except HTTPRequestAuthenticationError as error:
+            await _send_json(
+                send,
+                status=401,
+                body=_protocol_error_body(
+                    code=types.INVALID_REQUEST,
+                    message="Unauthorized",
+                    data={"request_id": error.request_id},
+                ),
+            )
+            return
         except Exception:
             await _send_json(
                 send,
@@ -896,6 +956,34 @@ def _mcp_content_block(content: Mapping[str, JsonValue]) -> types.ContentBlock:
         return _CONTENT_BLOCK_ADAPTER.validate_python(dict(content))
     except ValidationError as error:
         raise MCPError(types.INTERNAL_ERROR, "Internal error") from error
+
+
+def _validate_authority_meta(
+    context: CallContext,
+    meta: Mapping[str, JsonValue],
+) -> None:
+    trace = context.trace
+    expected: dict[str, str | None] = {
+        "tenant": context.tenant,
+        "subject": context.subject,
+        "run": context.run_id,
+        "scopes": " ".join(context.scopes),
+        "traceparent": trace.get("traceparent"),
+        "tracestate": trace.get("tracestate"),
+        "idempotency-key": context.idempotency_key,
+    }
+    for prefix in ("tesserix/runtime", "tesserix/adk"):
+        for name, value in expected.items():
+            key = f"{prefix}/{name}"
+            if key in meta and meta[key] != value:
+                raise MCPError(
+                    types.INVALID_REQUEST,
+                    "Unauthorized",
+                    {
+                        "code": "authority_mismatch",
+                        "request_id": context.request_id,
+                    },
+                )
 
 
 class StreamableHTTPTransport:
@@ -1429,8 +1517,9 @@ class StreamableHTTPTransport:
         if endpoint is None and protocol_endpoint is None:
             raise MCPError(types.INTERNAL_ERROR, "Internal error")
         call_context = self._call_context(request_context)
-        arguments: dict[str, JsonValue] = dict((params.arguments or {}).items())
         request_meta = {} if params.meta is None else cast(dict[str, JsonValue], dict(params.meta))
+        _validate_authority_meta(call_context, request_meta)
+        arguments: dict[str, JsonValue] = dict((params.arguments or {}).items())
         cancellation = call_context.cancellation
         protocol_result: ProtocolCallResult | None = None
         request_key = self._protocol_request_key(
@@ -1626,6 +1715,7 @@ class StreamableHTTPTransport:
 __all__ = [
     "ASGIApplication",
     "HTTPCallContextProvider",
+    "HTTPRequestAuthenticationError",
     "HTTPRequestMetadata",
     "ProtocolCallResult",
     "ProtocolTelemetryEvent",

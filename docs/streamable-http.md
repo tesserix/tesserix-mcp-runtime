@@ -35,8 +35,10 @@ request cancellation object. It must authenticate and validate the gateway
 metadata, then return a `CallContext` containing the authoritative identity,
 request/run IDs, trace context, deadline, and idempotency key. Header values are
 available through `header_values()` but are always redacted from `repr()`.
-Header presence alone is not authentication; issue #12 owns the concrete
-Gateway identity verifier.
+Header presence alone is not authentication. Use the concrete
+`GatewayJWTContextProvider` described in the
+[Gateway identity guide](gateway-identity.md) to verify the direct peer, token,
+claims, forwarded attribution, and bounded rotating JWKS before body parsing.
 
 ## Defaults and limits
 
@@ -137,6 +139,11 @@ Malformed JSON-RPC, unknown methods, invalid IDs, bad parameters, and
 unsupported revisions use the official SDK's standard bounded errors. Client
 responses never include an SDK version, credential, tenant value, tool result
 prefix, or Python validation detail.
+
+Authentication failures from `GatewayJWTContextProvider` return 401 with only
+a safe request ID. MCP `_meta` under `tesserix/runtime/*` or `tesserix/adk/*`
+cannot replace verified context; a supplied mismatch returns the stable
+`authority_mismatch` code before tool execution.
 
 ## Compatibility evidence
 
