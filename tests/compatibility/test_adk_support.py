@@ -23,14 +23,14 @@ def test_adk_bridge_is_an_exact_optional_release_dependency() -> None:
         "httpx>=0.28.1,<1",
         "mcp>=2.1.1,<3",
         "mcp-types>=2.1.1,<3",
-        "opentelemetry-api>=1.44,<2",
+        "opentelemetry-api>=1.42.1,<2",
         "PyJWT[crypto]>=2.13,<3",
         "uvicorn>=0.52.4,<1",
     ]
     assert project["optional-dependencies"] == {
         "adk": [ADK_WHEEL],
         "manifest": ["tesserix-mcp-manifest>=0.0.1.dev0,<1"],
-        "otel": ["opentelemetry-sdk>=1.44,<2"],
+        "otel": ["opentelemetry-sdk>=1.42.1,<2"],
         "publisher": ["tesserix-mcp-publisher>=0.0.1.dev0,<1"],
         "testkit": ["tesserix-mcp-testkit>=0.0.1.dev0,<1"],
     }

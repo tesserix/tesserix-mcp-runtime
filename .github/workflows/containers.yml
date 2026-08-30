@@ -1,0 +1,159 @@
+name: Containers
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/containers.yml"
+      - ".dockerignore"
+      - "compatibility/server.py"
+      - "deploy/**"
+      - "pyproject.toml"
+      - "src/**"
+      - "tests/deployment/**"
+      - "uv.lock"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/containers.yml"
+      - ".dockerignore"
+      - "compatibility/server.py"
+      - "deploy/**"
+      - "pyproject.toml"
+      - "src/**"
+      - "tests/deployment/**"
+      - "uv.lock"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: containers-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    name: ${{ matrix.variant }} image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: core
+            dockerfile: deploy/container/core.Dockerfile
+            image: tesserix-mcp-runtime:ci-core
+            base_image: ghcr.io/tesserix/base-python-runtime-3.14:20260829@sha256:3854f5d9d00705b14077bf6715feb9c3bd6d1ad2e41d5594b3c09c0a74c22add
+          - variant: adk
+            dockerfile: deploy/container/adk.Dockerfile
+            image: tesserix-mcp-runtime:ci-adk
+            base_image: ghcr.io/tesserix/base-python-adk-3.14:20260829@sha256:5a6fd1863ed7f37f3929cc596d0ec063c3077c11713cd334f14d1df2b30ef386
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install Python 3.14
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.7"
+          enable-cache: true
+      - name: Verify the frozen client environment
+        run: |
+          uv lock --check
+          uv sync --frozen
+      - name: Build the local image
+        run: |
+          docker build \
+            --build-arg PACKAGE_VERSION=0.0.1.dev0 \
+            --file "${{ matrix.dockerfile }}" \
+            --tag "${{ matrix.image }}" \
+            .
+      - name: Exercise the hardened runtime
+        run: |
+          mkdir -p artifacts
+          uv run --frozen python deploy/container/verify.py \
+            --image "${{ matrix.image }}" \
+            --variant "${{ matrix.variant }}" \
+            --base-image "${{ matrix.base_image }}" \
+            --expected-sdk 2.1.1 \
+            --output "artifacts/${{ matrix.variant }}-runtime.json"
+      - name: Save image and record compressed size
+        run: |
+          archive="artifacts/${{ matrix.variant }}-image.tar"
+          report="artifacts/${{ matrix.variant }}-runtime.json"
+          docker image save --output "$archive" "${{ matrix.image }}"
+          compressed_bytes="$(gzip -c "$archive" | wc -c | tr -d ' ')"
+          jq --argjson compressed "$compressed_bytes" \
+            '. + {compressed_archive_bytes: $compressed}' \
+            "$report" > "${report}.tmp"
+          mv "${report}.tmp" "$report"
+      - name: Generate fresh SPDX and CycloneDX SBOMs
+        run: |
+          docker run --rm \
+            --volume "$PWD/artifacts:/artifacts" \
+            anchore/syft:v1.51.1@sha256:95fe0835e5bebc6f8b1f8acef68d47d63d594ef4c0f25c097ff853b23cbac74c \
+            scan "docker-archive:/artifacts/${{ matrix.variant }}-image.tar" \
+            -o "spdx-json=/artifacts/${{ matrix.variant }}.spdx.json" \
+            -o "cyclonedx-json=/artifacts/${{ matrix.variant }}.cdx.json"
+      - name: Scan merged OS and language package inventories
+        run: |
+          mkdir -p artifacts/trivy-cache
+          docker run --rm \
+            --volume "$PWD/artifacts:/artifacts" \
+            --volume "$PWD/artifacts/trivy-cache:/root/.cache/trivy" \
+            aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
+            image --input "/artifacts/${{ matrix.variant }}-image.tar" \
+            --scanners vuln --pkg-types os --ignore-unfixed \
+            --severity HIGH,CRITICAL --exit-code 1 --format json \
+            --output "/artifacts/${{ matrix.variant }}-trivy-os.json"
+          docker run --rm \
+            --volume "$PWD/artifacts:/artifacts" \
+            --volume "$PWD/artifacts/trivy-cache:/root/.cache/trivy" \
+            aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
+            sbom "/artifacts/${{ matrix.variant }}.spdx.json" \
+            --scanners vuln --pkg-types library --ignore-unfixed \
+            --severity HIGH,CRITICAL --exit-code 1 --format json \
+            --output "/artifacts/${{ matrix.variant }}-trivy-library.json"
+      - name: Remove the local image archive
+        if: ${{ always() }}
+        run: rm -f "artifacts/${{ matrix.variant }}-image.tar"
+      - name: Upload container evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: container-${{ matrix.variant }}-evidence
+          path: |
+            artifacts/${{ matrix.variant }}-runtime.json
+            artifacts/${{ matrix.variant }}.spdx.json
+            artifacts/${{ matrix.variant }}.cdx.json
+            artifacts/${{ matrix.variant }}-trivy-os.json
+            artifacts/${{ matrix.variant }}-trivy-library.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  manifests:
+    name: Kubernetes reference manifests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate Kubernetes 1.31 schemas
+        run: |
+          docker run --rm --volume "$PWD:/work:ro" \
+            ghcr.io/yannh/kubeconform:v0.8.0@sha256:faffaf43f95aa6425306e1ab8d6fcad72acb9049158f38e574c085ea1ec0f64e \
+            -strict -summary -kubernetes-version 1.31.0 \
+            /work/deploy/kubernetes/reference/deployment.json \
+            /work/deploy/kubernetes/reference/service.json \
+            /work/deploy/kubernetes/reference/service-account.json \
+            /work/deploy/kubernetes/reference/pod-disruption-budget.json \
+            /work/deploy/kubernetes/reference/network-policy.json

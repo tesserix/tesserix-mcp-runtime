@@ -1,0 +1,16 @@
+**
+!LICENSE
+!README.md
+!compatibility/
+!compatibility/server.py
+!packages/
+!packages/tesserix-mcp-manifest/
+!packages/tesserix-mcp-manifest/pyproject.toml
+!packages/tesserix-mcp-publisher/
+!packages/tesserix-mcp-publisher/pyproject.toml
+!packages/tesserix-mcp-testkit/
+!packages/tesserix-mcp-testkit/pyproject.toml
+!pyproject.toml
+!src/
+!src/**
+!uv.lock

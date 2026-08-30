@@ -38,6 +38,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | [Registry-backed semantic discovery and progressive disclosure](docs/registry-discovery.md) | Implemented as an opt-in bounded client; pre-release |
 | [Gateway activation status](docs/gateway-activation.md) | Typed contract and bounded observer implemented; producer rollout tracked externally |
 | [Tenant Gateway reconciliation](docs/tenant-gateway-reconciliation.md) | Identity-scoped eligibility, collision-safe routes, and complete page assembly implemented; producer/GitOps rollout tracked externally |
+| [Container and GitOps deployment](docs/container-gitops.md) | Digest-pinned core and ADK images plus a fail-closed Kubernetes reference contract; product adoption tracked externally |
 
 The version can be inspected without starting runtime behavior:
 

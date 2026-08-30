@@ -43,7 +43,7 @@ def test_core_dependency_report_matches_frozen_resolution() -> None:
         "httpx>=0.28.1,<1",
         "mcp-types>=2.1.1,<3",
         "mcp>=2.1.1,<3",
-        "opentelemetry-api>=1.44,<2",
+        "opentelemetry-api>=1.42.1,<2",
         "uvicorn>=0.52.4,<1",
     ]
     assert result["profiles"]["core"]["distribution_count"] == 34
@@ -56,7 +56,7 @@ def test_core_dependency_report_matches_frozen_resolution() -> None:
     assert result["profiles"]["adk"]["distribution_count"] == 35
     assert result["profiles"]["otel"]["distribution_count"] == 36
     assert result["profiles"]["otel"]["declared_dependencies"][-2:] == [
-        "opentelemetry-sdk>=1.44,<2",
+        "opentelemetry-sdk>=1.42.1,<2",
         "uvicorn>=0.52.4,<1",
     ]
     assert result["profiles"]["manifest"]["declared_dependencies"][-2:] == [

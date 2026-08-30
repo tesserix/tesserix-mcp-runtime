@@ -79,7 +79,7 @@ def test_project_metadata_excludes_unsupported_sdk_majors() -> None:
         "httpx>=0.28.1,<1",
         "mcp>=2.1.1,<3",
         "mcp-types>=2.1.1,<3",
-        "opentelemetry-api>=1.44,<2",
+        "opentelemetry-api>=1.42.1,<2",
         "PyJWT[crypto]>=2.13,<3",
         "uvicorn>=0.52.4,<1",
     ]

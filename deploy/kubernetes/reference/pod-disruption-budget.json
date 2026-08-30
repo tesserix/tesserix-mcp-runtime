@@ -1,0 +1,19 @@
+{
+  "apiVersion": "policy/v1",
+  "kind": "PodDisruptionBudget",
+  "metadata": {
+    "name": "mcp-server-reference",
+    "labels": {
+      "app.kubernetes.io/name": "mcp-server-reference",
+      "app.kubernetes.io/component": "mcp-server"
+    }
+  },
+  "spec": {
+    "minAvailable": 1,
+    "selector": {
+      "matchLabels": {
+        "app.kubernetes.io/name": "mcp-server-reference"
+      }
+    }
+  }
+}
