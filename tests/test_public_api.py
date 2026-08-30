@@ -4,16 +4,26 @@ import subprocess
 import sys
 from pathlib import Path
 
+import tesserix_mcp_testkit
+
 import tesserix_mcp_runtime
 
 ROOT = Path(__file__).parents[1]
 CHECKER = ROOT / "architecture" / "check_public_api.py"
 SNAPSHOT = ROOT / "architecture" / "public-api.txt"
+TESTKIT_SNAPSHOT = ROOT / "architecture" / "testkit-public-api.txt"
 
 
-def run_snapshot_check(snapshot: Path) -> subprocess.CompletedProcess[str]:
+def run_snapshot_check(
+    snapshot: Path,
+    *,
+    package: str = "tesserix_mcp_runtime",
+) -> subprocess.CompletedProcess[str]:
+    command = [sys.executable, str(CHECKER), str(snapshot)]
+    if package != "tesserix_mcp_runtime":
+        command.extend(["--package", package])
     return subprocess.run(
-        [sys.executable, str(CHECKER), str(snapshot)],
+        command,
         cwd=ROOT,
         capture_output=True,
         check=False,
@@ -124,6 +134,21 @@ def test_checked_in_public_api_snapshot_matches_exports() -> None:
 
     assert completed.returncode == 0
     assert completed.stdout == "Public API snapshot matches (91 exports).\n"
+    assert completed.stderr == ""
+
+
+def test_testkit_public_api_snapshot_matches_exports() -> None:
+    assert len(tesserix_mcp_testkit.__all__) == 29
+    for name in tesserix_mcp_testkit.__all__:
+        assert getattr(tesserix_mcp_testkit, name) is not None
+
+    completed = run_snapshot_check(
+        TESTKIT_SNAPSHOT,
+        package="tesserix_mcp_testkit",
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout == "Public API snapshot matches (29 exports).\n"
     assert completed.stderr == ""
 
 

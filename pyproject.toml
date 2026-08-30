@@ -33,6 +33,9 @@ adk = [
 otel = [
   "opentelemetry-sdk>=1.44,<2",
 ]
+testkit = [
+  "tesserix-mcp-testkit>=0.0.1.dev0,<1",
+]
 
 [project.scripts]
 tesserix-mcp-runtime = "tesserix_mcp_runtime.__main__:main"
@@ -50,6 +53,7 @@ dev = [
   "pytest-cov==7.1.0",
   "pytest-socket==0.8.1",
   "ruff==0.16.5",
+  "tesserix-mcp-testkit",
   "twine==7.0.0",
   "types-jsonschema==4.26.0.20260518",
 ]
@@ -75,6 +79,12 @@ packages = ["src/tesserix_mcp_runtime"]
 [tool.uv]
 required-version = ">=0.12,<0.13"
 default-groups = ["dev"]
+
+[tool.uv.sources]
+tesserix-mcp-testkit = { workspace = true }
+
+[tool.uv.workspace]
+members = ["packages/tesserix-mcp-testkit"]
 
 [tool.ruff]
 line-length = 100
@@ -113,7 +123,7 @@ typeCheckingMode = "strict"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --strict-config --strict-markers --disable-socket --allow-unix-socket --cov --cov-report=term-missing"
+addopts = "-q --strict-config --strict-markers --disable-socket --allow-unix-socket -p no:tesserix_mcp_testkit --cov --cov-report=term-missing"
 xfail_strict = true
 filterwarnings = ["error"]
 

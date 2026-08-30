@@ -40,15 +40,33 @@ jobs:
           uv run --frozen ruff check .
       - name: Check static types
         run: |
-          uv run --frozen mypy --strict src tests
-          uv run --frozen pyright src tests
+          uv run --frozen mypy --strict src tests \
+            packages/tesserix-mcp-testkit/src \
+            packages/tesserix-mcp-testkit/tests \
+            examples/conformance-server
+          uv run --frozen pyright src tests \
+            packages/tesserix-mcp-testkit/src \
+            packages/tesserix-mcp-testkit/tests \
+            examples/conformance-server
       - name: Run the offline test suite
+        run: uv run --frozen pytest
+      - name: Run the reusable testkit suite
+        working-directory: packages/tesserix-mcp-testkit
+        run: |
+          uv run --project ../.. --frozen coverage run --branch \
+            --source=tesserix_mcp_testkit -m pytest
+          uv run --project ../.. --frozen coverage report \
+            --show-missing --fail-under=90
+      - name: Run the external conformance example
+        working-directory: examples/conformance-server
         run: uv run --frozen pytest
       - name: Verify architecture contracts
         run: |
           uv run --frozen lint-imports --config pyproject.toml --no-cache --no-logo
           uv run --frozen python architecture/check_layers.py
           uv run --frozen python architecture/check_public_api.py
+          uv run --frozen python architecture/check_public_api.py \
+            architecture/testkit-public-api.txt --package tesserix_mcp_testkit
           uv run --frozen python architecture/check_dependencies.py
 
   package:
@@ -73,11 +91,23 @@ jobs:
       - name: Build and validate distributions
         run: |
           uv sync --frozen
-          uv build --clear --offline
+          uv build --all-packages --clear --offline
           uv run --frozen twine check --strict dist/*
           uv run --frozen python architecture/check_artifacts.py dist
           uv run --frozen python architecture/smoke_install_artifacts.py \
             --offline --no-deps dist
+      - name: Install and run the published test extra offline
+        run: |
+          sample_env=$(mktemp -d)
+          runtime_wheel=$(find "$PWD/dist" -maxdepth 1 \
+            -name 'tesserix_mcp_runtime-*.whl' -print -quit)
+          testkit_wheel=$(find "$PWD/dist" -maxdepth 1 \
+            -name 'tesserix_mcp_testkit-*.whl' -print -quit)
+          uv venv --python 3.14 "$sample_env"
+          uv pip install --offline --python "$sample_env/bin/python" \
+            --find-links "$PWD/dist" "${runtime_wheel}[testkit]" "$testkit_wheel"
+          cd examples/conformance-server
+          "$sample_env/bin/python" -m pytest -q
       - name: Upload validated distributions
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:

@@ -55,10 +55,20 @@
     "legacy_latest": "2025-11-25",
     "modern": "2026-07-28"
   },
+  "conformance": {
+    "adk_applicable_cases": 2,
+    "contract_version": "1.0",
+    "core_cases": 24,
+    "required_capabilities": [
+      "discovery",
+      "invocation"
+    ],
+    "sdk_applicable_cases": 2
+  },
   "adk": {
     "release": "0.53.1",
     "locked_mcp_sdk": "2.1.0",
-    "bridge_status": "planned"
+    "bridge_status": "implemented"
   },
   "nonexistent_versions": [
     "1.34",

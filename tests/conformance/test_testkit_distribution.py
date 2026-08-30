@@ -1,0 +1,44 @@
+from __future__ import annotations
+
+import tomllib
+from pathlib import Path
+
+ROOT = Path(__file__).parents[2]
+TESTKIT = ROOT / "packages" / "tesserix-mcp-testkit"
+
+
+def test_testkit_is_an_opt_in_workspace_distribution() -> None:
+    runtime = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    testkit = tomllib.loads((TESTKIT / "pyproject.toml").read_text(encoding="utf-8"))
+
+    assert runtime["project"]["optional-dependencies"]["testkit"] == [
+        "tesserix-mcp-testkit>=0.0.1.dev0,<1"
+    ]
+    assert runtime["tool"]["uv"]["workspace"] == {"members": ["packages/tesserix-mcp-testkit"]}
+    assert runtime["tool"]["uv"]["sources"]["tesserix-mcp-testkit"] == {"workspace": True}
+
+    assert testkit["project"]["name"] == "tesserix-mcp-testkit"
+    assert testkit["project"]["requires-python"] == ">=3.12,<3.15"
+    assert testkit["project"]["license-files"] == ["LICENSE"]
+    assert testkit["project"]["dependencies"] == [
+        "pytest-socket>=0.8,<1",
+        "pytest>=9,<10",
+        "tesserix-mcp-runtime>=0.0.1.dev0,<1",
+    ]
+    assert testkit["project"]["entry-points"]["pytest11"] == {
+        "tesserix_mcp_testkit": "tesserix_mcp_testkit.pytest_plugin"
+    }
+    assert testkit["tool"]["hatch"]["version"]["raw-options"] == {"root": "../.."}
+    assert (TESTKIT / "LICENSE").read_text(encoding="utf-8") == (ROOT / "LICENSE").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_quality_workflow_enforces_standalone_testkit_branch_coverage() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "quality.yml").read_text(encoding="utf-8")
+
+    assert "working-directory: packages/tesserix-mcp-testkit" in workflow
+    assert "coverage run --branch \\" in workflow
+    assert "--source=tesserix_mcp_testkit -m pytest" in workflow
+    assert "coverage report \\" in workflow
+    assert "--show-missing --fail-under=90" in workflow

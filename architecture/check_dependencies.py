@@ -19,6 +19,15 @@ def canonical_name(requirement: str) -> str:
     return re.sub(r"[-_.]+", "-", match.group()).lower()
 
 
+def exported_dependency(line: str) -> str:
+    if not line.startswith("-e "):
+        return line
+    workspace_path = (ROOT / line.removeprefix("-e ")).resolve()
+    workspace_path.relative_to(ROOT)
+    project = tomllib.loads((workspace_path / "pyproject.toml").read_text(encoding="utf-8"))
+    return f"{project['project']['name']} (workspace)"
+
+
 def declared_profiles(pyproject_path: Path) -> tuple[str, dict[str, list[str]]]:
     pyproject = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
     project = pyproject["project"]
@@ -51,7 +60,7 @@ def resolved_dependencies(profile: str) -> list[str]:
         text=True,
     )
     return sorted(
-        line.strip()
+        exported_dependency(line.strip())
         for line in completed.stdout.splitlines()
         if line and not line[0].isspace() and not line.startswith("#")
     )

@@ -124,5 +124,5 @@ jobs:
           uv run --frozen python -c "from importlib.util import find_spec; assert find_spec('tesserix_adk') is None"
       - name: Exercise the exact optional ADK bridge
         run: >-
-          uv run --isolated --frozen --extra adk pytest -q -o addopts=''
+          uv run --isolated --frozen --extra adk --extra testkit pytest -q -o addopts=''
           compatibility/adk/test_bridge.py

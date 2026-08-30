@@ -59,6 +59,15 @@ def test_core_dependency_report_matches_frozen_resolution() -> None:
         "opentelemetry-sdk>=1.44,<2",
         "uvicorn>=0.52.4,<1",
     ]
+    assert result["profiles"]["testkit"]["declared_dependencies"][-2:] == [
+        "tesserix-mcp-testkit>=0.0.1.dev0,<1",
+        "uvicorn>=0.52.4,<1",
+    ]
+    assert result["profiles"]["testkit"]["distribution_count"] == 42
+    assert "pytest==9.0.3" in result["profiles"]["testkit"]["resolved_dependencies"]
+    assert (
+        "tesserix-mcp-testkit (workspace)" in result["profiles"]["testkit"]["resolved_dependencies"]
+    )
 
 
 def test_adk_is_forbidden_outside_its_explicit_dependency_profile(tmp_path: Path) -> None:

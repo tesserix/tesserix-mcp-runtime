@@ -21,7 +21,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | Capability | Status |
 | --- | --- |
 | Importable typed package and VCS-derived version command | Implemented in source; pre-release |
-| Runtime contracts, lifecycle, tool schema policy, and conformance helpers | Implemented in source; pre-release |
+| [Runtime contracts](docs/contracts.md) and [reusable conformance testkit](docs/conformance.md) | Implemented in source; pre-release |
 | Explicit application composition, in-process transport, signals, and bounded drain | Implemented in source; pre-release |
 | Typed callable authoring, schema fingerprints, compatibility classification, and handler-free metadata export | Implemented in source; pre-release |
 | MCP v2 Streamable HTTP serving, compatibility matrix, and bounded sessions | Implemented in source; pre-release |

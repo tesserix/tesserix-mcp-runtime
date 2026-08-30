@@ -6,6 +6,12 @@ resolution-markers = [
     "python_full_version < '3.14'",
 ]
 
+[manifest]
+members = [
+    "tesserix-mcp-runtime",
+    "tesserix-mcp-testkit",
+]
+
 [[package]]
 name = "annotated-types"
 version = "0.8.0"
@@ -1763,6 +1769,9 @@ adk = [
 otel = [
     { name = "opentelemetry-sdk" },
 ]
+testkit = [
+    { name = "tesserix-mcp-testkit" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1777,6 +1786,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-socket" },
     { name = "ruff" },
+    { name = "tesserix-mcp-testkit" },
     { name = "twine" },
     { name = "types-jsonschema" },
 ]
@@ -1791,9 +1801,10 @@ requires-dist = [
     { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.44,<2" },
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.13,<3" },
     { name = "tesserix-adk", marker = "extra == 'adk'", url = "https://github.com/tesserix/agent-development-kit/releases/download/v0.53.1/tesserix_adk-0.53.1-py3-none-any.whl" },
+    { name = "tesserix-mcp-testkit", marker = "extra == 'testkit'", editable = "packages/tesserix-mcp-testkit" },
     { name = "uvicorn", specifier = ">=0.52.4,<1" },
 ]
-provides-extras = ["adk", "otel"]
+provides-extras = ["adk", "otel", "testkit"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1808,8 +1819,25 @@ dev = [
     { name = "pytest-cov", specifier = "==7.1.0" },
     { name = "pytest-socket", specifier = "==0.8.1" },
     { name = "ruff", specifier = "==0.16.5" },
+    { name = "tesserix-mcp-testkit", editable = "packages/tesserix-mcp-testkit" },
     { name = "twine", specifier = "==7.0.0" },
     { name = "types-jsonschema", specifier = "==4.26.0.20260518" },
+]
+
+[[package]]
+name = "tesserix-mcp-testkit"
+source = { editable = "packages/tesserix-mcp-testkit" }
+dependencies = [
+    { name = "pytest" },
+    { name = "pytest-socket" },
+    { name = "tesserix-mcp-runtime" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pytest", specifier = ">=9,<10" },
+    { name = "pytest-socket", specifier = ">=0.8,<1" },
+    { name = "tesserix-mcp-runtime", editable = "." },
 ]
 
 [[package]]
