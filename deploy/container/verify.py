@@ -278,6 +278,33 @@ def _assert_no_runtime_shell(image: str) -> None:
             raise ContainerVerificationError(f"runtime image exposes a shell at {shell}")
 
 
+def _assert_no_runtime_pip(image: str) -> None:
+    for interpreter in (
+        "/usr/local/bin/python",
+        "/opt/app/bin/python",
+        "/opt/adk-venv/bin/python",
+    ):
+        completed = subprocess.run(
+            (
+                "docker",
+                "run",
+                "--rm",
+                "--entrypoint",
+                interpreter,
+                image,
+                "-m",
+                "pip",
+                "--version",
+            ),
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=15,
+        )
+        if completed.returncode == 0:
+            raise ContainerVerificationError(f"runtime image exposes pip through {interpreter}")
+
+
 def verify(
     *,
     image: str,
@@ -293,6 +320,7 @@ def verify(
     if not isinstance(entrypoint, list) or entrypoint[:2] != ["/usr/bin/tini", "--"]:
         raise ContainerVerificationError("runtime image entrypoint does not use tini")
     _assert_no_runtime_shell(image)
+    _assert_no_runtime_pip(image)
 
     container_id: str | None = None
     try:
@@ -349,6 +377,7 @@ def verify(
         "entrypoint": entrypoint,
         "command": config.get("Cmd"),
         "runtime_shell": False,
+        "runtime_pip": False,
         "read_only_root": True,
         "tmpfs": "/tmp",
         "capabilities_dropped": ["ALL"],

@@ -1,12 +1,11 @@
 name: Compatibility
 
 on:
+  workflow_call:
   pull_request:
   push:
     branches:
       - main
-    tags:
-      - "v*-rc*"
   repository_dispatch:
     types: [adk-release]
   schedule:

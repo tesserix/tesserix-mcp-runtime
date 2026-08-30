@@ -1,6 +1,7 @@
 name: Quality
 
 on:
+  workflow_call:
   pull_request:
   push:
     branches:
@@ -40,7 +41,7 @@ jobs:
           uv run --frozen ruff check .
       - name: Check static types
         run: |
-          uv run --frozen mypy --strict src tests \
+          uv run --frozen mypy --strict src tests release \
             packages/tesserix-mcp-manifest/src \
             packages/tesserix-mcp-manifest/tests \
             packages/tesserix-mcp-publisher/src \
@@ -48,7 +49,7 @@ jobs:
             packages/tesserix-mcp-testkit/src \
             packages/tesserix-mcp-testkit/tests \
             examples/conformance-server
-          uv run --frozen pyright src tests \
+          uv run --frozen pyright src tests release \
             packages/tesserix-mcp-manifest/src \
             packages/tesserix-mcp-manifest/tests \
             packages/tesserix-mcp-publisher/src \

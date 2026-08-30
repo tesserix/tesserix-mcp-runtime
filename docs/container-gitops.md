@@ -53,7 +53,8 @@ Use `deploy/container/adk.Dockerfile`, the ADK base digest from the table, and
 `--variant adk` for the optional variant. The verifier starts the image as
 `10001:10001` with a read-only root, a 64 MiB `noexec,nosuid,nodev` `/tmp`, all
 capabilities dropped, and no privilege escalation. It also proves there is no
-runtime shell. The Kubernetes contract adds `RuntimeDefault` seccomp.
+runtime shell or pip installer. The Kubernetes contract adds `RuntimeDefault`
+seccomp.
 
 Because there is no runtime shell, diagnose with structured logs, RED metrics,
 traces, health endpoints, and the verifier first. If process-namespace or file
@@ -68,14 +69,14 @@ inventories, and separate Trivy OS and language vulnerability reports for each
 variant. Tool images and Actions are pinned, the workflow has read-only
 permissions, and it neither pushes an image nor requests an OIDC token.
 
-An inherited layer SBOM in a third-party base can describe packages that a
-later layer removed. Direct library discovery reported `msgpack 1.1.2` and
-`setuptools 70.3.0` from that provenance even though neither package exists in
-the merged core or ADK filesystem. The fresh Syft inventories confirm their
-absence. CI therefore scans actual merged-image OS packages, then scans the
-fresh SPDX language inventory. It does not add an ignore rule for those package
-names or for a vulnerability ID; a package present in the final inventory will
-still fail the HIGH/CRITICAL gate.
+An inherited layer SBOM in a third-party base can describe pip-vendored
+`msgpack 1.1.2` and `setuptools 70.3.0`. Both final variants remove pip after
+the last local install, so neither package nor the installer remains reachable.
+The fresh Syft inventories and runtime verifier prove that removal. CI scans the
+actual merged-image OS and language packages without a CVE-specific waiver. It
+retains every HIGH/CRITICAL finding in JSON, reports inherited findings with no
+upstream fix, and fails closed when any finding has an available fixed version.
+That matches the owning base-image policy without hiding its residual risk.
 
 ## Adopt the Kubernetes contract
 
