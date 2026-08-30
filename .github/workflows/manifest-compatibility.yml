@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/manifest-compatibility.yml"
       - "packages/tesserix-mcp-manifest/**"
+      - "packages/tesserix-mcp-publisher/**"
   schedule:
     - cron: "41 5 * * 2"
   workflow_dispatch:
@@ -35,5 +36,5 @@ jobs:
       - name: Validate Agentic envelopes locally without registry access
         run: |
           for registry_file in packages/tesserix-mcp-manifest/tests/goldens/*/registry.json; do
-            go run github.com/tesserix/agentic-registry/cmd/agentic@8f0b5615fdfd1adbe48ade99e717f6cff22535e7 validate -f "$registry_file"
+            go run github.com/tesserix/agentic-registry/cmd/agentic@6921474591b6c59e89025370c310c7f85859246f validate -f "$registry_file"
           done

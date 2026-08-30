@@ -43,12 +43,16 @@ jobs:
           uv run --frozen mypy --strict src tests \
             packages/tesserix-mcp-manifest/src \
             packages/tesserix-mcp-manifest/tests \
+            packages/tesserix-mcp-publisher/src \
+            packages/tesserix-mcp-publisher/tests \
             packages/tesserix-mcp-testkit/src \
             packages/tesserix-mcp-testkit/tests \
             examples/conformance-server
           uv run --frozen pyright src tests \
             packages/tesserix-mcp-manifest/src \
             packages/tesserix-mcp-manifest/tests \
+            packages/tesserix-mcp-publisher/src \
+            packages/tesserix-mcp-publisher/tests \
             packages/tesserix-mcp-testkit/src \
             packages/tesserix-mcp-testkit/tests \
             examples/conformance-server
@@ -68,6 +72,13 @@ jobs:
             --source=tesserix_mcp_manifest -m pytest
           uv run --project ../.. --frozen coverage report \
             --show-missing --fail-under=90
+      - name: Run the publisher suite
+        working-directory: packages/tesserix-mcp-publisher
+        run: |
+          uv run --project ../.. --frozen coverage run --branch \
+            --source=tesserix_mcp_publisher -m pytest
+          uv run --project ../.. --frozen coverage report \
+            --show-missing --fail-under=90
       - name: Run the external conformance example
         working-directory: examples/conformance-server
         run: uv run --frozen pytest
@@ -80,6 +91,8 @@ jobs:
             architecture/testkit-public-api.txt --package tesserix_mcp_testkit
           uv run --frozen python architecture/check_public_api.py \
             architecture/manifest-public-api.txt --package tesserix_mcp_manifest
+          uv run --frozen python architecture/check_public_api.py \
+            architecture/publisher-public-api.txt --package tesserix_mcp_publisher
           uv run --frozen python architecture/check_dependencies.py
       - name: Lint semantic examples and record retrieval metrics
         run: uv run --frozen python architecture/check_semantic_discovery.py
@@ -133,6 +146,26 @@ jobs:
             --find-links "$PWD/dist" "${runtime_wheel}[testkit]" "$testkit_wheel"
           cd examples/conformance-server
           "$sample_env/bin/python" -m pytest -q
+      - name: Install and probe the published publisher extra offline
+        run: |
+          package_cache=$(mktemp -d)
+          seed_env=$(mktemp -d)
+          sample_env=$(mktemp -d)
+          requirements=$(mktemp)
+          runtime_wheel=$(find "$PWD/dist" -maxdepth 1 \
+            -name 'tesserix_mcp_runtime-*.whl' -print -quit)
+          uv export --quiet --frozen --no-dev --extra publisher \
+            --no-emit-project --no-emit-workspace \
+            --format requirements.txt --output-file "$requirements"
+          uv venv --python 3.14 "$seed_env"
+          UV_CACHE_DIR="$package_cache" uv pip install \
+            --python "$seed_env/bin/python" --requirement "$requirements"
+          uv venv --python 3.14 "$sample_env"
+          UV_CACHE_DIR="$package_cache" uv pip install --offline \
+            --python "$sample_env/bin/python" --find-links "$PWD/dist" \
+            "${runtime_wheel}[publisher]"
+          "$sample_env/bin/tesserix-mcp-runtime" --version
+          "$sample_env/bin/tesserix-mcp-publish" --help
       - name: Upload validated distributions
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:

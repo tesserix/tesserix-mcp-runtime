@@ -9,6 +9,7 @@ resolution-markers = [
 [manifest]
 members = [
     "tesserix-mcp-manifest",
+    "tesserix-mcp-publisher",
     "tesserix-mcp-runtime",
     "tesserix-mcp-testkit",
 ]
@@ -1765,6 +1766,20 @@ requires-dist = [
 ]
 
 [[package]]
+name = "tesserix-mcp-publisher"
+source = { editable = "packages/tesserix-mcp-publisher" }
+dependencies = [
+    { name = "tesserix-mcp-manifest" },
+    { name = "tesserix-mcp-runtime" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "tesserix-mcp-manifest", editable = "packages/tesserix-mcp-manifest" },
+    { name = "tesserix-mcp-runtime", editable = "." },
+]
+
+[[package]]
 name = "tesserix-mcp-runtime"
 source = { editable = "." }
 dependencies = [
@@ -1787,6 +1802,9 @@ manifest = [
 otel = [
     { name = "opentelemetry-sdk" },
 ]
+publisher = [
+    { name = "tesserix-mcp-publisher" },
+]
 testkit = [
     { name = "tesserix-mcp-testkit" },
 ]
@@ -1805,6 +1823,7 @@ dev = [
     { name = "pytest-socket" },
     { name = "ruff" },
     { name = "tesserix-mcp-manifest" },
+    { name = "tesserix-mcp-publisher" },
     { name = "tesserix-mcp-testkit" },
     { name = "twine" },
     { name = "types-jsonschema" },
@@ -1821,10 +1840,11 @@ requires-dist = [
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.13,<3" },
     { name = "tesserix-adk", marker = "extra == 'adk'", url = "https://github.com/tesserix/agent-development-kit/releases/download/v0.53.1/tesserix_adk-0.53.1-py3-none-any.whl" },
     { name = "tesserix-mcp-manifest", marker = "extra == 'manifest'", editable = "packages/tesserix-mcp-manifest" },
+    { name = "tesserix-mcp-publisher", marker = "extra == 'publisher'", editable = "packages/tesserix-mcp-publisher" },
     { name = "tesserix-mcp-testkit", marker = "extra == 'testkit'", editable = "packages/tesserix-mcp-testkit" },
     { name = "uvicorn", specifier = ">=0.52.4,<1" },
 ]
-provides-extras = ["adk", "manifest", "otel", "testkit"]
+provides-extras = ["adk", "manifest", "otel", "publisher", "testkit"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1840,6 +1860,7 @@ dev = [
     { name = "pytest-socket", specifier = "==0.8.1" },
     { name = "ruff", specifier = "==0.16.5" },
     { name = "tesserix-mcp-manifest", editable = "packages/tesserix-mcp-manifest" },
+    { name = "tesserix-mcp-publisher", editable = "packages/tesserix-mcp-publisher" },
     { name = "tesserix-mcp-testkit", editable = "packages/tesserix-mcp-testkit" },
     { name = "twine", specifier = "==7.0.0" },
     { name = "types-jsonschema", specifier = "==4.26.0.20260518" },

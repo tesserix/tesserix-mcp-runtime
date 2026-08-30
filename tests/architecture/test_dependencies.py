@@ -68,6 +68,19 @@ def test_core_dependency_report_matches_frozen_resolution() -> None:
         "tesserix-mcp-manifest (workspace)"
         in result["profiles"]["manifest"]["resolved_dependencies"]
     )
+    assert result["profiles"]["publisher"]["declared_dependencies"][-2:] == [
+        "tesserix-mcp-publisher>=0.0.1.dev0,<1",
+        "uvicorn>=0.52.4,<1",
+    ]
+    assert result["profiles"]["publisher"]["distribution_count"] == 36
+    assert (
+        "tesserix-mcp-manifest (workspace)"
+        in result["profiles"]["publisher"]["resolved_dependencies"]
+    )
+    assert (
+        "tesserix-mcp-publisher (workspace)"
+        in result["profiles"]["publisher"]["resolved_dependencies"]
+    )
     assert result["profiles"]["testkit"]["declared_dependencies"][-2:] == [
         "tesserix-mcp-testkit>=0.0.1.dev0,<1",
         "uvicorn>=0.52.4,<1",

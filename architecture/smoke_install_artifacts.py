@@ -32,6 +32,7 @@ print(json.dumps({
 """
 DISTRIBUTIONS = {
     "tesserix-mcp-manifest": "tesserix_mcp_manifest",
+    "tesserix-mcp-publisher": "tesserix_mcp_publisher",
     "tesserix-mcp-runtime": "tesserix_mcp_runtime",
     "tesserix-mcp-testkit": "tesserix_mcp_testkit",
 }
