@@ -202,6 +202,18 @@ def test_manifest_public_api_snapshot_matches_exports() -> None:
         "DiscoveryIntentResult",
         "DiscoveryRisk",
         "DiscoveryScenario",
+        "GatewayApprovalState",
+        "GatewayEligibilityCandidate",
+        "GatewayEligibilityDecision",
+        "GatewayEligibilityPolicy",
+        "GatewayEligibilityReason",
+        "GatewayReconciliationContractError",
+        "GatewayReconciliationPage",
+        "GatewayReconciliationSnapshot",
+        "GatewayRouteIdentity",
+        "GatewayRouteRecord",
+        "GatewayTenantSnapshot",
+        "GatewayTenantState",
         "ManifestError",
         "ManifestLifecycle",
         "ManifestValidationCode",
@@ -230,8 +242,11 @@ def test_manifest_public_api_snapshot_matches_exports() -> None:
         "ServerAuthoringManifest",
         "ToolInputField",
         "ToolSummary",
+        "assemble_gateway_reconciliation_pages",
         "compile_manifests",
+        "derive_gateway_route_identity",
         "evaluate_discovery",
+        "evaluate_gateway_eligibility",
         "extract_server_json",
         "lint_semantic_manifest",
         "load_authoring_manifest",
@@ -245,7 +260,7 @@ def test_manifest_public_api_snapshot_matches_exports() -> None:
     )
 
     assert completed.returncode == 0
-    assert completed.stdout == "Public API snapshot matches (49 exports).\n"
+    assert completed.stdout == "Public API snapshot matches (64 exports).\n"
     assert completed.stderr == ""
 
 

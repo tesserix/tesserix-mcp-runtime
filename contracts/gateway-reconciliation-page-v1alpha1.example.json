@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "v1alpha1",
+  "environment": "production",
+  "generation": 12,
+  "observedAt": "2026-08-30T12:05:00Z",
+  "snapshotDigest": "sha256:6208bff72815fe7c5d3c0bcd432e0715407fc9ed5a6d00b0872d953403ca0c7e",
+  "pageIndex": 0,
+  "pageSize": 100,
+  "routeCount": 1,
+  "resourceCount": 3,
+  "tenantCount": 2,
+  "cursor": null,
+  "nextCursor": null,
+  "complete": true,
+  "routes": [
+    {
+      "ref": "mcpservers/tenant-blue/io.example/orders@1.2.3",
+      "tenantId": "tenant-blue",
+      "serverName": "io.example/orders",
+      "registryDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "artifactDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "renderedDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "resourceCount": 3,
+      "activationGeneration": 7,
+      "identityDigest": "sha256:f91ba5bb082daa63add5f1f76305a04a77890615b4725592b8dd8048b1eab636",
+      "resourceName": "mcp-tenant-blue-io-example-orders-f91ba5bb082daa63",
+      "routePath": "/mcp/tenant-blue-a27dbbf442fca348/io-example-orders-644841bae61798fa",
+      "scope": "mcp:tenant-blue-a27dbbf442fca348:io-example-orders-644841bae61798fa",
+      "policyName": "mcp-tenant-blue-io-example-orders-f91ba5bb082daa63"
+    }
+  ],
+  "tenants": [
+    {
+      "tenantId": "tenant-blue",
+      "generation": 9,
+      "state": "ready",
+      "desiredRouteCount": 1,
+      "complete": true,
+      "pruneAuthorized": true,
+      "requestId": "tenant-blue-export-9"
+    },
+    {
+      "tenantId": "tenant-retired",
+      "generation": 3,
+      "state": "deactivated",
+      "desiredRouteCount": 0,
+      "complete": true,
+      "pruneAuthorized": true,
+      "requestId": "tenant-retired-deactivate-3"
+    }
+  ],
+  "requestId": "gateway-export-12"
+}

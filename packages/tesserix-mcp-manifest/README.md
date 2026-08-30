@@ -10,6 +10,13 @@ It is a build-time package exposed by the runtime's `manifest` extra. It is not
 installed by the core serving runtime and never publishes, resolves, activates,
 or fetches an MCP server.
 
+The package also exposes the read-only reference contract for
+[identity-scoped tenant Gateway reconciliation](../../docs/tenant-gateway-reconciliation.md):
+default-deny eligibility, deterministic collision-safe route identity, quota
+admission, digest-bound complete snapshots, and fail-closed cursor-page
+assembly. It does not discover tenants, provision roles, render or apply
+Kubernetes resources, or mutate Registry/Gateway state.
+
 ## Install
 
 ```bash
