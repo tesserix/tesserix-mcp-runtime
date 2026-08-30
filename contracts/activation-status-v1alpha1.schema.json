@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tesserix/tesserix-mcp-runtime/contracts/activation-status-v1alpha1.schema.json",
+  "title": "Tesserix MCP Gateway activation status v1alpha1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "ref",
+    "registryDigest",
+    "artifactDigest",
+    "generation",
+    "desiredState",
+    "phase",
+    "publishedAt",
+    "activeAt",
+    "observedAt",
+    "conditions"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "v1alpha1"
+    },
+    "ref": {
+      "type": "string",
+      "maxLength": 2048,
+      "pattern": "^mcpservers/[A-Za-z0-9][A-Za-z0-9._-]{0,254}/[A-Za-z0-9][A-Za-z0-9._-]{0,254}(?:/[A-Za-z0-9][A-Za-z0-9._-]{0,254})*@[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$"
+    },
+    "registryDigest": {
+      "$ref": "#/$defs/digest"
+    },
+    "artifactDigest": {
+      "$ref": "#/$defs/digest"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9223372036854775807
+    },
+    "desiredState": {
+      "enum": ["draft", "published", "deprecated", "retired"]
+    },
+    "phase": {
+      "enum": [
+        "draft",
+        "published",
+        "deployed",
+        "probed",
+        "active",
+        "degraded",
+        "deprecated",
+        "retired",
+        "failed"
+      ]
+    },
+    "publishedAt": {
+      "oneOf": [
+        {"$ref": "#/$defs/timestamp"},
+        {"type": "null"}
+      ]
+    },
+    "activeAt": {
+      "oneOf": [
+        {"$ref": "#/$defs/timestamp"},
+        {"type": "null"}
+      ]
+    },
+    "observedAt": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "conditions": {
+      "type": "array",
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/condition"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "maxLength": 32,
+      "pattern": "Z$"
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "status",
+        "actor",
+        "reason",
+        "observedGeneration",
+        "registryDigest",
+        "artifactDigest",
+        "lastTransitionTime",
+        "requestId"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "Published",
+            "DeploymentReady",
+            "ProbeReady",
+            "RouteReady",
+            "Healthy",
+            "Failed"
+          ]
+        },
+        "status": {
+          "enum": ["True", "False", "Unknown"]
+        },
+        "actor": {
+          "enum": ["registry", "gateway-reconciler", "protocol-prober"]
+        },
+        "reason": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Za-z0-9]{0,63}$"
+        },
+        "observedGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "registryDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "artifactDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "lastTransitionTime": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "requestId": {
+          "type": "string",
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,255}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"type": {"const": "Published"}}},
+          "then": {"properties": {"actor": {"const": "registry"}}}
+        },
+        {
+          "if": {"properties": {"type": {"const": "DeploymentReady"}}},
+          "then": {"properties": {"actor": {"const": "gateway-reconciler"}}}
+        },
+        {
+          "if": {"properties": {"type": {"const": "ProbeReady"}}},
+          "then": {"properties": {"actor": {"const": "protocol-prober"}}}
+        },
+        {
+          "if": {"properties": {"type": {"const": "RouteReady"}}},
+          "then": {"properties": {"actor": {"const": "gateway-reconciler"}}}
+        },
+        {
+          "if": {"properties": {"type": {"const": "Healthy"}}},
+          "then": {"properties": {"actor": {"const": "protocol-prober"}}}
+        },
+        {
+          "if": {"properties": {"type": {"const": "Failed"}}},
+          "then": {"properties": {"actor": {"const": "registry"}}}
+        }
+      ]
+    }
+  }
+}

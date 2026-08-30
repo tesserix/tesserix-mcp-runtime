@@ -188,6 +188,7 @@ class PublicationOutcome:
     idempotency_key: str
     ref: str
     digest: str
+    artifact_digest: str
     version: str
     created: bool | None
     artifact: PublishedArtifact | None
@@ -203,6 +204,7 @@ class PublicationOutcome:
                     self.idempotency_key,
                     self.ref,
                     self.digest,
+                    self.artifact_digest,
                     self.version,
                 )
             )
@@ -210,6 +212,7 @@ class PublicationOutcome:
             or not self.idempotency_key
             or _SAFE_ID.fullmatch(self.ref) is None
             or _DIGEST.fullmatch(self.digest) is None
+            or _DIGEST.fullmatch(self.artifact_digest) is None
             or (self.created is not None and not _is_runtime_instance(self.created, bool))
             or (
                 self.artifact is not None
@@ -220,6 +223,7 @@ class PublicationOutcome:
 
     def to_dict(self) -> dict[str, JsonValue]:
         return {
+            "artifact_digest": self.artifact_digest,
             "created": self.created,
             "digest": self.digest,
             "idempotency_key": self.idempotency_key,

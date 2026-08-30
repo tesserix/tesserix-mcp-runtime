@@ -193,6 +193,7 @@ def test_publish_verifies_tesserix_before_explicit_official_target() -> None:
     assert outcome.artifact is not None
     assert outcome.artifact.ref == prepared_publication().ref
     assert outcome.to_dict() == {
+        "artifact_digest": prepared_publication().evidence.artifact.digest,
         "created": True,
         "digest": prepared_publication().registry_digest,
         "idempotency_key": "publish-run-42",

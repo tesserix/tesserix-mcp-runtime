@@ -250,7 +250,7 @@ def test_manifest_public_api_snapshot_matches_exports() -> None:
 
 
 def test_publisher_public_api_snapshot_matches_exports() -> None:
-    assert len(tesserix_mcp_publisher.__all__) == 21
+    assert len(tesserix_mcp_publisher.__all__) == 37
     for name in tesserix_mcp_publisher.__all__:
         assert getattr(tesserix_mcp_publisher, name) is not None
 
@@ -260,7 +260,7 @@ def test_publisher_public_api_snapshot_matches_exports() -> None:
     )
 
     assert completed.returncode == 0
-    assert completed.stdout == "Public API snapshot matches (21 exports).\n"
+    assert completed.stdout == "Public API snapshot matches (37 exports).\n"
     assert completed.stderr == ""
 
 

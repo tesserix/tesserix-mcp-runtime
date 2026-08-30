@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "v1alpha1",
+  "ref": "mcpservers/tenant-orders/io.github.tesserix/orders@1.2.3",
+  "registryDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "artifactDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "generation": 7,
+  "desiredState": "published",
+  "phase": "active",
+  "publishedAt": "2026-08-30T11:59:00Z",
+  "activeAt": "2026-08-30T12:00:00Z",
+  "observedAt": "2026-08-30T12:00:00Z",
+  "conditions": [
+    {
+      "type": "Published",
+      "status": "True",
+      "actor": "registry",
+      "reason": "PublicationCommitted",
+      "observedGeneration": 7,
+      "registryDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "artifactDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "lastTransitionTime": "2026-08-30T11:59:00Z",
+      "requestId": "request-publish-42"
+    },
+    {
+      "type": "DeploymentReady",
+      "status": "True",
+      "actor": "gateway-reconciler",
+      "reason": "ResourcesAccepted",
+      "observedGeneration": 7,
+      "registryDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "artifactDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "lastTransitionTime": "2026-08-30T11:59:30Z",
+      "requestId": "request-deploy-42"
+    },
+    {
+      "type": "ProbeReady",
+      "status": "True",
+      "actor": "protocol-prober",
+      "reason": "AuthenticatedProbeSucceeded",
+      "observedGeneration": 7,
+      "registryDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "artifactDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "lastTransitionTime": "2026-08-30T11:59:45Z",
+      "requestId": "request-probe-42"
+    },
+    {
+      "type": "Healthy",
+      "status": "True",
+      "actor": "protocol-prober",
+      "reason": "ProtocolHealthy",
+      "observedGeneration": 7,
+      "registryDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "artifactDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "lastTransitionTime": "2026-08-30T11:59:45Z",
+      "requestId": "request-probe-42"
+    },
+    {
+      "type": "RouteReady",
+      "status": "True",
+      "actor": "gateway-reconciler",
+      "reason": "PublicRouteAccepted",
+      "observedGeneration": 7,
+      "registryDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "artifactDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "lastTransitionTime": "2026-08-30T12:00:00Z",
+      "requestId": "request-route-42"
+    }
+  ]
+}

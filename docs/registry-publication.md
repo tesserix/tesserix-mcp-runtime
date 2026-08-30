@@ -76,8 +76,9 @@ tesserix-mcp-runtime publish <evidence arguments> \
 Dry run performs local validation, `agentic status`, and Agentic remote apply
 validation without a write. The real flow applies atomically, pulls the exact
 name and version, recomputes its canonical digest, and runs Registry signature
-verification. The success JSON contains `ref`, `version`, `digest`, `created`,
-`signed_by`, `request_id`, and the reused `idempotency_key`.
+verification. The success JSON contains `ref`, `version`, Registry `digest`,
+`artifact_digest`, `created`, `signed_by`, `request_id`, and the reused
+`idempotency_key`.
 
 Official MCP Registry publication is preview functionality and must be
 explicit:
@@ -104,6 +105,8 @@ Tesserix result.
 | 4 | Publisher unavailable before confirmed success | Retry with the same inputs and idempotency key |
 | 5 | Agentic apply may have succeeded but verification did not finish | Do not blindly retry; reconcile exact pull and signature using the request ID |
 | 6 | Tesserix verified; explicit official target failed | Preserve the Tesserix result and reconcile only the official target |
+| 7 | Activation wait reached an incompatible terminal state | Follow safe condition reasons/request IDs; do not route |
+| 8 | Activation wait exceeded its bounded deadline | Inspect the safe final projection and activation alerts |
 
 For exit 5, run the owning `agentic pull mcpservers NAME --tag VERSION` and
 `agentic verify mcpservers NAME --tag VERSION` commands under the same tenant
@@ -112,6 +115,8 @@ another attempt is required, reuse the original idempotency key.
 
 Publication does not prove Gateway activation. Route pickup and activation
 have a separate default-deny status contract and must be observed independently.
+Use the [Gateway activation status guide](gateway-activation.md) with the exact
+`ref`, Registry `digest`, and `artifact_digest` returned here.
 
 The ownership, failure state machine, security model, cost, rollout, and
 rollback are recorded in

@@ -12,6 +12,12 @@ from typing import Any, NoReturn, TypeGuard, cast
 
 from tesserix_mcp_runtime import JsonValue, RedactionPolicy, registry_artifact_digest
 
+from .activation import (
+    ActivationContractError,
+    ActivationStatus,
+    ActivationSupersededError,
+    ActivationTarget,
+)
 from .commands import CommandLimits, CommandResult, CommandRunner
 from .errors import PublicationError, PublicationErrorCode
 from .models import PreparedPublication, PublishedArtifact, PublishReceipt
@@ -277,18 +283,39 @@ class AgenticCLIPublisher(_Delegate):
         *,
         request_id: str,
     ) -> PublishedArtifact:
+        document = await self._pull(
+            name=prepared.name,
+            version=prepared.version,
+            request_id=request_id,
+        )
+        return self._artifact(document, request_id=request_id)
+
+    async def _pull(
+        self,
+        *,
+        name: str,
+        version: str,
+        request_id: str,
+    ) -> Mapping[str, object]:
         result = await self._runner.run(
             (
                 self._executable,
                 "pull",
                 "mcpservers",
-                prepared.name,
+                name,
                 "--tag",
-                prepared.version,
+                version,
             ),
             request_id=request_id,
         )
-        document = self._document(result, request_id=request_id)
+        return self._document(result, request_id=request_id)
+
+    @staticmethod
+    def _artifact(
+        document: Mapping[str, object],
+        *,
+        request_id: str,
+    ) -> PublishedArtifact:
         try:
             metadata_value = document.get("metadata")
             spec_value = document.get("spec")
@@ -320,6 +347,63 @@ class AgenticCLIPublisher(_Delegate):
                 PublicationErrorCode.COMMAND_OUTPUT_INVALID,
                 request_id=request_id,
             ) from None
+
+    async def fetch_activation(
+        self,
+        target: ActivationTarget,
+        *,
+        request_id: str,
+    ) -> ActivationStatus:
+        if not _is_runtime_instance(target, ActivationTarget):
+            raise TypeError("target must be ActivationTarget")
+        document = await self._pull(
+            name=target.name,
+            version=target.version,
+            request_id=request_id,
+        )
+        artifact = self._artifact(document, request_id=request_id)
+        if (
+            artifact.name != target.name
+            or artifact.namespace != target.namespace
+            or artifact.version != target.version
+            or artifact.ref != target.ref
+            or artifact.digest != target.registry_digest
+        ):
+            raise ActivationSupersededError(request_id=request_id)
+        try:
+            spec = document.get("spec")
+            status = document.get("status")
+            if not _mapping(spec) or not _mapping(status):
+                raise ValueError
+            extension = spec.get("x-tesserix")
+            if not _mapping(extension):
+                raise ValueError
+            publication = extension.get("publication")
+            if not _mapping(publication):
+                raise ValueError
+            delivery_artifact = publication.get("artifact")
+            if not _mapping(delivery_artifact):
+                raise ValueError
+            if _text(delivery_artifact, "digest") != target.artifact_digest:
+                raise ActivationSupersededError(request_id=request_id)
+            activation = ActivationStatus.from_document(
+                status.get("activation"),
+                request_id=request_id,
+            )
+        except ActivationSupersededError:
+            raise
+        except ActivationContractError:
+            raise
+        except (KeyError, TypeError, ValueError):
+            raise ActivationContractError(request_id=request_id) from None
+        if (
+            activation.ref != target.ref
+            or activation.registry_digest != target.registry_digest
+            or activation.artifact_digest != target.artifact_digest
+            or (target.generation is not None and activation.generation != target.generation)
+        ):
+            raise ActivationSupersededError(request_id=request_id)
+        return activation
 
     async def verify(
         self,

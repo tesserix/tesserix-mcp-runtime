@@ -2,6 +2,24 @@
 
 from __future__ import annotations
 
+from .activation import (
+    ActivationActor,
+    ActivationClient,
+    ActivationClock,
+    ActivationCondition,
+    ActivationConditionStatus,
+    ActivationConditionType,
+    ActivationContractError,
+    ActivationDesiredState,
+    ActivationPhase,
+    ActivationStatus,
+    ActivationSupersededError,
+    ActivationTarget,
+    ActivationTerminalError,
+    ActivationTimeoutError,
+    ActivationWaiter,
+    SystemActivationClock,
+)
 from .commands import CommandLimits, CommandResult, CommandRunner, SubprocessCommandRunner
 from .delegates import AgenticCLIPublisher, OfficialMCPPublisherCLI
 from .errors import (
@@ -25,6 +43,21 @@ from .preparation import prepare_publication
 from .workflow import PublisherWorkflow
 
 __all__ = [
+    "ActivationActor",
+    "ActivationClient",
+    "ActivationClock",
+    "ActivationCondition",
+    "ActivationConditionStatus",
+    "ActivationConditionType",
+    "ActivationContractError",
+    "ActivationDesiredState",
+    "ActivationPhase",
+    "ActivationStatus",
+    "ActivationSupersededError",
+    "ActivationTarget",
+    "ActivationTerminalError",
+    "ActivationTimeoutError",
+    "ActivationWaiter",
     "AgenticCLIPublisher",
     "CommandLimits",
     "CommandResult",
@@ -44,6 +77,7 @@ __all__ = [
     "PublishedArtifact",
     "PublisherWorkflow",
     "SubprocessCommandRunner",
+    "SystemActivationClock",
     "evidence_reference_from_file",
     "prepare_publication",
 ]

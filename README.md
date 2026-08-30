@@ -11,8 +11,10 @@ process-signal handling, reusable in-process conformance support, and the
 official MCP v2 Streamable HTTP transport with a private bounded listener,
 finite execution, tenant bulkheads, deadlines, cancellation, safe retries, and
 identity-scoped bounded Registry discovery, and opt-in immutable Registry
-publication with exact read-back and signature verification. It does not yet
-activate Gateway routes. No stable package release is implied by
+publication with exact read-back and signature verification. It also provides
+a read-only, digest-bound Gateway activation status contract and bounded CLI
+waiter; the Registry/Gateway producer rollout remains external and does not yet
+activate routes automatically. No stable package release is implied by
 interfaces described as planned below.
 
 The accepted ownership boundary and measurable design envelope are recorded
@@ -34,7 +36,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | [Registry manifests](packages/tesserix-mcp-manifest/README.md) | Compilation is opt-in; pre-release |
 | [Registry publication](docs/registry-publication.md) | Implemented as opt-in delegated tooling; pre-release |
 | [Registry-backed semantic discovery and progressive disclosure](docs/registry-discovery.md) | Implemented as an opt-in bounded client; pre-release |
-| Automatic Gateway route pickup and activation status | Planned; not implemented |
+| [Gateway activation status](docs/gateway-activation.md) | Typed contract and bounded observer implemented; producer rollout tracked externally |
 
 The version can be inspected without starting runtime behavior:
 

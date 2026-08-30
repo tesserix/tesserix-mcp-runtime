@@ -31,11 +31,16 @@ def test_root_cli_lazily_delegates_publisher_commands(
 
     monkeypatch.setattr(runtime_cli, "import_module", import_module, raising=False)
 
-    result = runtime_cli.main(["publish", "--manifest", "authoring.json"])
+    publish_result = runtime_cli.main(["publish", "--manifest", "authoring.json"])
+    activation_result = runtime_cli.main(["activation", "--ref", "mcpservers/ns/name@1"])
 
-    assert result == 6
-    assert imported == ["tesserix_mcp_publisher.cli"]
-    assert delegated == [["publish", "--manifest", "authoring.json"]]
+    assert publish_result == 6
+    assert activation_result == 6
+    assert imported == ["tesserix_mcp_publisher.cli"] * 2
+    assert delegated == [
+        ["publish", "--manifest", "authoring.json"],
+        ["activation", "--ref", "mcpservers/ns/name@1"],
+    ]
 
 
 def test_root_cli_reports_an_actionable_missing_publisher_extra(

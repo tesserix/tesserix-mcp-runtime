@@ -40,6 +40,19 @@ class FakeRunner:
         return self.results.pop(0)
 
 
+class FakeClock:
+    def __init__(self) -> None:
+        self.now = 100.0
+        self.sleeps: list[float] = []
+
+    def monotonic(self) -> float:
+        return self.now
+
+    async def sleep(self, delay: float) -> None:
+        self.sleeps.append(delay)
+        self.now += delay
+
+
 def result(stdout: bytes = b"", *, stderr: bytes = b"", exit_code: int = 0) -> CommandResult:
     return CommandResult(exit_code=exit_code, stdout=stdout, stderr=stderr)
 
@@ -88,6 +101,53 @@ def published_document(prepared: PreparedPublication) -> bytes:
             "signedBy": "registry-key-2026-08",
         }
     )
+    return json.dumps(document, separators=(",", ":"), sort_keys=True).encode()
+
+
+def activation_document(prepared: PreparedPublication, *, phase: str = "published") -> bytes:
+    document = json.loads(published_document(prepared))
+    condition_names = ["Published"]
+    if phase in {"deployed", "probed", "active"}:
+        condition_names.append("DeploymentReady")
+    if phase in {"probed", "active"}:
+        condition_names.extend(("ProbeReady", "Healthy"))
+    if phase == "active":
+        condition_names.append("RouteReady")
+    actors = {
+        "Published": "registry",
+        "DeploymentReady": "gateway-reconciler",
+        "ProbeReady": "protocol-prober",
+        "Healthy": "protocol-prober",
+        "RouteReady": "gateway-reconciler",
+    }
+    document["status"] = {
+        "activation": {
+            "schemaVersion": "v1alpha1",
+            "ref": prepared.ref,
+            "registryDigest": prepared.registry_digest,
+            "artifactDigest": prepared.evidence.artifact.digest,
+            "generation": 7,
+            "desiredState": "published",
+            "phase": phase,
+            "publishedAt": "2026-08-30T11:59:00Z",
+            "activeAt": "2026-08-30T12:00:00Z" if phase == "active" else None,
+            "observedAt": "2026-08-30T12:00:00Z",
+            "conditions": [
+                {
+                    "type": name,
+                    "status": "True",
+                    "actor": actors[name],
+                    "reason": f"{name}Observed",
+                    "observedGeneration": 7,
+                    "registryDigest": prepared.registry_digest,
+                    "artifactDigest": prepared.evidence.artifact.digest,
+                    "lastTransitionTime": "2026-08-30T12:00:00Z",
+                    "requestId": f"request-{name.lower()}",
+                }
+                for name in condition_names
+            ],
+        }
+    }
     return json.dumps(document, separators=(",", ":"), sort_keys=True).encode()
 
 
@@ -289,10 +349,166 @@ def test_publish_returns_the_exact_verified_registry_result(tmp_path: Path) -> N
     document = json.loads(stdout.getvalue())
     assert document["status"] == "verified"
     assert document["digest"] == prepared.registry_digest
+    assert document["artifact_digest"] == prepared.evidence.artifact.digest
     assert document["ref"] == prepared.ref
     assert document["signed_by"] == "registry-key-2026-08"
     assert document["request_id"].startswith("publish-")
     assert [arguments[1] for arguments in runner.arguments] == ["apply", "pull", "verify"]
+
+
+def test_activation_command_explains_one_exact_status_without_payloads(tmp_path: Path) -> None:
+    prepared = prepared_publication(tmp_path)
+    runner = FakeRunner([result(activation_document(prepared))])
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    exit_code = run(
+        [
+            "activation",
+            "--ref",
+            prepared.ref,
+            "--registry-digest",
+            prepared.registry_digest,
+            "--artifact-digest",
+            prepared.evidence.artifact.digest,
+            "--request-id",
+            "request-activation-status",
+        ],
+        runner=runner,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert stderr.getvalue() == ""
+    explanation = json.loads(stdout.getvalue())
+    assert explanation["phase"] == "published"
+    assert explanation["summary"]
+    assert explanation["request_id"] == "request-activation-status"
+    assert "spec" not in explanation
+    assert "tools" not in explanation
+    assert runner.arguments == [
+        (
+            "agentic",
+            "pull",
+            "mcpservers",
+            prepared.name,
+            "--tag",
+            prepared.version,
+        )
+    ]
+
+
+def test_activation_command_waits_to_active_under_one_bounded_deadline(tmp_path: Path) -> None:
+    prepared = prepared_publication(tmp_path)
+    runner = FakeRunner(
+        [
+            result(activation_document(prepared)),
+            result(activation_document(prepared, phase="active")),
+        ]
+    )
+    clock = FakeClock()
+    stdout = io.StringIO()
+
+    exit_code = run(
+        [
+            "activation",
+            "--ref",
+            prepared.ref,
+            "--registry-digest",
+            prepared.registry_digest,
+            "--artifact-digest",
+            prepared.evidence.artifact.digest,
+            "--wait-for",
+            "active",
+            "--timeout-seconds",
+            "120",
+            "--poll-interval-seconds",
+            "2",
+            "--request-id",
+            "request-activation-wait",
+        ],
+        runner=runner,
+        clock=clock,
+        stdout=stdout,
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    assert json.loads(stdout.getvalue())["phase"] == "active"
+    assert clock.sleeps == [2.0]
+    assert [arguments[1] for arguments in runner.arguments] == ["pull", "pull"]
+
+
+def test_activation_command_timeout_preserves_only_safe_last_status(tmp_path: Path) -> None:
+    prepared = prepared_publication(tmp_path)
+    runner = FakeRunner([result(activation_document(prepared))] * 4)
+    clock = FakeClock()
+    stderr = io.StringIO()
+
+    exit_code = run(
+        [
+            "activation",
+            "--ref",
+            prepared.ref,
+            "--registry-digest",
+            prepared.registry_digest,
+            "--artifact-digest",
+            prepared.evidence.artifact.digest,
+            "--wait-for",
+            "active",
+            "--timeout-seconds",
+            "5",
+            "--poll-interval-seconds",
+            "2",
+            "--request-id",
+            "request-activation-timeout",
+        ],
+        runner=runner,
+        clock=clock,
+        stdout=io.StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 8
+    error = json.loads(stderr.getvalue())
+    assert error["code"] == "activation_timeout"
+    assert error["retryable"] is True
+    assert error["activation"]["phase"] == "published"
+    assert error["activation"]["request_id"] == "request-activation-timeout"
+    assert "spec" not in error["activation"]
+    assert clock.sleeps == [2.0, 2.0, 1.0]
+
+
+def test_activation_command_rejects_an_unsafe_request_id_before_registry_read(
+    tmp_path: Path,
+) -> None:
+    prepared = prepared_publication(tmp_path)
+    runner = FakeRunner([result(activation_document(prepared))])
+    stderr = io.StringIO()
+
+    exit_code = run(
+        [
+            "activation",
+            "--ref",
+            prepared.ref,
+            "--registry-digest",
+            prepared.registry_digest,
+            "--artifact-digest",
+            prepared.evidence.artifact.digest,
+            "--request-id",
+            "unsafe request id CCCCCCCCCCCCCCCC",
+        ],
+        runner=runner,
+        stdout=io.StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 2
+    error = json.loads(stderr.getvalue())
+    assert error["code"] == "invalid_argument"
+    assert "CCCCCCCCCCCCCCCC" not in stderr.getvalue()
+    assert runner.arguments == []
 
 
 @pytest.mark.parametrize(
