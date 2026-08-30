@@ -117,3 +117,7 @@ with a checked-in
 State derivation, condition ownership, SLO, security model, producer issues,
 failure behavior, rollout, and rollback are normative in
 [ADR-0020](adr/0020-digest-bound-gateway-activation.md).
+
+Identity-scoped tenant discovery, collision-safe route identity, complete
+pagination, quota admission, and tenant-scoped prune are a separate contract in
+the [tenant Gateway reconciliation guide](tenant-gateway-reconciliation.md).
