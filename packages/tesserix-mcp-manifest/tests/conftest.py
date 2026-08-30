@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from tesserix_mcp_manifest import (
     CredentialReference,
+    DiscoveryRisk,
     ManifestLifecycle,
     ManifestVisibility,
     Ownership,
@@ -46,9 +47,12 @@ def remote_manifest() -> ServerAuthoringManifest:
             key="access-credential",
         ),
         semantic=SemanticMetadata(
-            capabilities=("orders.read",),
+            capabilities=("cap/orders-read",),
             domains=("commerce",),
             keywords=("orders", "read"),
+            risk=DiscoveryRisk.MEDIUM,
+            summary="Locate customer orders by stable identifiers.",
+            when_to_use=("find a known customer order",),
         ),
         egress_hosts=("orders.example.com",),
         required_scopes=("orders:read",),
@@ -59,6 +63,12 @@ def remote_manifest() -> ServerAuthoringManifest:
                 input_fingerprint="a" * 64,
                 output_fingerprint="b" * 64,
                 required_scopes=("orders:read",),
+                semantic=SemanticMetadata(
+                    capabilities=("cap/orders-read",),
+                    risk=DiscoveryRisk.LOW,
+                    summary="Return a single order by its stable identifier.",
+                    when_to_use=("look up one known order",),
+                ),
             ),
         ),
     )

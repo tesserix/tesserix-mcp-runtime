@@ -162,6 +162,16 @@ def test_manifest_public_api_snapshot_matches_exports() -> None:
         "AUTHORING_MANIFEST_VERSION",
         "CompiledManifests",
         "CredentialReference",
+        "DISCOVERY_CAPABILITIES_ANNOTATION",
+        "DISCOVERY_REQUIRES_ANNOTATION",
+        "DISCOVERY_SUMMARY_ANNOTATION",
+        "DISCOVERY_WHEN_TO_USE_ANNOTATION",
+        "DiscoveryEvaluationDataset",
+        "DiscoveryEvaluationMetrics",
+        "DiscoveryIntentCase",
+        "DiscoveryIntentResult",
+        "DiscoveryRisk",
+        "DiscoveryScenario",
         "ManifestError",
         "ManifestLifecycle",
         "ManifestValidationCode",
@@ -183,11 +193,17 @@ def test_manifest_public_api_snapshot_matches_exports() -> None:
         "Repository",
         "RoutePolicy",
         "RuntimeAdapter",
+        "SEMANTIC_MANIFEST_TOKEN_BUDGET",
+        "SemanticLintCode",
+        "SemanticLintFinding",
         "SemanticMetadata",
         "ServerAuthoringManifest",
+        "ToolInputField",
         "ToolSummary",
         "compile_manifests",
+        "evaluate_discovery",
         "extract_server_json",
+        "lint_semantic_manifest",
         "load_authoring_manifest",
     }
     for name in tesserix_mcp_manifest.__all__:
@@ -199,7 +215,7 @@ def test_manifest_public_api_snapshot_matches_exports() -> None:
     )
 
     assert completed.returncode == 0
-    assert completed.stdout == "Public API snapshot matches (33 exports).\n"
+    assert completed.stdout == "Public API snapshot matches (49 exports).\n"
     assert completed.stderr == ""
 
 

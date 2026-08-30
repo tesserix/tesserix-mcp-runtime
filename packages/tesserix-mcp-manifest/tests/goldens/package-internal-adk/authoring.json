@@ -44,7 +44,7 @@
   },
   "semantic": {
     "capabilities": [
-      "inventory.search"
+      "cap/inventory-search"
     ],
     "domains": [
       "supply-chain"
@@ -52,6 +52,11 @@
     "keywords": [
       "inventory",
       "search"
+    ],
+    "risk": "low",
+    "summary": "Locate inventory records matching bounded stock criteria.",
+    "when_to_use": [
+      "find stock by SKU or warehouse"
     ]
   },
   "title": "Inventory MCP",
@@ -63,7 +68,17 @@
       "output_fingerprint": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
       "required_scopes": [
         "inventory:read"
-      ]
+      ],
+      "semantic": {
+        "capabilities": [
+          "cap/inventory-search"
+        ],
+        "risk": "low",
+        "summary": "Search stock records by SKU or warehouse filters.",
+        "when_to_use": [
+          "locate matching inventory records"
+        ]
+      }
     }
   ],
   "version": "2.0.0"

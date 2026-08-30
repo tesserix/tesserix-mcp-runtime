@@ -1,0 +1,110 @@
+{
+  "cases": [
+    {
+      "case_id": "ambiguous-order-reference",
+      "intent": "Find the customer order Alex mentioned yesterday.",
+      "relevant_artifact_ids": [
+        "arn:agentic:registry:tenant-orders:tools/tenant-orders/orders_search"
+      ],
+      "scenarios": [
+        "ambiguous"
+      ]
+    },
+    {
+      "case_id": "near-duplicate-order-reader",
+      "intent": "Read order A-123 using the maintained interface.",
+      "relevant_artifact_ids": [
+        "arn:agentic:registry:tenant-orders:tools/tenant-orders/orders_get_v2"
+      ],
+      "scenarios": [
+        "near-duplicate"
+      ]
+    },
+    {
+      "case_id": "wrong-tenant-customer-lookup",
+      "forbidden_artifact_ids": [
+        "arn:agentic:registry:tenant-other:tools/tenant-other/customer_lookup"
+      ],
+      "intent": "Find the customer attached to order A-123.",
+      "relevant_artifact_ids": [
+        "arn:agentic:registry:tenant-orders:tools/tenant-orders/customer_lookup"
+      ],
+      "scenarios": [
+        "wrong-tenant"
+      ]
+    },
+    {
+      "case_id": "deprecated-order-reader",
+      "deprecated_artifact_ids": [
+        "arn:agentic:registry:tenant-orders:tools/tenant-orders/orders_get_v1"
+      ],
+      "intent": "Read one order through the current supported tool.",
+      "relevant_artifact_ids": [
+        "arn:agentic:registry:tenant-orders:tools/tenant-orders/orders_get_v2"
+      ],
+      "scenarios": [
+        "deprecated"
+      ]
+    },
+    {
+      "case_id": "incompatible-order-mutation",
+      "incompatible_artifact_ids": [
+        "arn:agentic:registry:tenant-orders:tools/tenant-orders/orders_delete"
+      ],
+      "intent": "Read one order without changing fulfillment state.",
+      "relevant_artifact_ids": [
+        "arn:agentic:registry:tenant-orders:tools/tenant-orders/orders_get_v2"
+      ],
+      "scenarios": [
+        "incompatible"
+      ]
+    },
+    {
+      "case_id": "no-supported-weather-tool",
+      "intent": "Will it rain in Melbourne tomorrow?",
+      "no_good_match": true,
+      "scenarios": [
+        "no-good-match"
+      ]
+    }
+  ],
+  "dataset_version": "1.0",
+  "k": 1,
+  "name": "semantic-discovery-contract",
+  "recorded_results": [
+    {
+      "case_id": "ambiguous-order-reference",
+      "ranked_artifact_ids": [
+        "arn:agentic:registry:tenant-orders:tools/tenant-orders/orders_search"
+      ]
+    },
+    {
+      "case_id": "near-duplicate-order-reader",
+      "ranked_artifact_ids": [
+        "arn:agentic:registry:tenant-orders:tools/tenant-orders/orders_get_v2"
+      ]
+    },
+    {
+      "case_id": "wrong-tenant-customer-lookup",
+      "ranked_artifact_ids": [
+        "arn:agentic:registry:tenant-orders:tools/tenant-orders/customer_lookup"
+      ]
+    },
+    {
+      "case_id": "deprecated-order-reader",
+      "ranked_artifact_ids": [
+        "arn:agentic:registry:tenant-orders:tools/tenant-orders/orders_get_v2"
+      ]
+    },
+    {
+      "case_id": "incompatible-order-mutation",
+      "ranked_artifact_ids": [
+        "arn:agentic:registry:tenant-orders:tools/tenant-orders/orders_get_v2"
+      ]
+    },
+    {
+      "case_id": "no-supported-weather-tool",
+      "ranked_artifact_ids": []
+    }
+  ]
+}

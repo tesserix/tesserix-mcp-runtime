@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from tesserix_mcp_manifest._annotations import is_reserved_annotation
+from tesserix_mcp_manifest._discovery_text import validated_discovery_text
+from tesserix_mcp_manifest._secret_fields import is_secret_key
 from tesserix_mcp_manifest.constants import AUTHORING_MANIFEST_VERSION
 from tesserix_mcp_manifest.validation import validated_url
 from tesserix_mcp_runtime import ToolManifest
@@ -13,9 +16,36 @@ _SERVER_NAME = r"^[a-zA-Z0-9.-]+/[a-zA-Z0-9._-]+$"
 _VERSION = r"^\S{1,255}$"
 _FINGERPRINT = r"^[a-f0-9]{64}$"
 _OCI_DIGEST = r"^sha256:[a-f0-9]{64}$"
+_CAPABILITY = r"^cap/[a-z0-9]+(?:-[a-z0-9]+)*$"
+_TOOL_NAME = r"^[A-Za-z][A-Za-z0-9_.-]{0,127}$"
+_TOOL_INPUT_NAME = r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$"
+_REGISTRY_ARN = (
+    r"^arn:agentic:registry:[A-Za-z0-9._-]+:"
+    r"(?:skills|tools|mcpservers|prompts|workflows|blueprints|agents|datasets|evalsuites)/"
+    r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"
+)
+
+type DiscoverySummary = Annotated[
+    str, Field(min_length=3, max_length=200), AfterValidator(validated_discovery_text)
+]
+type DiscoveryPhrase = Annotated[
+    str, Field(min_length=3, max_length=200), AfterValidator(validated_discovery_text)
+]
+type DiscoveryKeyword = Annotated[
+    str, Field(min_length=2, max_length=64), AfterValidator(validated_discovery_text)
+]
+type ServerDiscoveryText = Annotated[
+    str, Field(min_length=1, max_length=100), AfterValidator(validated_discovery_text)
+]
+type ToolDescription = Annotated[
+    str, Field(min_length=1, max_length=512), AfterValidator(validated_discovery_text)
+]
+type ToolJsonType = Literal["array", "boolean", "integer", "null", "number", "object", "string"]
+type CapabilityIdentifier = Annotated[str, Field(max_length=64, pattern=_CAPABILITY)]
+type RegistryARN = Annotated[str, Field(max_length=512, pattern=_REGISTRY_ARN)]
 
 
-class _ManifestModel(BaseModel):
+class ManifestModel(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
         frozen=True,
@@ -40,6 +70,13 @@ class ManifestLifecycle(StrEnum):
     DEPRECATED = "deprecated"
 
 
+class DiscoveryRisk(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
 class PackageRegistry(StrEnum):
     NPM = "npm"
     PYPI = "pypi"
@@ -49,7 +86,7 @@ class PackageRegistry(StrEnum):
     MCPB = "mcpb"
 
 
-class Repository(_ManifestModel):
+class Repository(ManifestModel):
     url: str
     source: str = Field(min_length=1, max_length=64)
     id: str | None = Field(default=None, min_length=1, max_length=256)
@@ -61,7 +98,7 @@ class Repository(_ManifestModel):
         return validated_url(value, https_only=True)
 
 
-class RemoteEndpoint(_ManifestModel):
+class RemoteEndpoint(ManifestModel):
     url: str
 
     @field_validator("url")
@@ -70,7 +107,7 @@ class RemoteEndpoint(_ManifestModel):
         return validated_url(value, https_only=True)
 
 
-class PackageTransport(_ManifestModel):
+class PackageTransport(ManifestModel):
     type: Literal["stdio", "streamable-http"]
     url: str | None = None
 
@@ -85,7 +122,7 @@ class PackageTransport(_ManifestModel):
         return self
 
 
-class PackageIdentity(_ManifestModel):
+class PackageIdentity(ManifestModel):
     registry_type: PackageRegistry
     identifier: str = Field(min_length=1, max_length=2_048)
     transport: PackageTransport
@@ -136,12 +173,12 @@ class PackageIdentity(_ManifestModel):
         return self
 
 
-class CredentialReference(_ManifestModel):
+class CredentialReference(ManifestModel):
     secret_name: str = Field(min_length=1, max_length=253)
     key: str = Field(min_length=1, max_length=253)
 
 
-class Ownership(_ManifestModel):
+class Ownership(ManifestModel):
     namespace: str = Field(min_length=1, max_length=63)
     tenant_id: str = Field(min_length=1, max_length=63)
     visibility: ManifestVisibility
@@ -150,6 +187,13 @@ class Ownership(_ManifestModel):
     labels: dict[str, str] = Field(default_factory=dict)
     annotations: dict[str, str] = Field(default_factory=dict)
 
+    @field_validator("annotations")
+    @classmethod
+    def reject_reserved_annotations(cls, value: dict[str, str]) -> dict[str, str]:
+        if any(is_reserved_annotation(key) for key in value):
+            raise ValueError("registry-managed annotations must use typed authoring fields")
+        return value
+
     @model_validator(mode="after")
     def tenant_matches_namespace(self) -> Self:
         if self.tenant_id != self.namespace:
@@ -157,41 +201,139 @@ class Ownership(_ManifestModel):
         return self
 
 
-class RoutePolicy(_ManifestModel):
+class RoutePolicy(ManifestModel):
     gateway_path: str = Field(min_length=1, max_length=512)
     direct_access: bool = False
 
 
-class SemanticMetadata(_ManifestModel):
-    capabilities: tuple[str, ...] = ()
-    domains: tuple[str, ...] = ()
-    keywords: tuple[str, ...] = ()
+class SemanticMetadata(ManifestModel):
+    summary: DiscoverySummary | None = None
+    when_to_use: tuple[DiscoveryPhrase, ...] = Field(default=(), max_length=8)
+    not_for: tuple[DiscoveryPhrase, ...] = Field(default=(), max_length=8)
+    examples: tuple[DiscoveryPhrase, ...] = Field(default=(), max_length=8)
+    capabilities: tuple[CapabilityIdentifier, ...] = Field(default=(), max_length=32)
+    requires: tuple[RegistryARN, ...] = Field(default=(), max_length=32)
+    risk: DiscoveryRisk | None = None
+    domains: tuple[DiscoveryKeyword, ...] = Field(default=(), max_length=16)
+    keywords: tuple[DiscoveryKeyword, ...] = Field(default=(), max_length=32)
 
 
-class ToolSummary(_ManifestModel):
-    name: str = Field(min_length=1, max_length=128)
-    description: str = Field(min_length=1, max_length=512)
+class ToolInputField(ManifestModel):
+    name: str = Field(min_length=1, max_length=128, pattern=_TOOL_INPUT_NAME)
+    json_type: ToolJsonType
+    description: DiscoveryPhrase | None = None
+    required: bool = False
+
+
+def _tool_json_type(value: object) -> ToolJsonType | None:
+    if value == "array":
+        return "array"
+    if value == "boolean":
+        return "boolean"
+    if value == "integer":
+        return "integer"
+    if value == "null":
+        return "null"
+    if value == "number":
+        return "number"
+    if value == "object":
+        return "object"
+    if value == "string":
+        return "string"
+    return None
+
+
+def _runtime_tool_inputs(manifest: ToolManifest) -> tuple[ToolInputField, ...]:
+    schema = manifest.input_schema
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return ()
+
+    required_value = schema.get("required")
+    required_names: frozenset[str] = (
+        frozenset(value for value in required_value if isinstance(value, str))
+        if isinstance(required_value, list)
+        else frozenset[str]()
+    )
+    inputs: list[ToolInputField] = []
+    for name in sorted(properties):
+        if is_secret_key(name):
+            continue
+        definition = properties[name]
+        if not isinstance(definition, dict):
+            continue
+        json_type = _tool_json_type(definition.get("type"))
+        if json_type is None:
+            continue
+        description = definition.get("description")
+        inputs.append(
+            ToolInputField(
+                name=name,
+                json_type=json_type,
+                description=description if isinstance(description, str) else None,
+                required=name in required_names,
+            )
+        )
+    if len(inputs) > 50:
+        raise ValueError("tool discovery input projection exceeds 50 safe properties")
+    return tuple(inputs)
+
+
+def _runtime_semantic(manifest: ToolManifest) -> SemanticMetadata:
+    discovery = manifest.metadata.discovery
+    if discovery is None:
+        return SemanticMetadata()
+    return SemanticMetadata(
+        summary=discovery.summary,
+        when_to_use=(discovery.when_to_use,),
+        examples=discovery.examples,
+        capabilities=discovery.capabilities,
+    )
+
+
+def _runtime_lifecycle(manifest: ToolManifest) -> ManifestLifecycle:
+    discovery = manifest.metadata.discovery
+    if discovery is not None and discovery.lifecycle == "deprecated":
+        return ManifestLifecycle.DEPRECATED
+    return ManifestLifecycle.ACTIVE
+
+
+class ToolSummary(ManifestModel):
+    name: str = Field(min_length=1, max_length=128, pattern=_TOOL_NAME)
+    description: ToolDescription
     input_fingerprint: str = Field(pattern=_FINGERPRINT)
     output_fingerprint: str = Field(pattern=_FINGERPRINT)
     required_scopes: tuple[str, ...] = ()
+    semantic: SemanticMetadata = Field(default_factory=SemanticMetadata)
+    lifecycle: ManifestLifecycle = ManifestLifecycle.ACTIVE
+    inputs: tuple[ToolInputField, ...] = Field(default=(), max_length=50)
 
     @classmethod
-    def from_runtime(cls, manifest: ToolManifest) -> Self:
+    def from_runtime(
+        cls,
+        manifest: ToolManifest,
+        *,
+        semantic: SemanticMetadata | None = None,
+        lifecycle: ManifestLifecycle | None = None,
+    ) -> Self:
         return cls(
             name=manifest.normalized_name,
             description=manifest.metadata.description,
             input_fingerprint=manifest.input_fingerprint,
             output_fingerprint=manifest.output_fingerprint,
             required_scopes=manifest.metadata.required_scopes,
+            semantic=semantic if semantic is not None else _runtime_semantic(manifest),
+            lifecycle=lifecycle if lifecycle is not None else _runtime_lifecycle(manifest),
+            inputs=_runtime_tool_inputs(manifest),
         )
 
 
-class ServerAuthoringManifest(_ManifestModel):
+class ServerAuthoringManifest(ManifestModel):
     manifest_version: Literal["1.0"] = AUTHORING_MANIFEST_VERSION
     name: str = Field(min_length=3, max_length=200, pattern=_SERVER_NAME)
     version: str = Field(pattern=_VERSION)
-    description: str = Field(min_length=1, max_length=100)
-    title: str | None = Field(default=None, min_length=1, max_length=100)
+    description: ServerDiscoveryText
+    title: ServerDiscoveryText | None = None
     repository: Repository
     ownership: Ownership
     adapter: RuntimeAdapter
@@ -215,6 +357,7 @@ class ServerAuthoringManifest(_ManifestModel):
 
 __all__ = [
     "CredentialReference",
+    "DiscoveryRisk",
     "ManifestLifecycle",
     "ManifestVisibility",
     "Ownership",
@@ -227,5 +370,6 @@ __all__ = [
     "RuntimeAdapter",
     "SemanticMetadata",
     "ServerAuthoringManifest",
+    "ToolInputField",
     "ToolSummary",
 ]

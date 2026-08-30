@@ -12,6 +12,7 @@ class ManifestValidationCode(StrEnum):
     DUPLICATE_KEY = "duplicate_key"
     INVALID_JSON = "invalid_json"
     INVALID_MANIFEST = "invalid_manifest"
+    RESERVED_ANNOTATION = "reserved_annotation"
     SECRET_FIELD = "secret_field"
     SOURCE_TOO_LARGE = "source_too_large"
     TOO_COMPLEX = "too_complex"

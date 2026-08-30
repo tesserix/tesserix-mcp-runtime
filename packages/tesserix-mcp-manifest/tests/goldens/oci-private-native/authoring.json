@@ -43,7 +43,7 @@
   },
   "semantic": {
     "capabilities": [
-      "settlements.read"
+      "cap/settlements-read"
     ],
     "domains": [
       "payments"
@@ -51,6 +51,11 @@
     "keywords": [
       "settlements",
       "status"
+    ],
+    "risk": "medium",
+    "summary": "Retrieve private settlement processing status.",
+    "when_to_use": [
+      "check a known settlement status"
     ]
   },
   "title": "Settlements MCP",
@@ -58,11 +63,22 @@
     {
       "description": "Read settlement status.",
       "input_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111",
+      "lifecycle": "deprecated",
       "name": "settlements_get",
       "output_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
       "required_scopes": [
         "settlements:read"
-      ]
+      ],
+      "semantic": {
+        "capabilities": [
+          "cap/settlements-read"
+        ],
+        "risk": "medium",
+        "summary": "Return processing status for one settlement.",
+        "when_to_use": [
+          "inspect one known settlement"
+        ]
+      }
     }
   ],
   "version": "3.1.0"

@@ -7,9 +7,14 @@ from dataclasses import dataclass
 
 from pydantic import TypeAdapter, ValidationError
 
+from tesserix_mcp_manifest._annotations import is_reserved_annotation
 from tesserix_mcp_manifest._secret_fields import is_secret_key
 from tesserix_mcp_manifest.constants import (
     AUTHORING_MANIFEST_VERSION,
+    DISCOVERY_CAPABILITIES_ANNOTATION,
+    DISCOVERY_REQUIRES_ANNOTATION,
+    DISCOVERY_SUMMARY_ANNOTATION,
+    DISCOVERY_WHEN_TO_USE_ANNOTATION,
     OFFICIAL_SCHEMA_URL,
     REGISTRY_API_VERSION,
     REGISTRY_EXTENSION_KEY,
@@ -54,6 +59,25 @@ def _string_map(values: Mapping[str, str]) -> dict[str, JsonValue]:
     return result
 
 
+def _optional_sorted_strings(values: Iterable[str]) -> list[JsonValue] | None:
+    result = _sorted_strings(values)
+    return result or None
+
+
+def _semantic_annotations(manifest: ServerAuthoringManifest) -> dict[str, str]:
+    semantic = manifest.semantic
+    annotations: dict[str, str] = {}
+    if semantic.summary is not None:
+        annotations[DISCOVERY_SUMMARY_ANNOTATION] = semantic.summary
+    if semantic.when_to_use:
+        annotations[DISCOVERY_WHEN_TO_USE_ANNOTATION] = "; ".join(sorted(semantic.when_to_use))
+    if semantic.capabilities:
+        annotations[DISCOVERY_CAPABILITIES_ANNOTATION] = ", ".join(sorted(semantic.capabilities))
+    if semantic.requires:
+        annotations[DISCOVERY_REQUIRES_ANNOTATION] = ", ".join(sorted(semantic.requires))
+    return annotations
+
+
 def _package_document(package: PackageIdentity) -> dict[str, JsonValue]:
     identifier = package.identifier
     if package.image_digest is not None:
@@ -78,13 +102,43 @@ def _package_document(package: PackageIdentity) -> dict[str, JsonValue]:
 
 
 def _tool_document(tool: ToolSummary) -> dict[str, JsonValue]:
-    return {
-        "description": tool.description,
-        "inputFingerprint": tool.input_fingerprint,
-        "name": tool.name,
-        "outputFingerprint": tool.output_fingerprint,
-        "requiredScopes": _sorted_strings(tool.required_scopes),
-    }
+    properties: dict[str, JsonValue] = {}
+    required: list[JsonValue] = []
+    for input_field in sorted(tool.inputs, key=lambda item: item.name):
+        properties[input_field.name] = _without_none(
+            {
+                "description": input_field.description,
+                "type": input_field.json_type,
+            }
+        )
+        if input_field.required:
+            required.append(input_field.name)
+    return _without_none(
+        {
+            "capabilities": _sorted_strings(tool.semantic.capabilities),
+            "description": tool.description,
+            "inputFingerprint": tool.input_fingerprint,
+            "inputSchema": {
+                "properties": properties,
+                "required": required,
+                "type": "object",
+            },
+            "name": tool.name,
+            "outputFingerprint": tool.output_fingerprint,
+            "requires": _sorted_strings(tool.semantic.requires),
+            "requiredScopes": _sorted_strings(tool.required_scopes),
+            "riskLevel": tool.semantic.risk.value if tool.semantic.risk is not None else None,
+            "semantic": _without_none(
+                {
+                    "examples": _optional_sorted_strings(tool.semantic.examples),
+                    "notFor": _optional_sorted_strings(tool.semantic.not_for),
+                    "summary": tool.semantic.summary,
+                    "whenToUse": _optional_sorted_strings(tool.semantic.when_to_use),
+                }
+            ),
+            "status": tool.lifecycle.value,
+        }
+    )
 
 
 def _portable_document(manifest: ServerAuthoringManifest) -> dict[str, JsonValue]:
@@ -122,9 +176,11 @@ def _registry_document(
 ) -> dict[str, JsonValue]:
     labels = dict(manifest.ownership.labels)
     labels["transport"] = "streamable-http" if manifest.remote is not None else "package"
+    annotations = dict(manifest.ownership.annotations)
+    annotations.update(_semantic_annotations(manifest))
     metadata = _without_none(
         {
-            "annotations": _string_map(manifest.ownership.annotations) or None,
+            "annotations": _string_map(annotations) or None,
             "labels": _string_map(labels),
             "name": manifest.name,
             "namespace": manifest.ownership.namespace,
@@ -146,11 +202,21 @@ def _registry_document(
             "directAccess": manifest.route_policy.direct_access,
             "gatewayPath": manifest.route_policy.gateway_path,
         },
-        "semantic": {
-            "capabilities": _sorted_strings(manifest.semantic.capabilities),
-            "domains": _sorted_strings(manifest.semantic.domains),
-            "keywords": _sorted_strings(manifest.semantic.keywords),
-        },
+        "semantic": _without_none(
+            {
+                "capabilities": _sorted_strings(manifest.semantic.capabilities),
+                "domains": _sorted_strings(manifest.semantic.domains),
+                "examples": _optional_sorted_strings(manifest.semantic.examples),
+                "keywords": _sorted_strings(manifest.semantic.keywords),
+                "notFor": _optional_sorted_strings(manifest.semantic.not_for),
+                "requires": _optional_sorted_strings(manifest.semantic.requires),
+                "risk": (
+                    manifest.semantic.risk.value if manifest.semantic.risk is not None else None
+                ),
+                "summary": manifest.semantic.summary,
+                "whenToUse": _optional_sorted_strings(manifest.semantic.when_to_use),
+            }
+        ),
         "tools": [
             _tool_document(tool) for tool in sorted(manifest.tools, key=lambda item: item.name)
         ],
@@ -189,10 +255,16 @@ def compile_manifests(
     *,
     runtime_version: str,
 ) -> CompiledManifests:
+    if any(is_reserved_annotation(key) for key in manifest.ownership.annotations):
+        raise ManifestValidationError(ManifestValidationCode.RESERVED_ANNOTATION)
     if any(is_secret_key(key) for key in manifest.ownership.labels) or any(
         is_secret_key(key) for key in manifest.ownership.annotations
     ):
         raise ManifestValidationError(ManifestValidationCode.SECRET_FIELD)
+    try:
+        manifest = ServerAuthoringManifest.model_validate(manifest.model_dump())
+    except ValidationError:
+        raise ManifestValidationError(ManifestValidationCode.INVALID_MANIFEST) from None
     if runtime_version != manifest.version:
         raise ManifestVersionMismatchError(
             component="runtime",
