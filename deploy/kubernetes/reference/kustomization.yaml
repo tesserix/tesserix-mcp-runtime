@@ -1,0 +1,12 @@
+{
+  "apiVersion": "kustomize.config.k8s.io/v1beta1",
+  "kind": "Kustomization",
+  "namespace": "replace-in-tesserix-k8s",
+  "resources": [
+    "deployment.json",
+    "service.json",
+    "service-account.json",
+    "pod-disruption-budget.json",
+    "network-policy.json"
+  ]
+}

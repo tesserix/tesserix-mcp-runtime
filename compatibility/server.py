@@ -176,10 +176,21 @@ class CompatibilityContextProvider:
         )
 
 
-async def serve(port: int) -> None:
+async def serve(
+    port: int,
+    *,
+    host: str = "127.0.0.1",
+    allowed_hosts: tuple[str, ...] = (),
+    allowed_origins: tuple[str, ...] = (),
+) -> None:
     telemetry = NullTelemetry()
     transport = StreamableHTTPTransport(
-        config=StreamableHTTPConfig(port=port),
+        config=StreamableHTTPConfig(
+            host=host,
+            port=port,
+            allowed_hosts=allowed_hosts,
+            allowed_origins=allowed_origins,
+        ),
         limits=StreamableHTTPLimits(max_tools=4, tool_page_size=2, max_tool_pages=2),
         context_provider=CompatibilityContextProvider(),
         telemetry=telemetry,
@@ -216,9 +227,19 @@ async def serve(port: int) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, required=True)
+    parser.add_argument("--allowed-host", action="append", default=[])
+    parser.add_argument("--allowed-origin", action="append", default=[])
     arguments = parser.parse_args()
-    asyncio.run(serve(arguments.port))
+    asyncio.run(
+        serve(
+            arguments.port,
+            host=arguments.host,
+            allowed_hosts=tuple(arguments.allowed_host),
+            allowed_origins=tuple(arguments.allowed_origin),
+        )
+    )
 
 
 if __name__ == "__main__":
