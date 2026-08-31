@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "scope": "representative_sandbox_synthetic_replay",
+  "baseline": {
+    "poll_interval_seconds": 30,
+    "route_count": 500,
+    "activation_p99_seconds": 60,
+    "registry_requests_per_second": 0.33,
+    "missed_schedules": 0,
+    "duplicate_generations": 100,
+    "out_of_order_generations": 100,
+    "lost_events_repaired_by_full_reconciliation": 10
+  },
+  "decision": "retain_polling"
+}
