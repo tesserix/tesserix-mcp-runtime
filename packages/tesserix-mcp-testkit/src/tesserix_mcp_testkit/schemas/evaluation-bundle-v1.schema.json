@@ -1,0 +1,584 @@
+{
+  "$defs": {
+    "AssertionOperator": {
+      "enum": [
+        "equals",
+        "not_equals",
+        "exists",
+        "absent",
+        "contains",
+        "not_contains"
+      ],
+      "title": "AssertionOperator",
+      "type": "string"
+    },
+    "AssertionsExpectation": {
+      "additionalProperties": false,
+      "properties": {
+        "assertions": {
+          "items": {
+            "$ref": "#/$defs/EvaluationAssertion"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Assertions",
+          "type": "array"
+        },
+        "kind": {
+          "const": "assertions",
+          "default": "assertions",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "assertions"
+      ],
+      "title": "AssertionsExpectation",
+      "type": "object"
+    },
+    "CancellationExpectation": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "cancellation",
+          "default": "cancellation",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "title": "CancellationExpectation",
+      "type": "object"
+    },
+    "ErrorExpectation": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "kind": {
+          "const": "error",
+          "default": "error",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "ErrorExpectation",
+      "type": "object"
+    },
+    "EvaluationApproval": {
+      "additionalProperties": false,
+      "properties": {
+        "approval_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approval Id"
+        },
+        "granted": {
+          "title": "Granted",
+          "type": "boolean"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "required",
+        "granted"
+      ],
+      "title": "EvaluationApproval",
+      "type": "object"
+    },
+    "EvaluationAssertion": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "$ref": "#/$defs/AssertionOperator"
+        },
+        "pointer": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Pointer",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        }
+      },
+      "required": [
+        "pointer",
+        "operator"
+      ],
+      "title": "EvaluationAssertion",
+      "type": "object"
+    },
+    "EvaluationCase": {
+      "additionalProperties": false,
+      "properties": {
+        "arguments": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Arguments",
+          "type": "object"
+        },
+        "attempts": {
+          "default": 1,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Attempts",
+          "type": "integer"
+        },
+        "blocking_metrics": {
+          "items": {
+            "$ref": "#/$defs/EvaluationMetric"
+          },
+          "title": "Blocking Metrics",
+          "type": "array"
+        },
+        "case_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Case Id",
+          "type": "string"
+        },
+        "context": {
+          "$ref": "#/$defs/EvaluationContext"
+        },
+        "expectation": {
+          "discriminator": {
+            "mapping": {
+              "assertions": "#/$defs/AssertionsExpectation",
+              "cancellation": "#/$defs/CancellationExpectation",
+              "error": "#/$defs/ErrorExpectation",
+              "structured_result": "#/$defs/StructuredResultExpectation"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/StructuredResultExpectation"
+            },
+            {
+              "$ref": "#/$defs/AssertionsExpectation"
+            },
+            {
+              "$ref": "#/$defs/ErrorExpectation"
+            },
+            {
+              "$ref": "#/$defs/CancellationExpectation"
+            }
+          ],
+          "title": "Expectation"
+        },
+        "latency_budget_ms": {
+          "maximum": 60000,
+          "minimum": 1,
+          "title": "Latency Budget Ms",
+          "type": "integer"
+        },
+        "metrics": {
+          "items": {
+            "$ref": "#/$defs/EvaluationMetric"
+          },
+          "minItems": 1,
+          "title": "Metrics",
+          "type": "array"
+        },
+        "quarantine": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvaluationQuarantine"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Tags",
+          "type": "array"
+        },
+        "telemetry": {
+          "$ref": "#/$defs/TelemetryExpectation"
+        },
+        "timeout_ms": {
+          "default": 60000,
+          "maximum": 60000,
+          "minimum": 1,
+          "title": "Timeout Ms",
+          "type": "integer"
+        },
+        "tool": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Tool",
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_id",
+        "tool",
+        "arguments",
+        "expectation",
+        "tags",
+        "context",
+        "metrics",
+        "blocking_metrics",
+        "latency_budget_ms"
+      ],
+      "title": "EvaluationCase",
+      "type": "object"
+    },
+    "EvaluationContext": {
+      "additionalProperties": false,
+      "properties": {
+        "approval": {
+          "$ref": "#/$defs/EvaluationApproval"
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Idempotency Key"
+        },
+        "scopes": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Scopes",
+          "type": "array"
+        },
+        "tenant": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Tenant",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant",
+        "scopes",
+        "approval"
+      ],
+      "title": "EvaluationContext",
+      "type": "object"
+    },
+    "EvaluationMetric": {
+      "enum": [
+        "correctness",
+        "schema_conformance",
+        "secret_leakage",
+        "tenant_isolation",
+        "authorization_denial",
+        "idempotency",
+        "latency",
+        "availability"
+      ],
+      "title": "EvaluationMetric",
+      "type": "string"
+    },
+    "EvaluationMode": {
+      "enum": [
+        "in_process",
+        "streamable_http"
+      ],
+      "title": "EvaluationMode",
+      "type": "string"
+    },
+    "EvaluationPromotionPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "stages": {
+          "items": {
+            "$ref": "#/$defs/PromotionStagePolicy"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "title": "Stages",
+          "type": "array"
+        }
+      },
+      "required": [
+        "stages"
+      ],
+      "title": "EvaluationPromotionPolicy",
+      "type": "object"
+    },
+    "EvaluationQuarantine": {
+      "additionalProperties": false,
+      "properties": {
+        "issue": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Issue",
+          "type": "string"
+        },
+        "owner": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "issue",
+        "reason"
+      ],
+      "title": "EvaluationQuarantine",
+      "type": "object"
+    },
+    "JsonValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "PromotionMetricGate": {
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "$ref": "#/$defs/EvaluationMetric"
+        },
+        "minimum_score": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Minimum Score",
+          "type": "number"
+        }
+      },
+      "required": [
+        "metric",
+        "minimum_score"
+      ],
+      "title": "PromotionMetricGate",
+      "type": "object"
+    },
+    "PromotionStage": {
+      "enum": [
+        "experimental",
+        "internal",
+        "ga"
+      ],
+      "title": "PromotionStage",
+      "type": "string"
+    },
+    "PromotionStagePolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_quarantine": {
+          "title": "Allow Quarantine",
+          "type": "boolean"
+        },
+        "allowed_modes": {
+          "items": {
+            "$ref": "#/$defs/EvaluationMode"
+          },
+          "minItems": 1,
+          "title": "Allowed Modes",
+          "type": "array"
+        },
+        "gates": {
+          "items": {
+            "$ref": "#/$defs/PromotionMetricGate"
+          },
+          "minItems": 1,
+          "title": "Gates",
+          "type": "array"
+        },
+        "minimum_reviewers": {
+          "maximum": 16,
+          "minimum": 1,
+          "title": "Minimum Reviewers",
+          "type": "integer"
+        },
+        "required_reviewer_roles": {
+          "items": {
+            "$ref": "#/$defs/ReviewerRole"
+          },
+          "minItems": 1,
+          "title": "Required Reviewer Roles",
+          "type": "array"
+        },
+        "stage": {
+          "$ref": "#/$defs/PromotionStage"
+        }
+      },
+      "required": [
+        "stage",
+        "gates",
+        "allowed_modes",
+        "required_reviewer_roles",
+        "minimum_reviewers",
+        "allow_quarantine"
+      ],
+      "title": "PromotionStagePolicy",
+      "type": "object"
+    },
+    "ReviewerRole": {
+      "enum": [
+        "evaluation_owner",
+        "security_reviewer",
+        "registry_owner",
+        "release_reviewer"
+      ],
+      "title": "ReviewerRole",
+      "type": "string"
+    },
+    "StructuredResultExpectation": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "structured_result",
+          "default": "structured_result",
+          "title": "Kind",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "StructuredResultExpectation",
+      "type": "object"
+    },
+    "TelemetryExpectation": {
+      "additionalProperties": false,
+      "properties": {
+        "forbidden_events": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Forbidden Events",
+          "type": "array"
+        },
+        "required_events": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Required Events",
+          "type": "array"
+        }
+      },
+      "title": "TelemetryExpectation",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.tesserix.dev/mcp/evaluation-bundle/v1",
+  "additionalProperties": false,
+  "properties": {
+    "cases": {
+      "items": {
+        "$ref": "#/$defs/EvaluationCase"
+      },
+      "maxItems": 1000,
+      "minItems": 1,
+      "title": "Cases",
+      "type": "array"
+    },
+    "name": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "promotion_policy": {
+      "$ref": "#/$defs/EvaluationPromotionPolicy"
+    },
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "version": {
+      "maxLength": 64,
+      "minLength": 5,
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "version",
+    "cases"
+  ],
+  "title": "Tesserix MCP evaluation bundle v1",
+  "type": "object"
+}

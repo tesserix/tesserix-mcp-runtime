@@ -16,3 +16,17 @@ The complete guide and external server live in the
 [`tesserix-mcp-runtime` repository](https://github.com/tesserix/tesserix-mcp-runtime/blob/main/docs/conformance.md).
 The package also exposes the 51-case digest-bound adversarial contract described
 in the [security verification guide](https://github.com/tesserix/tesserix-mcp-runtime/blob/main/docs/security-verification.md).
+
+Evaluation contract v1 adds reusable, digest-bound correctness and promotion
+evidence. One bundle runs through `InProcessEvaluationTarget` during authoring
+and `StreamableHttpEvaluationTarget` against a canary. It covers correctness,
+schema conformance, secret leakage, tenant isolation, authorization denial,
+idempotency, latency, and availability; emits payload-free JSON and Markdown;
+and verifies Ed25519 signatures before experimental, internal, or GA policy is
+assessed. `reference_evaluation_bundle()` includes happy, boundary, denial,
+duplicate, timeout, cancellation, tenant-canary, and secret-canary examples.
+
+The packaged schema is
+`tesserix_mcp_testkit/schemas/evaluation-bundle-v1.schema.json`. See the
+[evaluation and promotion guide](https://github.com/tesserix/tesserix-mcp-runtime/blob/main/docs/evaluation.md)
+for local, HTTP, signing, and reviewer examples.
