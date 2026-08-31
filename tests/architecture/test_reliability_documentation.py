@@ -92,6 +92,8 @@ def test_reliability_guide_is_an_executable_sanitized_evidence_runbook() -> None
         "request-owned memory",
         "request-owned filesystem",
         "one external effect",
+        "--compatibility-smoke",
+        "Never retain or promote smoke output",
         "No raw payload",
         "Argo CD",
     ):

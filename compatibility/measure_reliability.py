@@ -112,7 +112,7 @@ def reliability_load_plans(
             lane=lane,
             kind=ReliabilityLoadKind.BURST,
             requests=burst_requests,
-            concurrency=min(32, burst_requests),
+            concurrency=min(16, burst_requests),
             tenants=min(16, burst_requests),
             request_bytes=1_024,
             response_bytes=4_096,
@@ -158,7 +158,10 @@ def reliability_loads_pass(
     loads: tuple[ReliabilityLoadEvidence, ...],
     *,
     required_kinds: tuple[ReliabilityLoadKind, ...] = _ALL_LOAD_KINDS,
+    enforce_rate_targets: bool = True,
 ) -> bool:
+    if not isinstance(enforce_rate_targets, bool):
+        raise TypeError("rate-target enforcement must be explicit")
     by_kind = {load.kind: load for load in loads}
     if set(by_kind) != set(required_kinds):
         return False
@@ -168,8 +171,13 @@ def reliability_loads_pass(
     burst = by_kind.get(ReliabilityLoadKind.BURST)
     boundary = by_kind.get(ReliabilityLoadKind.BOUNDARY)
     return not (
-        (sustained is not None and sustained.throughput_requests_per_second < 50)
-        or (burst is not None and burst.throughput_requests_per_second < 200)
+        (
+            enforce_rate_targets
+            and (
+                (sustained is not None and sustained.throughput_requests_per_second < 50)
+                or (burst is not None and burst.throughput_requests_per_second < 200)
+            )
+        )
         or (
             boundary is not None
             and (boundary.request_bytes < 60_000 or boundary.response_bytes < 500_000)
@@ -185,6 +193,7 @@ async def _measure(
     burst_requests: int,
     boundary_requests: int,
     kinds: tuple[ReliabilityLoadKind, ...] = _ALL_LOAD_KINDS,
+    enforce_rate_targets: bool = True,
 ) -> dict[str, object]:
     logging.getLogger("client").setLevel(logging.ERROR)
     async with Client(endpoint) as client:
@@ -213,18 +222,25 @@ async def _measure(
                 )
             ]
         )
+    targets: dict[str, object] = {
+        "sustained_requests_per_second": 50,
+        "burst_requests_per_second": 200,
+        "request_bytes": 60_000,
+        "response_bytes": 500_000,
+    }
+    if not enforce_rate_targets:
+        targets["assessment"] = "compatibility_smoke"
     return {
         "schema_version": 1,
         "lane": lane.value,
         "route": urlsplit(endpoint).path,
-        "targets": {
-            "sustained_requests_per_second": 50,
-            "burst_requests_per_second": 200,
-            "request_bytes": 60_000,
-            "response_bytes": 500_000,
-        },
+        "targets": targets,
         "loads": [load.model_dump(mode="json") for load in loads],
-        "passed": reliability_loads_pass(loads, required_kinds=kinds),
+        "passed": reliability_loads_pass(
+            loads,
+            required_kinds=kinds,
+            enforce_rate_targets=enforce_rate_targets,
+        ),
     }
 
 
@@ -251,6 +267,7 @@ def main() -> int:
     parser.add_argument("--burst-requests", type=_bounded_count, default=200)
     parser.add_argument("--boundary-requests", type=_bounded_count, default=4)
     parser.add_argument("--kind", choices=tuple(kind.value for kind in ReliabilityLoadKind))
+    parser.add_argument("--compatibility-smoke", action="store_true")
     parser.add_argument("--report", type=Path, required=True)
     arguments = parser.parse_args()
     lane = ReliabilityLane(arguments.lane)
@@ -265,6 +282,7 @@ def main() -> int:
                 burst_requests=arguments.burst_requests,
                 boundary_requests=arguments.boundary_requests,
                 kinds=kinds,
+                enforce_rate_targets=not arguments.compatibility_smoke,
             )
         )
         _write_report(arguments.report, report)

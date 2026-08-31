@@ -116,6 +116,26 @@ def _client_load(report_text: str, kind: ReliabilityLoadKind) -> ReliabilityLoad
         or report.get("passed") is not True
     ):
         raise ValueError("client reliability report is not passing AgentGateway evidence")
+    targets_value = report.get("targets")
+    expected_targets = {
+        "sustained_requests_per_second": 50,
+        "burst_requests_per_second": 200,
+        "request_bytes": 60_000,
+        "response_bytes": 500_000,
+    }
+    if not isinstance(targets_value, dict):
+        raise ValueError("client reliability report does not carry qualification targets")
+    untyped_targets = cast(dict[object, object], targets_value)
+    if not all(isinstance(name, str) for name in untyped_targets):
+        raise ValueError("client reliability report does not carry qualification targets")
+    targets = {str(name): value for name, value in untyped_targets.items()}
+    if set(targets) != set(expected_targets) or any(
+        isinstance(targets[name], bool)
+        or not isinstance(targets[name], int)
+        or targets[name] != expected
+        for name, expected in expected_targets.items()
+    ):
+        raise ValueError("client reliability report does not carry qualification targets")
     loads_value = report.get("loads")
     if not isinstance(loads_value, list):
         raise ValueError("client reliability report has invalid load evidence")

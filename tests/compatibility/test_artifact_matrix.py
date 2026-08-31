@@ -101,6 +101,7 @@ def test_compatibility_workflow_runs_pinned_artifact_and_devai_evidence() -> Non
     assert "--junit" in workflow
     assert workflow.count("compatibility/run_inspector.py") == 2
     assert workflow.count("compatibility/measure_reliability.py") == 2
+    assert workflow.count("--compatibility-smoke") == 2
     assert "reliability-direct.json" in workflow
     assert "reliability-agentgateway.json" in workflow
     assert "scan_journey_surfaces" in workflow

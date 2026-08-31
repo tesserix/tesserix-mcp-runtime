@@ -298,6 +298,15 @@ def test_correlator_rejects_an_incomplete_client_report_shape() -> None:
         _correlate(client_report=json.dumps(report))
 
 
+def test_correlator_rejects_a_nonqualification_client_report() -> None:
+    report = _client_document()
+    targets = cast(dict[str, object], report["targets"])
+    targets["assessment"] = "compatibility_smoke"
+
+    with pytest.raises(ValueError, match="qualification targets"):
+        _correlate(client_report=json.dumps(report))
+
+
 @pytest.mark.parametrize("loads", ({}, [1]), ids=("not-a-list", "non-object-item"))
 def test_correlator_rejects_invalid_client_load_collections(loads: object) -> None:
     report = _client_document()

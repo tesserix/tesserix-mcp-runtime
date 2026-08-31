@@ -35,7 +35,12 @@ def _write_sources(root: Path) -> dict[str, Path]:
         "schema_version": 1,
         "lane": "agentgateway",
         "route": "/gateway/runtime/mcp",
-        "targets": {},
+        "targets": {
+            "sustained_requests_per_second": 50,
+            "burst_requests_per_second": 200,
+            "request_bytes": 60_000,
+            "response_bytes": 500_000,
+        },
         "loads": [load],
         "passed": True,
     }

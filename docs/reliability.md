@@ -86,6 +86,14 @@ calls at 60,000 request bytes and 500,000 response bytes without an error or an
 unbounded queue. The lane is encoded in the target and report, so a direct run
 cannot be submitted as AgentGateway evidence.
 
+The default command is a qualification run and enforces both 50 sustained and
+200 burst calls/second. GitHub-hosted PR runners are not controlled performance
+hosts, so the compatibility workflow passes `--compatibility-smoke`: that mode
+still requires every call, boundary, and queue check to pass but does not claim
+rate qualification. It marks the report targets with `compatibility_smoke`, and
+the correlator rejects such a report. Never retain or promote smoke output as
+qualification evidence.
+
 Correlated Gateway evidence uses one fresh isolated container pair per load
 kind. Verify the chosen loopback ports are unused; never run this load against a
 cluster or production endpoint. Enable `--reliability-spans` on the

@@ -183,10 +183,12 @@ jobs:
           uv run --frozen python compatibility/measure_reliability.py \
             --endpoint "$runtime_endpoint" \
             --lane direct_http \
+            --compatibility-smoke \
             --report artifacts/compatibility/reliability-direct.json || status=1
           uv run --frozen python compatibility/measure_reliability.py \
             --endpoint "$gateway_endpoint" \
             --lane agentgateway \
+            --compatibility-smoke \
             --report artifacts/compatibility/reliability-agentgateway.json || status=1
           collect_compose_evidence
           trap - EXIT
