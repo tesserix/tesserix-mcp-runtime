@@ -6,7 +6,7 @@ import hashlib
 import logging
 import ssl
 import traceback
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -57,6 +57,17 @@ PUBLIC_V6 = "2606:2800:220:1::34"
 class UnrenderableRequestID:
     def __str__(self) -> str:
         raise AssertionError("request identifiers must not be rendered before validation")
+
+
+class CircuitClock:
+    def __init__(self) -> None:
+        self.value = 0.0
+
+    def __call__(self) -> float:
+        return self.value
+
+    def advance(self, seconds: float) -> None:
+        self.value += seconds
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +159,34 @@ class ScriptedNetworkBackend(httpcore.AsyncNetworkBackend):
         del seconds
 
 
+class BlockingProbeNetworkBackend(ScriptedNetworkBackend):
+    def __init__(self, scripts: list[ConnectionScript]) -> None:
+        super().__init__(scripts)
+        self._attempts = 0
+        self.probe_started = asyncio.Event()
+        self.release_probe = asyncio.Event()
+
+    async def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,  # noqa: ASYNC109
+        local_address: str | None = None,
+        socket_options: Any = None,
+    ) -> httpcore.AsyncNetworkStream:
+        self._attempts += 1
+        if self._attempts == 2:
+            self.probe_started.set()
+            await self.release_probe.wait()
+        return await super().connect_tcp(
+            host,
+            port,
+            timeout,
+            local_address,
+            socket_options,
+        )
+
+
 class StaticResolver:
     def __init__(self, answers: Mapping[str, tuple[str, ...]]) -> None:
         self._answers = dict(answers)
@@ -232,6 +271,7 @@ def client(
     audit_sink: OutboundHTTPAuditSink | None = None,
     redactor: RedactionPolicy | None = None,
     observability: RuntimeObservability | None = None,
+    circuit_clock: Callable[[], float] | None = None,
 ) -> OutboundHTTPClient:
     return OutboundHTTPClient(
         policy=DeclaredEgressPolicy(
@@ -243,6 +283,7 @@ def client(
         redactor=redactor or SecretRedactor(known_secrets=(SecretValue(CANARY),)),
         audit_sink=audit_sink,
         observability=observability,
+        circuit_clock=circuit_clock,
     )
 
 
@@ -914,6 +955,295 @@ def test_dependency_failures_use_one_safe_structured_error(
     asyncio.run(exercise())
 
 
+def test_repeated_dependency_failures_open_a_bounded_destination_circuit() -> None:
+    async def exercise() -> None:
+        closed = (("Connection", "close"),)
+        backend = ScriptedNetworkBackend(
+            [
+                ConnectionScript(raw_response(503, headers=closed)),
+                ConnectionScript(raw_response(503, headers=closed)),
+                ConnectionScript(raw_response(200, headers=closed, body=b"{}")),
+                ConnectionScript(raw_response(200, headers=closed, body=b"{}")),
+            ]
+        )
+        clock = CircuitClock()
+        observability = RuntimeObservability(server_name="outbound-test")
+        outbound = client(
+            backend,
+            StaticResolver({"api.example.test": (PUBLIC_V4,)}),
+            limits=OutboundHTTPLimits(
+                circuit_failure_threshold=2,
+                circuit_recovery_seconds=5,
+            ),
+            observability=observability,
+            circuit_clock=clock,
+        )
+
+        for sequence in range(2):
+            response = await outbound.request(
+                "GET",
+                "https://api.example.test/dependency",
+                request_id=f"request-failure-{sequence}",
+            )
+            assert response.status_code == 503
+
+        with pytest.raises(OutboundHTTPError) as captured:
+            await outbound.request(
+                "GET",
+                "https://api.example.test/dependency",
+                request_id="request-open",
+            )
+        assert captured.value.error.code is ErrorCode.UNAVAILABLE
+        assert len(backend.connects) == 2
+        assert (
+            'mcp_server_limit_count_total{limit="circuit",server="outbound-test",tool="none"} 1'
+            in observability.render_prometheus()
+        )
+
+        clock.advance(5)
+        recovered = await outbound.request(
+            "GET",
+            "https://api.example.test/dependency",
+            request_id="request-probe",
+        )
+        assert recovered.status_code == 200
+        healthy = await outbound.request(
+            "GET",
+            "https://api.example.test/dependency",
+            request_id="request-healthy",
+        )
+        assert healthy.status_code == 200
+        assert len(backend.connects) == 4
+        await outbound.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_open_destination_circuit_does_not_isolate_a_healthy_destination() -> None:
+    async def exercise() -> None:
+        closed = (("Connection", "close"),)
+        backend = ScriptedNetworkBackend(
+            [
+                ConnectionScript(raw_response(503, headers=closed)),
+                ConnectionScript(raw_response(200, headers=closed)),
+            ]
+        )
+        outbound = client(
+            backend,
+            StaticResolver(
+                {
+                    "api.example.test": (PUBLIC_V4,),
+                    "healthy.example.test": (PUBLIC_V4,),
+                }
+            ),
+            destinations=(destination(), destination("healthy.example.test")),
+            limits=OutboundHTTPLimits(circuit_failure_threshold=1),
+        )
+
+        failed = await outbound.request(
+            "GET",
+            "https://api.example.test/dependency",
+            request_id="request-failed-destination",
+        )
+        assert failed.status_code == 503
+
+        healthy = await outbound.request(
+            "GET",
+            "https://healthy.example.test/dependency",
+            request_id="request-healthy-destination",
+        )
+        assert healthy.status_code == 200
+
+        with pytest.raises(OutboundHTTPError) as captured:
+            await outbound.request(
+                "GET",
+                "https://api.example.test/dependency",
+                request_id="request-still-open",
+            )
+        assert captured.value.error.code is ErrorCode.UNAVAILABLE
+        assert len(backend.connects) == 2
+        await outbound.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_half_open_circuit_admits_exactly_one_concurrent_probe() -> None:
+    async def exercise() -> None:
+        closed = (("Connection", "close"),)
+        backend = BlockingProbeNetworkBackend(
+            [
+                ConnectionScript(raw_response(503, headers=closed)),
+                ConnectionScript(raw_response(200, headers=closed)),
+            ]
+        )
+        clock = CircuitClock()
+        outbound = client(
+            backend,
+            StaticResolver({"api.example.test": (PUBLIC_V4,)}),
+            limits=OutboundHTTPLimits(
+                circuit_failure_threshold=1,
+                circuit_recovery_seconds=5,
+            ),
+            circuit_clock=clock,
+        )
+
+        failed = await outbound.request(
+            "GET",
+            "https://api.example.test/dependency",
+            request_id="request-open-circuit",
+        )
+        assert failed.status_code == 503
+        clock.advance(5)
+
+        probe = asyncio.create_task(
+            outbound.request(
+                "GET",
+                "https://api.example.test/dependency",
+                request_id="request-half-open-probe",
+            )
+        )
+        await backend.probe_started.wait()
+        try:
+            with pytest.raises(OutboundHTTPError) as captured:
+                await outbound.request(
+                    "GET",
+                    "https://api.example.test/dependency",
+                    request_id="request-concurrent-probe",
+                )
+            assert captured.value.error.code is ErrorCode.UNAVAILABLE
+        finally:
+            backend.release_probe.set()
+
+        recovered = await probe
+        assert recovered.status_code == 200
+        assert len(backend.connects) == 2
+        await outbound.aclose()
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("status", [408, 425, 429, 500, 502, 503, 504])
+def test_transient_statuses_count_toward_the_destination_circuit(status: int) -> None:
+    async def exercise() -> None:
+        closed = (("Connection", "close"),)
+        backend = ScriptedNetworkBackend([ConnectionScript(raw_response(status, headers=closed))])
+        outbound = client(
+            backend,
+            StaticResolver({"api.example.test": (PUBLIC_V4,)}),
+            limits=OutboundHTTPLimits(circuit_failure_threshold=1),
+        )
+
+        response = await outbound.request(
+            "GET",
+            "https://api.example.test/dependency",
+            request_id="request-transient",
+        )
+        assert response.status_code == status
+
+        with pytest.raises(OutboundHTTPError) as captured:
+            await outbound.request(
+                "GET",
+                "https://api.example.test/dependency",
+                request_id="request-open-after-transient",
+            )
+        assert captured.value.error.code is ErrorCode.UNAVAILABLE
+        assert len(backend.connects) == 1
+        await outbound.aclose()
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("status", [200, 400, 409, 422])
+def test_non_transient_status_resets_prior_circuit_failures(status: int) -> None:
+    async def exercise() -> None:
+        closed = (("Connection", "close"),)
+        backend = ScriptedNetworkBackend(
+            [
+                ConnectionScript(raw_response(503, headers=closed)),
+                ConnectionScript(raw_response(status, headers=closed)),
+                ConnectionScript(raw_response(503, headers=closed)),
+                ConnectionScript(raw_response(200, headers=closed)),
+            ]
+        )
+        outbound = client(
+            backend,
+            StaticResolver({"api.example.test": (PUBLIC_V4,)}),
+            limits=OutboundHTTPLimits(circuit_failure_threshold=2),
+        )
+
+        observed: list[int] = []
+        for sequence in range(4):
+            response = await outbound.request(
+                "GET",
+                "https://api.example.test/dependency",
+                request_id=f"request-reset-{sequence}",
+            )
+            observed.append(response.status_code)
+
+        assert observed == [503, status, 503, 200]
+        assert len(backend.connects) == 4
+        await outbound.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_tracked_destination_state_stays_bounded_and_reuses_released_capacity() -> None:
+    async def exercise() -> None:
+        closed = (("Connection", "close"),)
+        backend = ScriptedNetworkBackend(
+            [
+                ConnectionScript(raw_response(503, headers=closed)),
+                ConnectionScript(raw_response(503, headers=closed)),
+                ConnectionScript(raw_response(200, headers=closed)),
+                ConnectionScript(raw_response(200, headers=closed)),
+            ]
+        )
+        hosts = ("one.example.test", "two.example.test", "three.example.test")
+        outbound = client(
+            backend,
+            StaticResolver(dict.fromkeys(hosts, (PUBLIC_V4,))),
+            destinations=tuple(destination(host) for host in hosts),
+            limits=OutboundHTTPLimits(
+                circuit_failure_threshold=100,
+                max_circuit_destinations=2,
+            ),
+        )
+
+        for sequence, host in enumerate(hosts[:2]):
+            response = await outbound.request(
+                "GET",
+                f"https://{host}/dependency",
+                request_id=f"request-fill-{sequence}",
+            )
+            assert response.status_code == 503
+
+        with pytest.raises(OutboundHTTPError) as captured:
+            await outbound.request(
+                "GET",
+                "https://three.example.test/dependency",
+                request_id="request-capacity-full",
+            )
+        assert captured.value.error.code is ErrorCode.UNAVAILABLE
+        assert len(backend.connects) == 2
+
+        released = await outbound.request(
+            "GET",
+            "https://one.example.test/dependency",
+            request_id="request-release-capacity",
+        )
+        admitted = await outbound.request(
+            "GET",
+            "https://three.example.test/dependency",
+            request_id="request-reuse-capacity",
+        )
+        assert released.status_code == 200
+        assert admitted.status_code == 200
+        assert len(backend.connects) == 4
+        await outbound.aclose()
+
+    asyncio.run(exercise())
+
+
 def test_explicit_audit_is_payload_free_redacted_and_failure_is_nonfatal() -> None:
     async def exercise() -> None:
         recording = RecordingAuditSink()
@@ -1149,8 +1479,26 @@ def test_request_after_close_uses_stable_unavailable_error() -> None:
         {"max_connections": 257},
         {"max_headers": 129},
         {"max_header_bytes": 65_537},
+        {"circuit_failure_threshold": 0},
+        {"circuit_failure_threshold": 101},
+        {"circuit_recovery_seconds": 0},
+        {"circuit_recovery_seconds": 301},
+        {"max_circuit_destinations": 0},
+        {"max_circuit_destinations": 257},
     ],
 )
 def test_outbound_limits_have_non_bypassable_hard_maxima(kwargs: dict[str, Any]) -> None:
     with pytest.raises(ValueError, match="outbound HTTP limit"):
         OutboundHTTPLimits(**kwargs)
+
+
+def test_circuit_limits_accept_the_reviewed_hard_maximum_boundary() -> None:
+    limits = OutboundHTTPLimits(
+        circuit_failure_threshold=100,
+        circuit_recovery_seconds=300,
+        max_circuit_destinations=256,
+    )
+
+    assert limits.circuit_failure_threshold == 100
+    assert limits.circuit_recovery_seconds == 300
+    assert limits.max_circuit_destinations == 256

@@ -29,20 +29,30 @@ def test_compatibility_stack_uses_the_built_runtime_and_real_agentgateway() -> N
     assert services["gateway"]["image"] == GATEWAY_IMAGE
     assert services["runtime"]["user"] == "10001:10001"
     assert services["gateway"]["user"] == "65532:65532"
+    assert "--reliability-spans" in cast(list[str], services["runtime"]["command"])
     for name, service in services.items():
         assert service["read_only"] is True, name
         assert service["cap_drop"] == ["ALL"], name
         assert service["security_opt"] == ["no-new-privileges:true"], name
         assert service["restart"] == "no", name
-        published = "38080" if name == "runtime" else "33000"
-        assert service["ports"] == [
+        expected_ports = [
             {
                 "host_ip": "127.0.0.1",
-                "published": published,
+                "published": "38080" if name == "runtime" else "33000",
                 "protocol": "tcp",
                 "target": 8000 if name == "runtime" else 3000,
             }
         ]
+        if name == "gateway":
+            expected_ports.append(
+                {
+                    "host_ip": "127.0.0.1",
+                    "published": "31520",
+                    "protocol": "tcp",
+                    "target": 15020,
+                }
+            )
+        assert service["ports"] == expected_ports
 
     networks = cast(dict[str, dict[str, object]], compose["networks"])
     assert networks == {"compatibility": {"internal": False}}
@@ -90,6 +100,9 @@ def test_compatibility_workflow_runs_pinned_artifact_and_devai_evidence() -> Non
     assert "--devai-python" in workflow
     assert "--junit" in workflow
     assert workflow.count("compatibility/run_inspector.py") == 2
+    assert workflow.count("compatibility/measure_reliability.py") == 2
+    assert "reliability-direct.json" in workflow
+    assert "reliability-agentgateway.json" in workflow
     assert "scan_journey_surfaces" in workflow
     assert "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in workflow
     assert "retention-days: 7" in workflow

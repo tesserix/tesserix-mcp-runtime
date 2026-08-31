@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import math
 import time
@@ -249,6 +250,25 @@ class LargeEndpoint(FakeEndpoint):
         del name, arguments
         self.contexts.append(context)
         return InvocationResult.success({"text": "private-result-" + "x" * 1_024})
+
+
+class NearEnvelopeEndpoint(FakeEndpoint):
+    async def invoke(
+        self,
+        name: str,
+        arguments: Mapping[str, JsonValue],
+        *,
+        context: CallContext,
+    ) -> InvocationResult:
+        del name, arguments
+        self.contexts.append(context)
+        chunks: list[JsonValue] = ["s" * 62_500 for _ in range(8)]
+        result: dict[str, JsonValue] = {
+            "request_bytes": 60_000,
+            "response_bytes": 500_000,
+            "chunks": chunks,
+        }
+        return InvocationResult.success(result)
 
 
 class UnserializableEndpoint(FakeEndpoint):
@@ -1254,6 +1274,156 @@ def test_official_client_initializes_lists_pings_and_calls_without_a_socket() ->
 
         await transport.drain(deadline=100.0)
         await transport.stop()
+
+    asyncio.run(exercise())
+
+
+def test_stateless_asgi_calls_alternate_replicas_with_one_external_idempotent_effect() -> None:
+    class ExternalIdempotencyAuthority:
+        def __init__(self) -> None:
+            self.records: dict[tuple[str, str, str], tuple[str, InvocationResult]] = {}
+            self.effects = 0
+
+        def apply(
+            self,
+            arguments: Mapping[str, JsonValue],
+            *,
+            context: CallContext,
+        ) -> InvocationResult:
+            assert context.idempotency_key is not None
+            key = (
+                context.tenant,
+                "capability:orders.create@1",
+                context.idempotency_key,
+            )
+            request_digest = hashlib.sha256(
+                json.dumps(arguments, separators=(",", ":"), sort_keys=True).encode("utf-8")
+            ).hexdigest()
+            existing = self.records.get(key)
+            if existing is not None:
+                assert existing[0] == request_digest
+                return existing[1]
+            self.effects += 1
+            result = InvocationResult.success(
+                {
+                    "effect_number": self.effects,
+                    "workflow_id": "workflow-order-shared",
+                }
+            )
+            self.records[key] = (request_digest, result)
+            return result
+
+    class StatelessReplicaEndpoint(FakeEndpoint):
+        def __init__(self, authority: ExternalIdempotencyAuthority) -> None:
+            super().__init__(
+                (
+                    ToolManifest(
+                        metadata=ToolMetadata(
+                            name="orders.create",
+                            title="Create order",
+                            description="Create one idempotent synthetic order.",
+                            effect=ToolEffect.WRITE,
+                            approval=ApprovalRequirement.NOT_REQUIRED,
+                            idempotency=IdempotencyRequirement.REQUIRED,
+                            required_scopes=("examples:read",),
+                        ),
+                        normalized_name="orders.create",
+                        input_schema={
+                            "type": "object",
+                            "properties": {"customer": {"type": "string", "maxLength": 64}},
+                            "required": ["customer"],
+                            "additionalProperties": False,
+                        },
+                        output_schema={
+                            "type": "object",
+                            "properties": {
+                                "effect_number": {"type": "integer"},
+                                "workflow_id": {"type": "string", "maxLength": 64},
+                            },
+                            "required": ["effect_number", "workflow_id"],
+                            "additionalProperties": False,
+                        },
+                    ),
+                )
+            )
+            self._authority = authority
+
+        async def invoke(
+            self,
+            name: str,
+            arguments: Mapping[str, JsonValue],
+            *,
+            context: CallContext,
+        ) -> InvocationResult:
+            assert name == "orders.create"
+            self.contexts.append(context)
+            return self._authority.apply(arguments, context=context)
+
+    async def exercise() -> None:
+        authority = ExternalIdempotencyAuthority()
+        listeners = (LifespanListener(), LifespanListener())
+        endpoints = (
+            StatelessReplicaEndpoint(authority),
+            StatelessReplicaEndpoint(authority),
+        )
+        providers = (StaticContextProvider(), StaticContextProvider())
+        transports = tuple(
+            StreamableHTTPTransport(
+                config=StreamableHTTPConfig(stateless=True),
+                limits=StreamableHTTPLimits(),
+                context_provider=provider,
+                telemetry=RecordingProtocolTelemetry(),
+                listener=listener,
+            )
+            for listener, provider in zip(listeners, providers, strict=True)
+        )
+        for transport, endpoint in zip(transports, endpoints, strict=True):
+            await transport.start(endpoint)
+        assert all(listener.app is not None for listener in listeners)
+
+        async def invoke(app: Any) -> object:
+            async with (
+                httpx.AsyncClient(
+                    transport=httpx.ASGITransport(app=app),
+                    base_url="http://127.0.0.1:8000",
+                ) as http_client,
+                streamable_http_client(
+                    "http://127.0.0.1:8000/mcp",
+                    http_client=http_client,
+                    terminate_on_close=False,
+                ) as streams,
+                ClientSession(streams[0], streams[1]) as session,
+            ):
+                await session.initialize()
+                result = await session.call_tool(
+                    "orders.create",
+                    {"customer": "customer-shared"},
+                )
+            assert result.is_error is False
+            return result.structured_content
+
+        try:
+            results = [
+                await invoke(listeners[delivery % len(listeners)].app) for delivery in range(4)
+            ]
+        finally:
+            for transport in transports:
+                await transport.stop()
+
+        assert results == [{"effect_number": 1, "workflow_id": "workflow-order-shared"}] * 4
+        assert authority.effects == 1
+        assert len(authority.records) == 1
+        assert [len(endpoint.contexts) for endpoint in endpoints] == [2, 2]
+        assert all(
+            context.idempotency_key == "idempotency-example"
+            for endpoint in endpoints
+            for context in endpoint.contexts
+        )
+        assert all(
+            not request.header_values("mcp-session-id")
+            for provider in providers
+            for request in provider.requests
+        )
 
     asyncio.run(exercise())
 
@@ -2512,6 +2682,42 @@ def test_request_and_response_limits_fail_without_returning_tool_output() -> Non
             assert b"private-result" not in response_body
             assert jsonrpc_code(response_body) == INTERNAL_ERROR
             await response_transport.stop()
+
+    asyncio.run(exercise())
+
+
+def test_near_limit_structured_result_is_not_duplicated_into_text_content() -> None:
+    async def exercise() -> None:
+        listener = LifespanListener()
+        transport = StreamableHTTPTransport(
+            config=StreamableHTTPConfig(),
+            limits=StreamableHTTPLimits(),
+            context_provider=StaticContextProvider(),
+            telemetry=RecordingProtocolTelemetry(),
+            listener=listener,
+        )
+        await transport.start(NearEnvelopeEndpoint((manifest("examples.echo"),)))
+        assert listener.app is not None
+
+        status, _, body = await call_asgi(
+            listener.app,
+            headers=modern_headers("tools/call", name="examples.echo"),
+            body=modern_request(
+                "tools/call",
+                params={"name": "examples.echo", "arguments": {"text": "hello"}},
+            ),
+        )
+
+        assert status == 200
+        assert len(body) <= 524_288
+        document = json.loads(body)
+        result = document["result"]
+        assert result["content"] == []
+        structured = result["structuredContent"]
+        assert structured["request_bytes"] == 60_000
+        assert structured["response_bytes"] == 500_000
+        assert sum(len(chunk) for chunk in structured["chunks"]) == 500_000
+        await transport.stop()
 
     asyncio.run(exercise())
 

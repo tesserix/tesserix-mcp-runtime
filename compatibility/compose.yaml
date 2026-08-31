@@ -28,6 +28,7 @@ services:
       - runtime:8000
       - --allowed-origin
       - http://gateway:3000
+      - --reliability-spans
     healthcheck:
       test:
         - CMD
@@ -62,6 +63,10 @@ services:
         published: "33000"
         protocol: tcp
         target: 3000
+      - host_ip: 127.0.0.1
+        published: "31520"
+        protocol: tcp
+        target: 15020
     volumes:
       - ./agentgateway.yaml:/etc/agentgateway/config.yaml:ro
 

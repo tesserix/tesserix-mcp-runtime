@@ -170,7 +170,7 @@ def test_checked_in_public_api_snapshot_matches_exports() -> None:
 
 
 def test_testkit_public_api_snapshot_matches_exports() -> None:
-    assert len(tesserix_mcp_testkit.__all__) == 104
+    assert len(tesserix_mcp_testkit.__all__) == 162
     for name in tesserix_mcp_testkit.__all__:
         assert getattr(tesserix_mcp_testkit, name) is not None
 
@@ -180,7 +180,7 @@ def test_testkit_public_api_snapshot_matches_exports() -> None:
     )
 
     assert completed.returncode == 0
-    assert completed.stdout == "Public API snapshot matches (104 exports).\n"
+    assert completed.stdout == "Public API snapshot matches (162 exports).\n"
     assert completed.stderr == ""
 
 

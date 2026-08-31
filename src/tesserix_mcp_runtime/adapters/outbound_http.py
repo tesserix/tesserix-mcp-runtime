@@ -5,11 +5,12 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import ipaddress
+import math
 import re
 import socket
 import ssl
 import time
-from collections.abc import AsyncIterable, AsyncIterator, Mapping
+from collections.abc import AsyncIterable, AsyncIterator, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol, cast, runtime_checkable
 from urllib.parse import parse_qsl, unquote, urlsplit
@@ -25,6 +26,7 @@ from tesserix_mcp_runtime.egress import (
 )
 from tesserix_mcp_runtime.errors import RuntimeFailure
 from tesserix_mcp_runtime.observability import (
+    RuntimeLimit,
     RuntimeObservability,
     RuntimeOperation,
     RuntimeOutcome,
@@ -79,9 +81,16 @@ _MAX_TIMEOUT = 30.0
 _MAX_CONNECTIONS = 256
 _MAX_HEADERS = 128
 _MAX_HEADER_BYTES = 65_536
+_MAX_CIRCUIT_FAILURE_THRESHOLD = 100
+_MAX_CIRCUIT_RECOVERY_SECONDS = 300.0
+_MAX_CIRCUIT_DESTINATIONS = 256
+_CIRCUIT_FAILURE_STATUSES = frozenset({408, 425, 429, 500, 502, 503, 504})
 
 
-def _is_runtime_instance(value: object, expected: type[Any]) -> bool:
+def _is_runtime_instance(
+    value: object,
+    expected: type[Any] | tuple[type[Any], ...],
+) -> bool:
     return isinstance(value, expected)
 
 
@@ -94,6 +103,9 @@ class OutboundHTTPLimits:
     max_connections: int = 32
     max_headers: int = 64
     max_header_bytes: int = 32_768
+    circuit_failure_threshold: int = 5
+    circuit_recovery_seconds: float = 5.0
+    max_circuit_destinations: int = 64
 
     def __post_init__(self) -> None:
         positive_integers = (
@@ -102,6 +114,8 @@ class OutboundHTTPLimits:
             (self.max_connections, _MAX_CONNECTIONS),
             (self.max_headers, _MAX_HEADERS),
             (self.max_header_bytes, _MAX_HEADER_BYTES),
+            (self.circuit_failure_threshold, _MAX_CIRCUIT_FAILURE_THRESHOLD),
+            (self.max_circuit_destinations, _MAX_CIRCUIT_DESTINATIONS),
         )
         if any(
             _is_runtime_instance(value, bool)
@@ -120,8 +134,18 @@ class OutboundHTTPLimits:
                 or _is_runtime_instance(self.request_timeout, float)
             )
             or not 0 < self.request_timeout <= _MAX_TIMEOUT
+            or _is_runtime_instance(self.circuit_recovery_seconds, bool)
+            or not _is_runtime_instance(self.circuit_recovery_seconds, (int, float))
+            or not 0 < self.circuit_recovery_seconds <= _MAX_CIRCUIT_RECOVERY_SECONDS
         ):
             raise ValueError("outbound HTTP limit must be within its hard maximum")
+
+
+@dataclass(slots=True)
+class _CircuitState:
+    failures: int = 0
+    opened_at: float | None = None
+    probe_in_flight: bool = False
 
 
 _DEFAULT_OUTBOUND_LIMITS = OutboundHTTPLimits()
@@ -465,6 +489,7 @@ class OutboundHTTPClient:
         audit_sink: OutboundHTTPAuditSink | None = None,
         ssl_context: ssl.SSLContext | None = None,
         observability: RuntimeObservability | None = None,
+        circuit_clock: Callable[[], float] | None = None,
     ) -> None:
         resolver = resolver or SystemHostResolver()
         network_backend = network_backend or cast(
@@ -485,6 +510,7 @@ class OutboundHTTPClient:
                 observability is not None
                 and not _is_runtime_instance(observability, RuntimeObservability)
             )
+            or (circuit_clock is not None and not callable(circuit_clock))
             or (
                 ssl_context is not None
                 and (
@@ -520,11 +546,63 @@ class OutboundHTTPClient:
         )
         self._audit_failures = 0
         self._closed = False
+        self._circuit_clock = circuit_clock or time.monotonic
+        self._circuits: dict[EgressDestination, _CircuitState] = {}
         self._transport = _CoreTransport(pool)
 
     @property
     def audit_failures(self) -> int:
         return self._audit_failures
+
+    def _circuit_now(self) -> float:
+        value = self._circuit_clock()
+        if (
+            _is_runtime_instance(value, bool)
+            or not _is_runtime_instance(value, (int, float))
+            or not math.isfinite(value)
+            or value < 0
+        ):
+            raise ValueError("circuit clock must be finite and monotonic")
+        return float(value)
+
+    def _admit_circuit(
+        self,
+        destination: EgressDestination,
+        *,
+        request_id: str,
+    ) -> None:
+        state = self._circuits.get(destination)
+        if state is None:
+            if len(self._circuits) >= self._limits.max_circuit_destinations:
+                self._observability.record_limit(tool_name=None, limit=RuntimeLimit.CIRCUIT)
+                raise OutboundHTTPError(ErrorCode.UNAVAILABLE, request_id=request_id)
+            state = _CircuitState()
+            self._circuits[destination] = state
+        if state.opened_at is None:
+            return
+        try:
+            recovered = self._circuit_now() - state.opened_at
+        except ValueError:
+            recovered = -1
+        if recovered < self._limits.circuit_recovery_seconds or state.probe_in_flight:
+            self._observability.record_limit(tool_name=None, limit=RuntimeLimit.CIRCUIT)
+            raise OutboundHTTPError(ErrorCode.UNAVAILABLE, request_id=request_id)
+        state.probe_in_flight = True
+
+    def _record_circuit_failure(self, destination: EgressDestination) -> None:
+        state = self._circuits.get(destination)
+        if state is None:
+            return
+        state.probe_in_flight = False
+        state.failures += 1
+        if state.failures >= self._limits.circuit_failure_threshold:
+            try:
+                state.opened_at = self._circuit_now()
+            except ValueError:
+                state.opened_at = math.inf
+
+    def _record_circuit_success(self, destination: EgressDestination) -> None:
+        self._circuits.pop(destination, None)
 
     async def request(
         self,
@@ -552,6 +630,7 @@ class OutboundHTTPClient:
                 raise ValueError("invalid content")
             if self._closed:
                 raise OutboundHTTPError(ErrorCode.UNAVAILABLE, request_id=safe_request_id)
+            self._admit_circuit(audit_destination, request_id=safe_request_id)
         except OutboundHTTPError as caught_error:
             public_error = OutboundHTTPError(
                 caught_error.error.code,
@@ -613,6 +692,14 @@ class OutboundHTTPClient:
                     protected_secrets=protected_secrets,
                 )
         except OutboundHTTPError as caught_error:
+            if caught_error.error.code in {
+                ErrorCode.OVERLOADED,
+                ErrorCode.TIMEOUT,
+                ErrorCode.UNAVAILABLE,
+            }:
+                self._record_circuit_failure(audit_destination)
+            else:
+                self._record_circuit_success(audit_destination)
             public_error = OutboundHTTPError(
                 caught_error.error.code,
                 request_id=safe_request_id,
@@ -626,6 +713,7 @@ class OutboundHTTPClient:
             )
             raise public_error from None
         except EgressPolicyViolation:
+            self._record_circuit_success(audit_destination)
             denied_error = OutboundHTTPError(ErrorCode.FORBIDDEN, request_id=safe_request_id)
             self._emit_audit(
                 request_id=safe_request_id,
@@ -636,6 +724,7 @@ class OutboundHTTPClient:
             )
             raise denied_error from None
         except (TimeoutError, httpcore.TimeoutException, httpx.TimeoutException):
+            self._record_circuit_failure(audit_destination)
             timeout_error = OutboundHTTPError(ErrorCode.TIMEOUT, request_id=safe_request_id)
             self._emit_audit(
                 request_id=safe_request_id,
@@ -646,6 +735,7 @@ class OutboundHTTPClient:
             )
             raise timeout_error from None
         except RedactionError:
+            self._record_circuit_success(audit_destination)
             redaction_error = OutboundHTTPError(
                 ErrorCode.INTERNAL_FAILURE,
                 request_id=safe_request_id,
@@ -659,6 +749,7 @@ class OutboundHTTPClient:
             )
             raise redaction_error from None
         except Exception:
+            self._record_circuit_failure(audit_destination)
             unavailable_error = OutboundHTTPError(
                 ErrorCode.UNAVAILABLE,
                 request_id=safe_request_id,
@@ -672,6 +763,10 @@ class OutboundHTTPClient:
             )
             raise unavailable_error from None
 
+        if response.status_code in _CIRCUIT_FAILURE_STATUSES:
+            self._record_circuit_failure(audit_destination)
+        else:
+            self._record_circuit_success(audit_destination)
         self._emit_audit(
             request_id=safe_request_id,
             method=audit_method,

@@ -180,6 +180,14 @@ jobs:
           uv run --frozen python compatibility/run_inspector.py \
             --endpoint "$gateway_endpoint" \
             --report artifacts/compatibility/inspector-agentgateway.json || status=1
+          uv run --frozen python compatibility/measure_reliability.py \
+            --endpoint "$runtime_endpoint" \
+            --lane direct_http \
+            --report artifacts/compatibility/reliability-direct.json || status=1
+          uv run --frozen python compatibility/measure_reliability.py \
+            --endpoint "$gateway_endpoint" \
+            --lane agentgateway \
+            --report artifacts/compatibility/reliability-agentgateway.json || status=1
           collect_compose_evidence
           trap - EXIT
           exit "$status"

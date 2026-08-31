@@ -4,14 +4,22 @@
 > contract, not product desired state. Adopt it through a reviewed change in
 > `tesserix-k8s`; never apply these placeholder resources to a shared cluster.
 
-The package contains five Kubernetes 1.31 resources:
+The package contains six Kubernetes 1.31 resources plus one machine-readable
+capacity plan:
 
 - a two-replica, zero-unavailable `Deployment` with startup, readiness, and
   liveness probes plus graceful drain;
-- a private `ClusterIP` `Service` for AgentGateway;
+- a private `ClusterIP` `Service` for AgentGateway with session affinity
+  explicitly disabled;
 - a keyless workload identity `ServiceAccount`;
-- a `PodDisruptionBudget` retaining one replica; and
-- a default-deny `NetworkPolicy` with bounded ingress and egress.
+- a `PodDisruptionBudget` retaining one replica;
+- a default-deny `NetworkPolicy` with bounded ingress and egress; and
+- a two-to-ten-replica `HorizontalPodAutoscaler` driven by per-pod saturation.
+
+`capacity-plan.json` binds the 128/256 MiB resources, two-replica floor,
+ten-replica ceiling, 45-second termination grace, and 0.5 saturation target to
+the checked-in reliability observations. It is evidence input, not a
+Kubernetes resource.
 
 ## Why adoption fails closed
 
@@ -59,7 +67,7 @@ Rendering is read-only and does not contact a cluster:
 
     kustomize build deploy/kubernetes/reference
 
-The CI workflow validates all five JSON resources against strict Kubernetes
+The CI workflow validates all six Kubernetes JSON resources against strict Kubernetes
 1.31 schemas. Product adoption must validate the fully rendered
 `tesserix-k8s` revision as well; validation of these placeholders does not prove
 the adopted identities, routes, or NetworkPolicy peers are correct.

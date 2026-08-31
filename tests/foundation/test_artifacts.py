@@ -85,3 +85,6 @@ def test_wheel_and_sdist_install_and_import_without_network(
         assert distribution["sdist"]["typed"] is True
         assert distribution["wheel"]["dependencies_installed"] is False
         assert distribution["sdist"]["dependencies_installed"] is False
+    testkit = report["tesserix-mcp-testkit"]
+    assert testkit["wheel"]["required_module_present"] is True
+    assert testkit["sdist"]["required_module_present"] is True

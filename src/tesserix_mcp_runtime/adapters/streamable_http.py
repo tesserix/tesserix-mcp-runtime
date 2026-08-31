@@ -1790,17 +1790,21 @@ class StreamableHTTPTransport:
                 is_error=True,
             )
         value = result.value
+        encoded_value = json.dumps(
+            value,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        encoded_bytes = len(encoded_value.encode("utf-8"))
+        text_bytes = len(json.dumps(encoded_value, ensure_ascii=False).encode("utf-8"))
+        content: list[types.ContentBlock] = (
+            [types.TextContent(text=encoded_value)]
+            if encoded_bytes + text_bytes + 512 <= self._limits.max_response_body_bytes
+            else []
+        )
         return types.CallToolResult(
-            content=[
-                types.TextContent(
-                    text=json.dumps(
-                        value,
-                        ensure_ascii=False,
-                        separators=(",", ":"),
-                        sort_keys=True,
-                    )
-                )
-            ],
+            content=content,
             structured_content=value,
             is_error=False,
         )

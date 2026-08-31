@@ -233,7 +233,7 @@ def main() -> int:
     expected_names = (
         {"cancellation_probe", "echo"}
         if route == "/gateway/runtime/mcp"
-        else {"always_fails", "cancellation_probe", "echo"}
+        else {"always_fails", "cancellation_probe", "echo", "reliability_probe"}
     )
     if names != expected_names:
         raise RuntimeError("Inspector returned an unexpected tool catalog")

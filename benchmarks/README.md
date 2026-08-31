@@ -77,6 +77,29 @@ on Python 3.14 arm64 macOS. This is instrumentation regression evidence, not a
 production throughput or end-to-end network SLO claim; issue #29 still owns
 load and soak proof.
 
+## Offline reliability harness
+
+`measure_reliability.py` exercises the reusable load and soak runners without
+opening a network socket:
+
+    uv run --frozen python benchmarks/measure_reliability.py \
+      --requests 200 --cycles 3
+
+It measures sustained, burst, and 64 KiB/512 KiB boundary plans through a
+lane-bound in-process target and samples all six bounded resources before and
+after every soak cycle. Deterministic targets execute alternating-replica
+duplicate delivery, singular retry ownership, all six dependency failures,
+and all five rollout drains; evidence is derived from counter deltas rather
+than constructed passing rows. Output contains aggregate counts, timings,
+digests, and synthetic resource values; it contains no request content,
+tenant identity, credential, conversation reference, or exception text.
+
+`reliability-observations.json` is the checked local Python 3.14 observation.
+The report marks direct HTTP and AgentGateway as
+`deferred_to_container_lane`: this fast quality gate proves the offline
+harness and contracts, while the pinned container workflow owns real direct
+and AgentGateway throughput evidence. It is not a production SLO claim.
+
 ## Conformance PR-lane measurement
 
 `measure_conformance.py` runs the core, official SDK, and external published
