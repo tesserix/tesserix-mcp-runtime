@@ -12,7 +12,11 @@ import pytest
 import yaml
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from integration.journey.discovery import journey_read_policy
-from integration.journey.identity import IdentityAuthority, IdentityService
+from integration.journey.identity import (
+    ROUTE_SCOPE_CLAIM,
+    IdentityAuthority,
+    IdentityService,
+)
 from integration.journey.publication import AgenticRegistryClient, render_authoring
 from integration.journey.registry import (
     REGISTRY_ORIGIN,
@@ -292,6 +296,12 @@ async def test_publisher_dry_runs_replays_and_verifies_the_exact_signed_artifact
         if request.url.path == "/v0/export/agentgateway":
             assert request.url.params["namespace"] == prepared.namespace
             assert request.url.params["legacyFlatPath"] == "false"
+            require_server_scope = request.url.params["requireServerScope"]
+            assert require_server_scope in {"false", "true"}
+            if require_server_scope == "true":
+                assert request.url.params["scopeClaim"] == ROUTE_SCOPE_CLAIM
+            else:
+                assert "scopeClaim" not in request.url.params
             return httpx.Response(
                 200,
                 content=export_body,
@@ -368,6 +378,12 @@ async def test_publisher_dry_runs_replays_and_verifies_the_exact_signed_artifact
         exported = await client.export_agentgateway(
             namespace=prepared.namespace,
             request_id="request-gateway-export",
+            require_server_scope=True,
+        )
+        unscoped_export = await client.export_agentgateway(
+            namespace=prepared.namespace,
+            request_id="request-gateway-export-unscoped",
+            require_server_scope=False,
         )
 
     assert dry_run.status is PublicationStatus.DRY_RUN
@@ -377,6 +393,8 @@ async def test_publisher_dry_runs_replays_and_verifies_the_exact_signed_artifact
     assert revisions == 1
     assert exported.resource_count == 1
     assert exported.digest == export_digest
+    assert unscoped_export.resource_count == 1
+    assert unscoped_export.digest == export_digest
     assert sum(request.method == "POST" for request in seen) == 3
 
 

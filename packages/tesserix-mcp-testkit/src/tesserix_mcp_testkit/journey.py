@@ -52,8 +52,9 @@ _TIMESTAMP = re.compile(
 )
 _BEARER = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{8,}")
 _SECRET_ASSIGNMENT = re.compile(
-    r"(?i)\b(?:api[_-]?key|access[_-]?token|password|authorization|credential|secret)"
-    r"\s*[:=]\s*[^\s,;\"}]{4,}"
+    r"(?i)\b(?:(?:api[_-]?key|access[_-]?token|password|credential|secret)"
+    r"\s*[:=]\s*[^\s,;\"}\[{]{4,}|authorization\s*[:=]\s*"
+    r"(?!(?:action|rules)\s*:)[^\s,;\"}\[{]{4,})"
 )
 _MAX_EVIDENCE_BYTES = 1024 * 1024
 _MAX_SURFACE_BYTES = 1024 * 1024

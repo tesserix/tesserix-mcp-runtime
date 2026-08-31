@@ -14,6 +14,7 @@ REUSABLE_GATES = (
     ROOT / ".github" / "workflows" / "compatibility.yml",
     ROOT / ".github" / "workflows" / "containers.yml",
     ROOT / ".github" / "workflows" / "quality.yml",
+    ROOT / ".github" / "workflows" / "release-journey.yml",
     ROOT / ".github" / "workflows" / "security.yml",
 )
 PINNED_ACTIONS = {
@@ -48,6 +49,7 @@ def test_release_is_tag_only_and_privilege_is_scoped_to_protected_jobs() -> None
     }
     jobs = cast(dict[str, dict[str, object]], workflow["jobs"])
     assert set(jobs) == {
+        "adversarial",
         "compatibility",
         "containers",
         "finalize",
@@ -74,8 +76,23 @@ def test_release_is_tag_only_and_privilege_is_scoped_to_protected_jobs() -> None
         "packages": "read",
     }
     assert jobs["public_smoke"]["permissions"] == jobs["smoke"]["permissions"]
-    for name in ("guard", "quality", "security", "compatibility", "containers"):
+    for name in (
+        "adversarial",
+        "guard",
+        "quality",
+        "security",
+        "compatibility",
+        "containers",
+    ):
         assert jobs[name].get("environment") is None
+    assert jobs["publish"]["needs"] == [
+        "guard",
+        "quality",
+        "security",
+        "compatibility",
+        "containers",
+        "adversarial",
+    ]
 
 
 def test_release_reuses_every_gate_and_pins_every_external_action() -> None:

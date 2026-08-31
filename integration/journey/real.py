@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import re
 import time
 from collections.abc import AsyncIterator, Awaitable, Mapping
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -14,9 +15,11 @@ import httpx
 import httpx2
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
+from mcp.shared.exceptions import MCPError
 from mcp.types import CallToolResult, PaginatedRequestParams
 from tesserix_mcp_publisher import (
     PreparedPublication,
+    PublicationError,
     PublicationEvidence,
     PublicationStatus,
     PublisherWorkflow,
@@ -27,12 +30,17 @@ from tesserix_mcp_testkit import (
     JourneyAssertion,
     JourneyComponent,
     JourneyEvidence,
+    SecurityReport,
+    SecurityResult,
+    SecuritySubject,
+    SecuritySurface,
     make_journey_assertion,
 )
 
 from integration.journey.backing import JOURNEY_CANARY
 from integration.journey.discovery import journey_read_policy
 from integration.journey.gateway import render_standalone_gateway_config
+from integration.journey.identity import AdversarialTokenCase
 from integration.journey.publication import AgenticRegistryClient, render_authoring
 from integration.journey.reference_server import JOURNEY_APPROVAL_ID
 from integration.journey.registry import (
@@ -49,6 +57,11 @@ from integration.journey.runner import (
     decode_success,
     has_backing_correlation,
 )
+from integration.journey.security import (
+    black_box_security_results,
+    collect_host_security_results,
+    surface_security_results,
+)
 from integration.journey.stack import ComposeStack
 from tesserix_mcp_runtime import (
     AuthenticatedIdentity,
@@ -59,10 +72,14 @@ from tesserix_mcp_runtime import (
     RegistryResolver,
     RegistrySearchQuery,
     RegistrySearchStub,
+    SecretValue,
 )
 from tesserix_mcp_runtime.adapters.registry_http import RegistryHTTPDiscovery
 
 REGISTRY_COMMIT = "6921474591b6c59e89025370c310c7f85859246f"
+_ROUTE_SCOPE = "mcp:tenant-a:io-github-tesserix-journey"
+_TOOL_SCOPES = ("journey:approve", "journey:read", "journey:write")
+_ROUTE_AND_TOOL_SCOPES = (*_TOOL_SCOPES, _ROUTE_SCOPE)
 GATEWAY_IMAGE = (
     "cr.agentgateway.dev/agentgateway:v1.4.1@"
     "sha256:efd79355b89094a8225a9db465d9a01dc656b377f0bab458761b935a13231d29"
@@ -71,6 +88,7 @@ GATEWAY_DIGEST = "sha256:efd79355b89094a8225a9db465d9a01dc656b377f0bab458761b935
 TRACE_ID = "1" * 32
 TRACEPARENT = f"00-{TRACE_ID}-{'2' * 16}-01"
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
+_REVISION = re.compile(r"[0-9a-f]{40}\Z")
 _RUN_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z")
 _TIMESTAMP = re.compile(
     r"(?:19|20)[0-9]{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])"
@@ -93,6 +111,8 @@ _MAX_HTTP_DOCUMENT_BYTES = 1024 * 1024
 class RealJourneyConfig:
     output_dir: Path
     runtime_artifact_digest: str
+    package_digest: str
+    source_revision: str
     run_id: str
     created_at: str
 
@@ -103,6 +123,10 @@ class RealJourneyConfig:
             or not self.output_dir.is_dir()
             or not isinstance(self.runtime_artifact_digest, str)
             or _DIGEST.fullmatch(self.runtime_artifact_digest) is None
+            or not isinstance(self.package_digest, str)
+            or _DIGEST.fullmatch(self.package_digest) is None
+            or not isinstance(self.source_revision, str)
+            or _REVISION.fullmatch(self.source_revision) is None
             or not isinstance(self.run_id, str)
             or _RUN_ID.fullmatch(self.run_id) is None
             or not isinstance(self.created_at, str)
@@ -222,6 +246,7 @@ async def _mcp_session(
     timeout_ms: int,
     idempotency_key: str | None = None,
     approval_id: str | None = None,
+    additional_headers: Mapping[str, str] | None = None,
 ) -> AsyncIterator[ClientSession]:
     headers = authority.headers(
         request_id=request_id,
@@ -230,6 +255,16 @@ async def _mcp_session(
         idempotency_key=idempotency_key,
         approval_id=approval_id,
     )
+    if additional_headers is not None:
+        if not isinstance(additional_headers, Mapping) or any(
+            not isinstance(name, str)
+            or not isinstance(value, str)
+            or not name
+            or name.casefold() in headers
+            for name, value in additional_headers.items()
+        ):
+            raise ValueError("additional MCP headers must be distinct bounded text")
+        headers.update(additional_headers)
     timeout = max(5.0, timeout_ms / 1_000 + 2.0)
     async with (
         httpx2.AsyncClient(headers=headers, follow_redirects=False, timeout=timeout) as http_client,
@@ -248,12 +283,14 @@ async def _probe(
     authority: MCPAuthority,
     *,
     request_id: str,
+    additional_headers: Mapping[str, str] | None = None,
 ) -> tuple[str, frozenset[str]]:
     async with _mcp_session(
         endpoint,
         authority,
         request_id=request_id,
         timeout_ms=5_000,
+        additional_headers=additional_headers,
     ) as session:
         initialized = await session.initialize()
         names: set[str] = set()
@@ -310,6 +347,7 @@ async def _invoke(
     timeout_ms: int = 2_000,
     idempotency_key: str | None = None,
     approval_id: str | None = None,
+    additional_headers: Mapping[str, str] | None = None,
 ) -> CallToolResult:
     async with _mcp_session(
         endpoint,
@@ -318,6 +356,7 @@ async def _invoke(
         timeout_ms=timeout_ms,
         idempotency_key=idempotency_key,
         approval_id=approval_id,
+        additional_headers=additional_headers,
     ) as session:
         await session.initialize()
         result = await session.call_tool(tool_name, arguments)
@@ -353,14 +392,79 @@ async def _invoke_twice(
 async def _is_rejected(operation: Awaitable[object]) -> bool:
     try:
         await operation
-    except Exception:
-        return True
+    except Exception as error:
+        if _is_expected_rejection(error, allow_publication=True):
+            return True
+        raise
     return False
+
+
+async def _call_is_rejected(operation: Awaitable[CallToolResult]) -> bool:
+    try:
+        result = await operation
+    except Exception as error:
+        if _is_expected_rejection(error, allow_publication=False):
+            return True
+        raise
+    try:
+        decode_failure(result)
+    except JourneyRunError:
+        return False
+    return True
+
+
+def _is_expected_rejection(error: BaseException, *, allow_publication: bool) -> bool:
+    if isinstance(error, BaseExceptionGroup):
+        return bool(error.exceptions) and all(
+            _is_expected_rejection(item, allow_publication=allow_publication)
+            for item in error.exceptions
+        )
+    if isinstance(error, MCPError | httpx2.HTTPError | TimeoutError):
+        return True
+    return allow_publication and isinstance(error, PublicationError)
 
 
 async def _backing_document(origin: str) -> dict[str, object]:
     response = await _wait_status(origin, "/control/observations", frozenset({200}))
     return dict(decode_json_object(response.content, maximum=_MAX_HTTP_DOCUMENT_BYTES))
+
+
+def _backing_observation_count(document: Mapping[str, object]) -> int:
+    observations = document.get("observations")
+    if not isinstance(observations, list) or len(observations) > 10_000:
+        raise JourneyRunError("backing_observations_invalid")
+    return len(observations)
+
+
+async def _adversarial_token(
+    client: httpx.AsyncClient,
+    *,
+    case: AdversarialTokenCase,
+    run_id: str,
+) -> SecretValue:
+    response = await client.post(
+        "/adversarial-token",
+        json={
+            "case": case.value,
+            "run_id": run_id,
+            "scopes": list(_ROUTE_AND_TOOL_SCOPES),
+            "subject": "subject-a",
+            "tenant": "tenant-a",
+        },
+    )
+    if response.status_code != 200 or len(response.content) > 20_000:
+        raise JourneyRunError("adversarial_identity_unavailable")
+    document = decode_json_object(response.content, maximum=20_000)
+    token = document.get("access_token")
+    if (
+        set(document) != {"access_token", "case", "token_type"}
+        or document.get("case") != case.value
+        or document.get("token_type") != "Bearer"
+        or not isinstance(token, str)
+        or not 1 <= len(token) <= 16_384
+    ):
+        raise JourneyRunError("adversarial_identity_invalid")
+    return SecretValue(token)
 
 
 async def _set_backing_availability(origin: str, available: bool) -> None:
@@ -371,6 +475,16 @@ async def _set_backing_availability(origin: str, available: bool) -> None:
     document = decode_json_object(response.content, maximum=4_096)
     if document != {"available": available}:
         raise JourneyRunError("backing_control_failed")
+
+
+async def _set_identity_availability(origin: str, available: bool) -> None:
+    async with httpx.AsyncClient(follow_redirects=False, timeout=5.0) as client:
+        response = await client.put(origin + "/control/availability", json={"available": available})
+    if response.status_code != 200 or len(response.content) > 4_096:
+        raise JourneyRunError("identity_control_failed")
+    document = decode_json_object(response.content, maximum=4_096)
+    if document != {"available": available}:
+        raise JourneyRunError("identity_control_failed")
 
 
 async def _wait_in_flight(origin: str, operation: asyncio.Task[CallToolResult]) -> bytes:
@@ -430,6 +544,7 @@ async def run_real_journey(
     if not isinstance(config, RealJourneyConfig) or not isinstance(stack, ComposeStack):
         raise TypeError("real journey requires validated configuration and stack")
     assertions: list[JourneyAssertion] = []
+    security_results: list[SecurityResult] = []
     surfaces: dict[str, bytes] = {}
     results: dict[str, JsonValue] = {}
     stack.validate()
@@ -559,6 +674,37 @@ async def run_real_journey(
             known_good=known_good,
         )
 
+        published = await registry.fetch(
+            prepared,
+            request_id="request-security-published-artifact",
+        )
+        forged = replace(published, digest="sha256:" + "f" * 64)
+        unsigned = replace(
+            published,
+            signature=base64.b64encode(b"\x00" * 63).decode("ascii"),
+        )
+        for case_id, artifact_candidate, request_id in (
+            (
+                "control_plane.forged_metadata",
+                forged,
+                "request-security-forged-metadata",
+            ),
+            (
+                "control_plane.unsigned_artifact",
+                unsigned,
+                "request-security-unsigned-artifact",
+            ),
+        ):
+            if not await _is_rejected(registry.verify(artifact_candidate, request_id=request_id)):
+                raise JourneyRunError("control_plane_artifact_accepted")
+            security_results.extend(
+                black_box_security_results(
+                    (case_id,),
+                    request_id=request_id,
+                    observation={"activation": "blocked", "verification": "rejected"},
+                )
+            )
+
         discovery = RegistryHTTPDiscovery(
             origin=REGISTRY_ORIGIN,
             transport=transport,
@@ -630,10 +776,43 @@ async def run_real_journey(
             request_id="request-discovery-other",
             known_good=known_good,
         )
+        security_results.extend(
+            black_box_security_results(
+                (
+                    "tenant.cache_non_disclosure",
+                    "tenant.discovery_non_disclosure",
+                    "tenant.exact_fetch_non_disclosure",
+                ),
+                request_id="request-discovery-other",
+                observation={
+                    "exact_fetch": "not_found",
+                    "resolved": False,
+                    "search_count": 0,
+                },
+            )
+        )
 
+        unscoped_export = await registry.export_agentgateway(
+            namespace=prepared.namespace,
+            request_id="request-gateway-export-unscoped",
+            require_server_scope=False,
+        )
+        try:
+            render_standalone_gateway_config(
+                unscoped_export,
+                upstream_url="http://runtime-good:8080/mcp",
+                issuer="https://identity.journey.invalid",
+                audience=REGISTRY_ORIGIN,
+                jwks_url="http://identity:8081/jwks.json",
+            )
+        except ValueError:
+            pass
+        else:
+            raise JourneyRunError("route_scope_missing_accepted")
         exported = await registry.export_agentgateway(
             namespace=prepared.namespace,
             request_id="request-gateway-export",
+            require_server_scope=True,
         )
         good_config = render_standalone_gateway_config(
             exported,
@@ -671,11 +850,11 @@ async def run_real_journey(
         endpoint = gateway_origin + gateway_path
         runtime_token = await credentials.issue(
             audience=REGISTRY_ORIGIN,
-            scopes=("journey:approve", "journey:read", "journey:write"),
+            scopes=_ROUTE_AND_TOOL_SCOPES,
             context=_context(
                 tenant="tenant-a",
                 subject="subject-a",
-                scopes=("journey:approve", "journey:read", "journey:write"),
+                scopes=_ROUTE_AND_TOOL_SCOPES,
                 request_id="request-runtime-token",
                 run_id=config.run_id,
             ),
@@ -703,6 +882,140 @@ async def run_real_journey(
             started=started,
             request_id="request-gateway-probe",
             known_good=known_good,
+        )
+
+        route_unscoped_token = await credentials.issue(
+            audience=REGISTRY_ORIGIN,
+            scopes=(*_TOOL_SCOPES, _ROUTE_SCOPE + "-lookalike"),
+            context=_context(
+                tenant="tenant-a",
+                subject="subject-a",
+                scopes=(*_TOOL_SCOPES, _ROUTE_SCOPE + "-lookalike"),
+                request_id="request-security-route-scope-token",
+                run_id=config.run_id,
+            ),
+        )
+        if not await _is_rejected(
+            _probe(
+                endpoint,
+                MCPAuthority(token=route_unscoped_token, run_id=config.run_id),
+                request_id="request-security-route-scope-missing",
+            )
+        ):
+            raise JourneyRunError("route_scope_missing_accepted")
+        protocol, tools = await _probe(
+            endpoint,
+            authority,
+            request_id="request-security-route-scope-recovery",
+        )
+        if protocol != "2025-11-25" or tools != _EXPECTED_TOOLS:
+            raise JourneyRunError("route_scope_recovery_invalid")
+        security_results.extend(
+            black_box_security_results(
+                ("control_plane.route_scope_missing",),
+                request_id="request-security-route-scope-missing",
+                observation={
+                    "activation": "blocked_without_policy",
+                    "healthy_scoped_route": True,
+                    "route": "present",
+                    "unscoped_token": "rejected",
+                },
+            )
+        )
+
+        retired_token: SecretValue | None = None
+        for adversarial_case, case_id in (
+            (AdversarialTokenCase.MALFORMED, "identity.malformed"),
+            (AdversarialTokenCase.EXPIRED, "identity.expired"),
+            (AdversarialTokenCase.FORGED_SIGNATURE, "identity.forged_signature"),
+            (AdversarialTokenCase.WRONG_AUDIENCE, "identity.wrong_audience"),
+            (AdversarialTokenCase.WRONG_ISSUER, "identity.wrong_issuer"),
+            (AdversarialTokenCase.WRONG_ALGORITHM, "identity.wrong_algorithm"),
+            (AdversarialTokenCase.REVOKED_KEY, "identity.revoked_key"),
+            (
+                AdversarialTokenCase.CLAIM_DISAGREEMENT,
+                "authority.claim_disagreement",
+            ),
+        ):
+            request_id = f"request-security-{adversarial_case.value}"
+            before = await _backing_document(backing_origin)
+            token = await _adversarial_token(
+                identity,
+                case=adversarial_case,
+                run_id=config.run_id,
+            )
+            if adversarial_case is AdversarialTokenCase.REVOKED_KEY:
+                retired_token = token
+            rejected = await _is_rejected(
+                _invoke(
+                    endpoint,
+                    MCPAuthority(token=token, run_id=config.run_id),
+                    request_id=request_id,
+                    tool_name="journey.read_order",
+                    arguments={"order_id": "order-001"},
+                )
+            )
+            after = await _backing_document(backing_origin)
+            if not rejected or _backing_observation_count(after) != _backing_observation_count(
+                before
+            ):
+                raise JourneyRunError("adversarial_identity_accepted")
+            security_results.extend(
+                black_box_security_results(
+                    (case_id,),
+                    request_id=request_id,
+                    observation={
+                        "backing_calls": 0,
+                        "rejected": True,
+                        "token_case": adversarial_case.value,
+                    },
+                )
+            )
+        if retired_token is None:
+            raise JourneyRunError("adversarial_identity_missing")
+        protocol, tools = await _probe(
+            endpoint,
+            authority,
+            request_id="request-security-identity-recovery",
+        )
+        if protocol != "2025-11-25" or tools != _EXPECTED_TOOLS:
+            raise JourneyRunError("adversarial_identity_recovery_invalid")
+
+        await _set_identity_availability(identity_origin, False)
+        try:
+            known_key_accepted = not await _is_rejected(
+                _probe(
+                    endpoint,
+                    authority,
+                    request_id="request-security-known-key-outage",
+                )
+            )
+            unknown_key_rejected = await _is_rejected(
+                _invoke(
+                    endpoint,
+                    MCPAuthority(token=retired_token, run_id=config.run_id),
+                    request_id="request-security-unknown-key-outage",
+                    tool_name="journey.read_order",
+                    arguments={"order_id": "order-001"},
+                )
+            )
+        finally:
+            await _set_identity_availability(identity_origin, True)
+        if not known_key_accepted or not unknown_key_rejected:
+            raise JourneyRunError("identity_outage_policy_invalid")
+        security_results.extend(
+            black_box_security_results(
+                ("identity.verifier_outage_known_key",),
+                request_id="request-security-known-key-outage",
+                observation={"cached_known_key": "accepted", "verifier": "unavailable"},
+            )
+        )
+        security_results.extend(
+            black_box_security_results(
+                ("identity.verifier_outage_unknown_key",),
+                request_id="request-security-unknown-key-outage",
+                observation={"unknown_key": "rejected", "verifier": "unavailable"},
+            )
         )
 
         started = time.monotonic()
@@ -751,6 +1064,115 @@ async def run_real_journey(
             trace_id=TRACE_ID,
             known_good=known_good,
         )
+        security_results.extend(
+            black_box_security_results(
+                ("authority.idempotency_replay",),
+                request_id="request-write-001",
+                observation={
+                    "calls": 2,
+                    "effects": backing_after_write.get("effect_count"),
+                    "same_result": first_value == replay_value,
+                },
+            )
+        )
+
+        limited_token = await credentials.issue(
+            audience=REGISTRY_ORIGIN,
+            scopes=("journey:read", _ROUTE_SCOPE),
+            context=_context(
+                tenant="tenant-a",
+                subject="subject-a",
+                scopes=("journey:read", _ROUTE_SCOPE),
+                request_id="request-security-limited-token",
+                run_id=config.run_id,
+            ),
+        )
+        limited_authority = MCPAuthority(token=limited_token, run_id=config.run_id)
+        before_scope_attack = await _backing_document(backing_origin)
+        scope_rejected = await _call_is_rejected(
+            _invoke(
+                endpoint,
+                limited_authority,
+                request_id="request-security-scope-escalation",
+                tool_name="journey.write_order",
+                arguments={"order_id": "order-002", "status": "created"},
+                idempotency_key="write-order-002",
+            )
+        )
+        after_scope_attack = await _backing_document(backing_origin)
+        if not scope_rejected or _backing_observation_count(
+            after_scope_attack
+        ) != _backing_observation_count(before_scope_attack):
+            raise JourneyRunError("scope_escalation_accepted")
+        security_results.extend(
+            black_box_security_results(
+                ("authority.scope_escalation",),
+                request_id="request-security-scope-escalation",
+                observation={"backing_calls": 0, "route": "denied", "scope": "read_only"},
+            )
+        )
+
+        before_confirm_bypass = await _backing_document(backing_origin)
+        confirm_rejected = await _call_is_rejected(
+            _invoke(
+                endpoint,
+                authority,
+                request_id="request-security-confirm-bypass",
+                tool_name="journey.approve_order",
+                arguments={"confirm": True, "order_id": "order-001"},
+                idempotency_key="approve-confirm-bypass",
+                approval_id=JOURNEY_APPROVAL_ID,
+            )
+        )
+        after_confirm_bypass = await _backing_document(backing_origin)
+        if not confirm_rejected or _backing_observation_count(
+            after_confirm_bypass
+        ) != _backing_observation_count(before_confirm_bypass):
+            raise JourneyRunError("confirm_bypass_accepted")
+        security_results.extend(
+            black_box_security_results(
+                ("authority.confirm_bypass",),
+                request_id="request-security-confirm-bypass",
+                observation={"backing_calls": 0, "confirm_field": "rejected"},
+            )
+        )
+
+        spoof_rejected = False
+        spoof_value: dict[str, JsonValue] = {}
+        try:
+            spoof_result = await _invoke(
+                endpoint,
+                authority,
+                request_id="request-security-header-spoof",
+                tool_name="journey.read_order",
+                arguments={"order_id": "order-001"},
+                additional_headers={"x-jwt-claim-tenant-id": "tenant-b"},
+            )
+            try:
+                spoof_value = decode_success(spoof_result)
+            except JourneyRunError:
+                decode_failure(spoof_result)
+                spoof_rejected = True
+        except Exception as error:
+            if not _is_expected_rejection(error, allow_publication=False):
+                raise
+            spoof_rejected = True
+        spoof_backing = await _backing_document(backing_origin)
+        if (
+            not spoof_rejected and spoof_value.get("status") != "created"
+        ) or b"tenant-b" in _canonical_json(spoof_backing):
+            raise JourneyRunError("trusted_header_spoof_accepted")
+        security_results.extend(
+            black_box_security_results(
+                ("authority.trusted_header_spoof",),
+                request_id="request-security-header-spoof",
+                observation={
+                    "authority": "unchanged",
+                    "cross_tenant_backing": False,
+                    "request_rejected": spoof_rejected,
+                },
+            )
+        )
 
         started = time.monotonic()
         approval_denied = decode_failure(
@@ -776,6 +1198,30 @@ async def run_real_journey(
         )
         if approval_denied != "approval_required" or approval_allowed.get("status") != "approved":
             raise JourneyRunError("approval_invalid")
+        before_approval_replay = await _backing_document(backing_origin)
+        approval_replay_rejected = await _call_is_rejected(
+            _invoke(
+                endpoint,
+                authority,
+                request_id="request-security-approval-replay",
+                tool_name="journey.approve_order",
+                arguments={"order_id": "order-002"},
+                idempotency_key="approve-order-002",
+                approval_id=JOURNEY_APPROVAL_ID,
+            )
+        )
+        after_approval_replay = await _backing_document(backing_origin)
+        if not approval_replay_rejected or _backing_observation_count(
+            after_approval_replay
+        ) != _backing_observation_count(before_approval_replay):
+            raise JourneyRunError("approval_replay_accepted")
+        security_results.extend(
+            black_box_security_results(
+                ("authority.approval_replay",),
+                request_id="request-security-approval-replay",
+                observation={"backing_calls": 0, "cross_action_replay": "rejected"},
+            )
+        )
         results["approval_denied"] = approval_denied
         results["approval_allowed"] = approval_allowed
         _record(
@@ -857,20 +1303,54 @@ async def run_real_journey(
         started = time.monotonic()
         other_token = await credentials.issue(
             audience=REGISTRY_ORIGIN,
-            scopes=("journey:approve", "journey:read", "journey:write"),
+            scopes=_ROUTE_AND_TOOL_SCOPES,
             context=_context(
                 tenant="tenant-b",
                 subject="subject-b",
-                scopes=("journey:approve", "journey:read", "journey:write"),
+                scopes=_ROUTE_AND_TOOL_SCOPES,
                 request_id="request-runtime-token-other",
                 run_id=config.run_id,
             ),
         )
         other_authority = MCPAuthority(token=other_token, run_id=config.run_id)
-        if not await _is_rejected(
+        before_tenant_attack = await _backing_document(backing_origin)
+        route_rejected = await _is_rejected(
             _probe(endpoint, other_authority, request_id="request-tenant-other")
+        )
+        session_rejected = await _call_is_rejected(
+            _invoke(
+                endpoint,
+                other_authority,
+                request_id="request-security-session-reuse",
+                tool_name="journey.read_order",
+                arguments={"order_id": "order-001"},
+                additional_headers={"mcp-session-id": "tenant-a-session"},
+            )
+        )
+        after_tenant_attack = await _backing_document(backing_origin)
+        if (
+            not route_rejected
+            or not session_rejected
+            or _backing_observation_count(after_tenant_attack)
+            != _backing_observation_count(before_tenant_attack)
         ):
             raise JourneyRunError("tenant_invocation_disclosed")
+        security_results.extend(
+            black_box_security_results(
+                (
+                    "tenant.backing_non_disclosure",
+                    "tenant.route_non_disclosure",
+                    "tenant.session_non_reuse",
+                    "tenant.tool_non_disclosure",
+                ),
+                request_id="request-tenant-other",
+                observation={
+                    "backing_calls": 0,
+                    "route_rejected": route_rejected,
+                    "session_rejected": session_rejected,
+                },
+            )
+        )
         _record(
             assertions,
             code="tenant.invocation_non_disclosure",
@@ -885,6 +1365,18 @@ async def run_real_journey(
         metrics = metrics_response.content
         if b'"event":"audit"' not in runtime_logs or JOURNEY_CANARY.encode() in runtime_logs:
             raise JourneyRunError("audit_invalid")
+        if b"tenant-b" in runtime_logs or b"tenant-b" in metrics:
+            raise JourneyRunError("tenant_observability_disclosed")
+        security_results.extend(
+            black_box_security_results(
+                (
+                    "tenant.audit_non_disclosure",
+                    "tenant.metrics_non_disclosure",
+                ),
+                request_id="request-tenant-other",
+                observation={"audit_tenant_labels": 0, "metric_tenant_labels": 0},
+            )
+        )
         started = time.monotonic()
         _record(
             assertions,
@@ -1073,26 +1565,27 @@ async def run_real_journey(
         "runtime-good",
     ):
         surfaces[f"logs/{service}.log"] = stack.logs(service)
+    components = (
+        JourneyComponent(
+            name="agentgateway",
+            version="1.4.1",
+            revision=GATEWAY_DIGEST,
+        ),
+        JourneyComponent(
+            name="agentic-registry",
+            version="6921474",
+            revision=REGISTRY_COMMIT,
+        ),
+        JourneyComponent(
+            name="tesserix-mcp-runtime",
+            version="1.0.0",
+            revision=config.runtime_artifact_digest,
+        ),
+    )
     evidence = JourneyEvidence(
         run_id=config.run_id,
         created_at=config.created_at,
-        components=(
-            JourneyComponent(
-                name="agentgateway",
-                version="1.4.1",
-                revision=GATEWAY_DIGEST,
-            ),
-            JourneyComponent(
-                name="agentic-registry",
-                version="6921474",
-                revision=REGISTRY_COMMIT,
-            ),
-            JourneyComponent(
-                name="tesserix-mcp-runtime",
-                version="1.0.0",
-                revision=config.runtime_artifact_digest,
-            ),
-        ),
+        components=components,
         known_good=known_good,
         assertions=tuple(assertions),
     )
@@ -1100,11 +1593,60 @@ async def run_real_journey(
         surfaces=tuple(surfaces.values()),
         canaries=(JOURNEY_CANARY,),
     )
+    logs = b"".join(body for name, body in sorted(surfaces.items()) if name.startswith("logs/"))
+    sbom = (config.output_dir / "journey.spdx.json").read_bytes()
+    provenance = (config.output_dir / "journey.intoto.json").read_bytes()
+    raw_security_surfaces = {
+        SecuritySurface.MANIFEST: prepared.registry_manifest,
+        SecuritySurface.SEMANTIC_ANNOTATIONS: surfaces["registry-stub.json"],
+        SecuritySurface.SCHEMA: _canonical_json(_json_value(artifact.spec)),
+        SecuritySurface.ERROR: _canonical_json(
+            {
+                "approval_denied": results["approval_denied"],
+                "deadline": results["deadline"],
+                "safe_failure": results["safe_failure"],
+            }
+        ),
+        SecuritySurface.RESULT: surfaces["results.json"],
+        SecuritySurface.LOG: logs,
+        SecuritySurface.TRACE: surfaces["backing-observations.json"],
+        SecuritySurface.METRIC: metrics,
+        SecuritySurface.AUDIT: runtime_logs,
+        SecuritySurface.CRASH_DUMP: b'{"crash_dumps":[]}\n',
+        SecuritySurface.SBOM: sbom,
+        SecuritySurface.RELEASE_ASSET: encoded + provenance,
+    }
+    security_surfaces, redaction_results = surface_security_results(
+        raw_security_surfaces,
+        canaries=(JOURNEY_CANARY,),
+    )
+    security_results.extend(redaction_results)
+    security_results.extend(await collect_host_security_results(Path(__file__).parents[2]))
+    sbom_digest = next(
+        surface.digest for surface in security_surfaces if surface.surface is SecuritySurface.SBOM
+    )
+    security_report = SecurityReport(
+        run_id=config.run_id,
+        created_at=config.created_at,
+        prepared_by="github-actions/release-journey",
+        subject=SecuritySubject(
+            source_revision=config.source_revision,
+            package_digest=config.package_digest,
+            image_digest=config.runtime_artifact_digest,
+            manifest_digest=prepared.registry_digest,
+            sbom_digest=sbom_digest,
+        ),
+        components=components,
+        results=tuple(security_results),
+        surfaces=security_surfaces,
+    )
+    security_encoded = security_report.to_json()
     for relative, body in surfaces.items():
         target = config.output_dir / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(body)
     (config.output_dir / "journey-evidence.json").write_bytes(encoded)
+    (config.output_dir / "security-evidence.json").write_bytes(security_encoded)
     return evidence
 
 

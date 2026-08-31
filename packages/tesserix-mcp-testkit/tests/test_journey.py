@@ -177,6 +177,35 @@ def test_scanner_checks_each_surface_without_returning_payloads() -> None:
     )
 
 
+def test_scanner_allows_structural_authorization_policy_without_secret_scalar() -> None:
+    scan_journey_surfaces(
+        ('authorization:\n  rules:\n  - \'"mcp:tenant-a:orders" in jwt["scope"]\'\n',)
+    )
+
+
+@pytest.mark.parametrize(
+    "surface",
+    [
+        "password:\n  value: journey-value-that-must-not-escape",
+        "credential:\n  value: journey-value-that-must-not-escape",
+        "password:\n  rules:\n  - journey-value-that-must-not-escape",
+        "credential:\n  action: journey-value-that-must-not-escape",
+    ],
+    ids=[
+        "nested-password",
+        "nested-credential",
+        "password-with-policy-key",
+        "credential-with-policy-key",
+    ],
+)
+def test_scanner_rejects_nested_secret_values_without_echoing_them(surface: str) -> None:
+    with pytest.raises(JourneyEvidenceError) as captured:
+        scan_journey_surfaces((surface,))
+
+    assert captured.value.code == "forbidden_material"
+    assert surface not in str(captured.value)
+
+
 def test_incomplete_journey_reports_only_stable_missing_assertion_codes() -> None:
     evidence = replace(
         complete_evidence(),

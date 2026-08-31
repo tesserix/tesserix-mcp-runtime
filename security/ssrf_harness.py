@@ -207,6 +207,7 @@ async def _expect_error(
     resolver: HarnessResolver,
     path: str,
     code: ErrorCode,
+    permitted_internal_networks: tuple[str, ...] = ("127.0.0.0/8",),
 ) -> None:
     try:
         await _request(
@@ -214,6 +215,7 @@ async def _expect_error(
             ssl_context=ssl_context,
             resolver=resolver,
             path=path,
+            permitted_internal_networks=permitted_internal_networks,
         )
     except OutboundHTTPError as error:
         if error.error.code is code:
@@ -221,21 +223,34 @@ async def _expect_error(
     raise AssertionError("isolated SSRF probe did not fail with the expected stable code")
 
 
-async def _expect_invalid_url(client: OutboundHTTPClient, url: str) -> None:
+async def _expect_invalid_url(
+    client: OutboundHTTPClient,
+    url: str,
+    *,
+    code: ErrorCode = ErrorCode.INVALID_INPUT,
+) -> None:
     try:
         await client.request("GET", url, request_id="ssrf-harness")
     except OutboundHTTPError as error:
-        if error.error.code is ErrorCode.INVALID_INPUT:
+        if error.error.code is code:
             return
     raise AssertionError("unsafe URL did not fail with the stable invalid-input code")
 
 
-async def _run() -> dict[str, object]:
+async def run_ssrf_harness() -> dict[str, object]:
     with tempfile.TemporaryDirectory(prefix="tesserix-ssrf-") as directory:
         server_context, client_context = _tls_contexts(Path(directory))
         server = IsolatedTLSServer(server_context, host="127.0.0.1")
         await server.start()
         try:
+            await _expect_error(
+                port=server.port,
+                ssl_context=client_context,
+                resolver=HarnessResolver({"localhost": [("127.0.0.1",)]}),
+                path="/ok",
+                code=ErrorCode.FORBIDDEN,
+                permitted_internal_networks=(),
+            )
             body = await _request(
                 port=server.port,
                 ssl_context=client_context,
@@ -281,6 +296,12 @@ async def _run() -> dict[str, object]:
             try:
                 connections_before_invalid_urls = server.connections
                 await _expect_invalid_url(client, "https://2130706433/")
+                alternate_port = 443 if server.port != 443 else 444
+                await _expect_invalid_url(
+                    client,
+                    f"https://localhost:{alternate_port}/ok",
+                    code=ErrorCode.FORBIDDEN,
+                )
                 await _expect_invalid_url(
                     client,
                     f"https://user:placeholder@localhost:{server.port}/ok",
@@ -299,6 +320,14 @@ async def _run() -> dict[str, object]:
         ipv6_server = IsolatedTLSServer(server_context, host="::1")
         await ipv6_server.start()
         try:
+            await _expect_error(
+                port=ipv6_server.port,
+                ssl_context=client_context,
+                resolver=HarnessResolver({"localhost": [("::1",)]}),
+                path="/ok",
+                code=ErrorCode.FORBIDDEN,
+                permitted_internal_networks=(),
+            )
             body = await _request(
                 port=ipv6_server.port,
                 ssl_context=client_context,
@@ -312,15 +341,15 @@ async def _run() -> dict[str, object]:
             await ipv6_server.close()
 
         return {
-            "checks": [
-                "explicit_internal_policy",
-                "explicit_internal_ipv6_policy",
-                "metadata_redirect",
-                "private_redirect",
-                "dns_rebinding",
-                "alternate_ip",
-                "credential_url_rejected",
-                "encoded_host_rejected",
+            "cases": [
+                "egress.alternate_port",
+                "egress.dns_rebinding",
+                "egress.encoded_ip",
+                "egress.ipv6",
+                "egress.loopback",
+                "egress.metadata",
+                "egress.private_range",
+                "egress.redirect",
             ],
             "connections": server.connections + ipv6_server.connections,
             "passed": True,
@@ -328,10 +357,13 @@ async def _run() -> dict[str, object]:
 
 
 def main() -> int:
-    report = asyncio.run(_run())
+    report = asyncio.run(run_ssrf_harness())
     print(json.dumps(report, sort_keys=True))
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+__all__ = ["run_ssrf_harness"]

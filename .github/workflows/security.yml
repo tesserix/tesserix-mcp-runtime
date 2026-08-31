@@ -46,6 +46,8 @@ jobs:
         run: uv run --frozen python security/check_licenses.py
       - name: Verify the cross-system threat model
         run: uv run --frozen python security/check_threat_model.py --model security/threat-model.json
+      - name: Verify CI and dependency attack paths
+        run: uv run --frozen python security/check_ci_attack_paths.py
       - name: Run the isolated SSRF harness
         run: uv run --frozen python security/ssrf_harness.py
       - name: Scan Git history for secrets

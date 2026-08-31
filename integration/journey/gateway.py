@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 
 import yaml
 
+from integration.journey.identity import ROUTE_SCOPE_CLAIM
 from integration.journey.registry import REGISTRY_ORIGIN
 from tesserix_mcp_runtime.adapters.outbound_http import OutboundHTTPResponse
 
@@ -237,14 +238,24 @@ def render_standalone_gateway_config(
             raise TypeError
         backend = _single_resource(exported, "AgentgatewayBackend")
         route = _single_resource(exported, "HTTPRoute")
+        scope_policy = _single_resource(exported, "AgentgatewayPolicy")
         backend_metadata = _mapping(backend.get("metadata"))
         route_metadata = _mapping(route.get("metadata"))
+        policy_metadata = _mapping(scope_policy.get("metadata"))
         backend_name = _text(backend_metadata, "name")
-        if _text(route_metadata, "name") != backend_name or _text(
-            route_metadata, "namespace"
-        ) != _text(
-            backend_metadata,
-            "namespace",
+        if (
+            _text(route_metadata, "name") != backend_name
+            or _text(route_metadata, "namespace")
+            != _text(
+                backend_metadata,
+                "namespace",
+            )
+            or _text(policy_metadata, "name") != backend_name
+            or _text(
+                policy_metadata,
+                "namespace",
+            )
+            != _text(backend_metadata, "namespace")
         ):
             raise ValueError
         labels = _mapping(backend_metadata.get("labels"))
@@ -289,6 +300,23 @@ def render_standalone_gateway_config(
         route_path = _text(path_match, "value")
         if path_match.get("type") != "PathPrefix" or route_path != f"/mcp/{tenant}/{server}":
             raise ValueError
+        policy_spec = _mapping(scope_policy.get("spec"))
+        target_refs = _sequence(policy_spec.get("targetRefs"))
+        if len(target_refs) != 1:
+            raise ValueError
+        target_ref = _mapping(target_refs[0])
+        if (
+            target_ref.get("group") != "gateway.networking.k8s.io"
+            or target_ref.get("kind") != "HTTPRoute"
+            or target_ref.get("name") != backend_name
+        ):
+            raise ValueError
+        authorization = _mapping(_mapping(policy_spec.get("traffic")).get("authorization"))
+        policy = _mapping(authorization.get("policy"))
+        expressions = _sequence(policy.get("matchExpressions"))
+        scope_rule = f'"mcp:{tenant}:{server}" in jwt["{ROUTE_SCOPE_CLAIM}"]'
+        if authorization.get("action") != "Allow" or expressions != (scope_rule,):
+            raise ValueError
         resolved_upstream = _validated_upstream(upstream_url, expected_path=expected_path)
         _validate_identity_urls(issuer=issuer, audience=audience, jwks_url=jwks_url)
     except (TypeError, ValueError):
@@ -316,6 +344,7 @@ def render_standalone_gateway_config(
                                 "matches": [{"path": {"pathPrefix": route_path}}],
                                 "name": backend_name,
                                 "policies": {
+                                    "authorization": {"rules": [scope_rule]},
                                     "backendAuth": {"passthrough": {}},
                                     "mcpAuthentication": {
                                         "audiences": [audience],
@@ -328,6 +357,7 @@ def render_standalone_gateway_config(
                                                 "https://gateway.journey.invalid" + route_path
                                             ),
                                             "scopesSupported": [
+                                                f"mcp:{tenant}:{server}",
                                                 "journey:approve",
                                                 "journey:read",
                                                 "journey:write",

@@ -122,6 +122,19 @@ terminal scripted value rather than an injected failure. Cancellation raises
 `InjectedFault` carrying only its `FaultKind`. `FakeClock` advances logical time
 without waiting on wall time.
 
+## Adversarial security evidence
+
+The same package exports security contract 1.0 for release-blocking negative
+tests. Its 51 required cases cover tenancy, identity, authority, isolated
+egress, every named redaction sink, control-plane activation, and CI/dependency
+policy. Observations are scanned, hashed, and discarded; canonical reports bind
+the exact source, package, image, manifest, SBOM, Registry, and Gateway
+identities. GA serialization can require a scope-bound independent review.
+
+See the [adversarial security verification guide](security-verification.md) for
+the case matrix, result and sink APIs, finding/retest rules, the pinned real
+journey, and contract-version policy.
+
 ## Versioning and compatibility
 
 `CONFORMANCE_CONTRACT_VERSION` is independent of the package release version.
