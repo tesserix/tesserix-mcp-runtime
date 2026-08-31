@@ -87,6 +87,19 @@ def test_container_measurement_can_isolate_one_correlation_window() -> None:
     assert plans[0].requests == 4
 
 
+def test_burst_window_drives_the_reviewed_tool_concurrency_capacity() -> None:
+    plans = reliability_load_plans(
+        ReliabilityLane.AGENTGATEWAY,
+        sustained_requests=100,
+        burst_requests=200,
+        boundary_requests=4,
+        kinds=(ReliabilityLoadKind.BURST,),
+    )
+
+    assert len(plans) == 1
+    assert plans[0].concurrency == 32
+
+
 def test_isolated_boundary_window_is_assessed_against_only_its_target() -> None:
     async def exercise() -> None:
         evidence = await run_reliability_load(

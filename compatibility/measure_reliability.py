@@ -112,7 +112,7 @@ def reliability_load_plans(
             lane=lane,
             kind=ReliabilityLoadKind.BURST,
             requests=burst_requests,
-            concurrency=min(16, burst_requests),
+            concurrency=min(32, burst_requests),
             tenants=min(16, burst_requests),
             request_bytes=1_024,
             response_bytes=4_096,
