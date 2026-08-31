@@ -95,6 +95,26 @@ The release manifest records the tag, PEP 440 version, source SHA, workflow
 ref, artifact SHA-256 values, sizes, and image digest references. `SHA256SUMS`
 covers every downloadable asset and the manifest itself.
 
+## Adversarial evidence and GA review
+
+The `adversarial` release prerequisite runs the pinned Registry, AgentGateway,
+identity, backing, and built-runtime journey before the protected publish job.
+It must emit `security-evidence.json` with all 51 required cases passed, all 12
+named sinks digest-bound, no open finding, and exact source/package/image/
+manifest/SBOM/component identities. Missing or failed evidence prevents the
+reusable workflow from succeeding and therefore prevents publication.
+
+Nightly and release-candidate evidence may have `review: null`. A GA operator
+must obtain a review from someone other than the evidence preparer and require
+`SecurityReport.to_json(require_independent_review=True)` against the exact
+reviewed scope. Changing any digest, result, sink, component, or finding after
+review invalidates the scope digest. A green candidate run is not itself an
+independent approval.
+
+Follow the [security verification guide](security-verification.md) for the case
+matrix, retained-evidence rules, finding ownership/remediation/retest policy,
+verifier-outage behavior, and compatible contract upgrades.
+
 ## Consumer verification
 
 Install the GitHub CLI and Cosign from their authenticated distribution

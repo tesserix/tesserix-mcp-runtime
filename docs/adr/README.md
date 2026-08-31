@@ -26,6 +26,7 @@
 | [0022](0022-container-and-gitops-deployment.md) | Accepted | Digest-pinned core and ADK images, fail-closed Kubernetes contract, and one-revision GitOps rollback |
 | [0023](0023-release-integration-journey.md) | Accepted | Hermetic and digest-pinned release journey with fail-closed sanitized evidence |
 | [0024](0024-immutable-release-supply-chain.md) | Accepted | Tag-only protected publication with keyless signatures, SBOMs, provenance, and public smoke |
+| [0025](0025-adversarial-security-evidence.md) | Accepted | Reusable adversarial contract and digest-bound evidence; see the [security verification guide](../security-verification.md) |
 
 Architecture decisions are append-only. A later decision supersedes an
 accepted ADR instead of silently rewriting its history.

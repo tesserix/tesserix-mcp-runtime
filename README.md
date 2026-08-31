@@ -39,6 +39,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | [Gateway activation status](docs/gateway-activation.md) | Typed contract and bounded observer implemented; producer rollout tracked externally |
 | [Tenant Gateway reconciliation](docs/tenant-gateway-reconciliation.md) | Identity-scoped eligibility, collision-safe routes, and complete page assembly implemented; producer/GitOps rollout tracked externally |
 | [Container and GitOps deployment](docs/container-gitops.md) | Digest-pinned core and ADK images plus a fail-closed Kubernetes reference contract; product adoption tracked externally |
+| [Adversarial security verification](docs/security-verification.md) | Reusable 51-case contract and pinned real-image release gate implemented; independent review remains required before GA |
 | [Immutable release supply chain](docs/releasing.md) | Tag-only GitHub Release and GHCR workflow implemented; the first public candidate still requires explicit approval and protected-environment setup |
 
 The version can be inspected without starting runtime behavior:

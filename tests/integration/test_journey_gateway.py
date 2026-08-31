@@ -9,6 +9,7 @@ from integration.journey.gateway import (
     parse_agentgateway_export,
     render_standalone_gateway_config,
 )
+from integration.journey.identity import ROUTE_SCOPE_CLAIM
 
 from tesserix_mcp_runtime import JsonValue
 from tesserix_mcp_runtime.adapters.outbound_http import OutboundHTTPResponse
@@ -19,6 +20,7 @@ def _export_response(
     resources: list[dict[str, JsonValue]] | None = None,
     count: int | None = None,
     digest: str | None = None,
+    include_scope_policy: bool = True,
 ) -> OutboundHTTPResponse:
     documents = resources or [
         {
@@ -85,6 +87,44 @@ def _export_response(
             },
         },
     ]
+    if resources is None and include_scope_policy:
+        documents.append(
+            {
+                "apiVersion": "agentgateway.dev/v1alpha1",
+                "kind": "AgentgatewayPolicy",
+                "metadata": {
+                    "labels": {
+                        "app.kubernetes.io/managed-by": "agentic-registry",
+                        "mcp.tesserix.app/tenant": "tenant-a",
+                        "registry.agentic.dev/mcp": "io-github-tesserix-journey",
+                    },
+                    "name": "tenant-a-io-github-tesserix-journey",
+                    "namespace": "agentgateway-system",
+                },
+                "spec": {
+                    "targetRefs": [
+                        {
+                            "group": "gateway.networking.k8s.io",
+                            "kind": "HTTPRoute",
+                            "name": "tenant-a-io-github-tesserix-journey",
+                        }
+                    ],
+                    "traffic": {
+                        "authorization": {
+                            "action": "Allow",
+                            "policy": {
+                                "matchExpressions": [
+                                    (
+                                        '"mcp:tenant-a:io-github-tesserix-journey" '
+                                        f'in jwt["{ROUTE_SCOPE_CLAIM}"]'
+                                    )
+                                ]
+                            },
+                        }
+                    },
+                },
+            }
+        )
     body = yaml.safe_dump_all(documents, explicit_start=False, sort_keys=True).encode()
     computed = "sha256:" + hashlib.sha256(body).hexdigest()
     resource_digest = digest or computed
@@ -120,7 +160,7 @@ def test_export_verification_drives_equivalent_standalone_gateway_config() -> No
     mcp = cast(dict[str, object], backends[0]["mcp"])
     targets = cast(list[dict[str, object]], mcp["targets"])
 
-    assert exported.resource_count == 2
+    assert exported.resource_count == 3
     assert binds[0]["port"] == 3000
     assert route["matches"] == [
         {"path": {"pathPrefix": "/mcp/tenant-a/io-github-tesserix-journey"}}
@@ -132,20 +172,28 @@ def test_export_verification_drives_equivalent_standalone_gateway_config() -> No
         }
     ]
     assert policies["backendAuth"] == {"passthrough": {}}
+    assert policies["authorization"] == {
+        "rules": [f'"mcp:tenant-a:io-github-tesserix-journey" in jwt["{ROUTE_SCOPE_CLAIM}"]']
+    }
     assert policies["mcpAuthorization"] == {"rules": ['jwt.tenant_id == "tenant-a"']}
     authentication = cast(dict[str, object], policies["mcpAuthentication"])
     assert authentication["mode"] == "strict"
     assert authentication["resourceMetadata"] == {
         "bearerMethodsSupported": ["header"],
         "resource": ("https://gateway.journey.invalid/mcp/tenant-a/io-github-tesserix-journey"),
-        "scopesSupported": ["journey:approve", "journey:read", "journey:write"],
+        "scopesSupported": [
+            "mcp:tenant-a:io-github-tesserix-journey",
+            "journey:approve",
+            "journey:read",
+            "journey:write",
+        ],
     }
 
 
 @pytest.mark.parametrize(
     "response",
     [
-        _export_response(count=3),
+        _export_response(count=4),
         _export_response(digest="sha256:" + "f" * 64),
         _export_response(
             resources=[
@@ -167,3 +215,16 @@ def test_export_parser_fails_closed_on_untrusted_control_plane_input(
 ) -> None:
     with pytest.raises(ValueError, match="AgentGateway export"):
         parse_agentgateway_export(response)
+
+
+def test_activation_rejects_route_without_expected_scope_policy() -> None:
+    exported = parse_agentgateway_export(_export_response(include_scope_policy=False))
+
+    with pytest.raises(ValueError, match="equivalent route"):
+        render_standalone_gateway_config(
+            exported,
+            upstream_url="http://runtime-good:8080/mcp",
+            issuer="https://identity.journey.invalid",
+            audience="https://registry.journey.invalid",
+            jwks_url="http://identity:8081/jwks.json",
+        )

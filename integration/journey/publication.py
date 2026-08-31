@@ -20,6 +20,7 @@ from tesserix_mcp_publisher import (
 )
 
 from integration.journey.gateway import AgentGatewayExport, parse_agentgateway_export
+from integration.journey.identity import ROUTE_SCOPE_CLAIM
 from integration.journey.registry import (
     REGISTRY_ORIGIN,
     JourneyCredentialProvider,
@@ -235,19 +236,22 @@ class AgenticRegistryClient:
         *,
         namespace: str,
         request_id: str,
+        require_server_scope: bool,
     ) -> AgentGatewayExport:
-        if namespace != self._context.tenant:
+        if namespace != self._context.tenant or not isinstance(require_server_scope, bool):
             raise _publication_error(
                 PublicationErrorCode.INVALID_ARGUMENT,
                 request_id=request_id,
             )
-        path = "/v0/export/agentgateway?" + urlencode(
-            {
-                "legacyFlatPath": "false",
-                "namespace": namespace,
-                "targetNamespace": "agentgateway-system",
-            }
-        )
+        query = {
+            "legacyFlatPath": "false",
+            "namespace": namespace,
+            "requireServerScope": str(require_server_scope).lower(),
+            "targetNamespace": "agentgateway-system",
+        }
+        if require_server_scope:
+            query["scopeClaim"] = ROUTE_SCOPE_CLAIM
+        path = "/v0/export/agentgateway?" + urlencode(query)
         response = await self._request("GET", path, request_id=request_id)
         try:
             return parse_agentgateway_export(response)

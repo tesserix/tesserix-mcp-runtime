@@ -9,7 +9,11 @@ from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
 
-from tesserix_mcp_testkit import JourneyEvidenceError, scan_journey_surfaces
+from tesserix_mcp_testkit import (
+    JourneyEvidenceError,
+    SecurityReportError,
+    scan_journey_surfaces,
+)
 
 from integration.journey.real import RealJourneyConfig, run_real_journey
 from integration.journey.runner import JourneyRunError
@@ -44,6 +48,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--runtime-image", required=True)
     parser.add_argument("--registry-image", required=True)
     parser.add_argument("--runtime-artifact-digest", required=True)
+    parser.add_argument("--package-digest", required=True)
+    parser.add_argument("--source-revision", required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument(
         "--compose-file",
@@ -115,6 +121,8 @@ def run(argv: list[str] | None = None) -> int:
         config = RealJourneyConfig(
             output_dir=output_dir,
             runtime_artifact_digest=arguments.runtime_artifact_digest,
+            package_digest=arguments.package_digest,
+            source_revision=arguments.source_revision,
             run_id=run_id,
             created_at=created_at,
         )
@@ -128,7 +136,13 @@ def run(argv: list[str] | None = None) -> int:
             executable=executable,
         )
         asyncio.run(run_real_journey(config, stack=stack))
-    except (JourneyEvidenceError, JourneyRunError, JourneyStackError, ValueError) as error:
+    except (
+        JourneyEvidenceError,
+        JourneyRunError,
+        JourneyStackError,
+        SecurityReportError,
+        ValueError,
+    ) as error:
         code = getattr(error, "code", "configuration_invalid")
         _write_failure(
             output_dir=output_dir,

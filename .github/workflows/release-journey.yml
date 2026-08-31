@@ -1,6 +1,7 @@
 name: Release integration journey
 
 on:
+  workflow_call:
   push:
     tags:
       - "v*-rc*"
@@ -89,6 +90,8 @@ jobs:
           } > artifacts/tool-versions.txt
       - name: Build the core and journey images
         run: |
+          mkdir -p artifacts/security-package
+          uv build --wheel --out-dir artifacts/security-package
           docker buildx build \
             --build-arg PACKAGE_VERSION=0.0.1.dev0 \
             --file deploy/container/core.Dockerfile \
@@ -135,13 +138,20 @@ jobs:
       - name: Run the release integration journey
         run: |
           runtime_digest="$(jq -er '."containerimage.digest" | select(test("^sha256:[0-9a-f]{64}$"))' artifacts/runtime-build.json)"
+          mapfile -t package_wheels < <(find artifacts/security-package -maxdepth 1 -type f -name 'tesserix_mcp_runtime-*.whl' -print)
+          test "${#package_wheels[@]}" -eq 1
+          package_hash="$(sha256sum "${package_wheels[0]}")"
+          package_digest="sha256:${package_hash%% *}"
           uv run --frozen python -m integration.journey.run \
             --runtime-image "$JOURNEY_IMAGE" \
             --registry-image "$REGISTRY_IMAGE" \
             --runtime-artifact-digest "$runtime_digest" \
+            --package-digest "$package_digest" \
+            --source-revision "$GITHUB_SHA" \
             --output-dir artifacts/journey \
             --compose-standalone .journey/tools/docker-compose-linux-x86_64 \
             --run-id "journey-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          test -s artifacts/journey/security-evidence.json
       - name: Sanitize all retained evidence
         id: sanitize
         if: ${{ always() }}

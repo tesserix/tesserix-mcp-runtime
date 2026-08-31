@@ -14,3 +14,5 @@ and deterministic.
 
 The complete guide and external server live in the
 [`tesserix-mcp-runtime` repository](https://github.com/tesserix/tesserix-mcp-runtime/blob/main/docs/conformance.md).
+The package also exposes the 51-case digest-bound adversarial contract described
+in the [security verification guide](https://github.com/tesserix/tesserix-mcp-runtime/blob/main/docs/security-verification.md).
