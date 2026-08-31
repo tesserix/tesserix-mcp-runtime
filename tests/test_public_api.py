@@ -78,6 +78,10 @@ def test_public_api_exports_only_the_stable_contract_surface() -> None:
         "LifecycleTransitionError",
         "MappedError",
         "MetadataPolicy",
+        "MigrationDiff",
+        "MigrationRoute",
+        "MigrationSurface",
+        "MigrationToolDiff",
         "RedactionError",
         "RedactionLimits",
         "RedactionPolicy",
@@ -151,6 +155,7 @@ def test_public_api_exports_only_the_stable_contract_surface() -> None:
         "TraceContext",
         "__version__",
         "classify_schema_change",
+        "compare_migration_surfaces",
         "map_exception",
         "normalize_tool_name",
         "registry_artifact_digest",
@@ -165,7 +170,7 @@ def test_checked_in_public_api_snapshot_matches_exports() -> None:
     completed = run_snapshot_check(SNAPSHOT)
 
     assert completed.returncode == 0
-    assert completed.stdout == "Public API snapshot matches (119 exports).\n"
+    assert completed.stdout == "Public API snapshot matches (124 exports).\n"
     assert completed.stderr == ""
 
 
