@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "evidencePath": "../../../benchmarks/reliability-observations.json",
+  "stateless": true,
+  "payloadBytes": {
+    "request": 65536,
+    "response": 524288
+  },
+  "observed": {
+    "sustainedRequestsPerSecond": 55.0,
+    "burstRequestsPerSecond": 210.0,
+    "handlerP99Milliseconds": 250.0,
+    "peakRssMebibytes": 112.0
+  },
+  "perPod": {
+    "maximumConcurrency": 64,
+    "normalOccupancyRatio": 0.5,
+    "normalConcurrency": 32.0,
+    "memoryRequestMebibytes": 128,
+    "memoryLimitMebibytes": 256,
+    "cpuLimit": null
+  },
+  "replicas": {
+    "burstConcurrentDemand": 52.5,
+    "calculatedMinimum": 2,
+    "availabilityFloor": 2,
+    "minimum": 2,
+    "maximum": 10
+  },
+  "scaling": {
+    "metric": "mcp_server_saturation_ratio",
+    "target": 0.5,
+    "scaleDownStabilizationSeconds": 300
+  },
+  "terminationGraceSeconds": 45.0
+}

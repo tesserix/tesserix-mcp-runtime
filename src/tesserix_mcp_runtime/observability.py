@@ -52,6 +52,7 @@ class RuntimeLimit(StrEnum):
     INPUT = "input"
     RESULT = "result"
     DRAIN = "drain"
+    CIRCUIT = "circuit"
 
 
 class RuntimeLogName(StrEnum):

@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "case": "agentgateway_reliability_correlation",
+  "evidence_scope": "isolated_local_containers",
+  "captured_date": "2026-08-31",
+  "runtime": {
+    "image_digest": "sha256:a204a67822189cddd90e0024c403406756b36ffa4c1c767318f929dc32bcdb9d",
+    "python": "3.14.7",
+    "mcp_sdk": "2.1.1",
+    "stateless_http": true
+  },
+  "gateway": {
+    "name": "AgentGateway",
+    "version": "v1.4.1",
+    "image_digest": "sha256:efd79355b89094a8225a9db465d9a01dc656b377f0bab458761b935a13231d29",
+    "retries": 0
+  },
+  "loads": [
+    {
+      "completed": 100,
+      "duration_seconds": 0.35000291699543595,
+      "kind": "sustained",
+      "lane": "agentgateway",
+      "latency": {
+        "maximum_milliseconds": 75.692291,
+        "p50_milliseconds": 54.128375,
+        "p95_milliseconds": 67.899792,
+        "p99_milliseconds": 74.370167
+      },
+      "maximum_queue_depth": 0,
+      "name": "agentgateway-sustained",
+      "outcomes": [
+        {
+          "count": 100,
+          "outcome": "success"
+        }
+      ],
+      "peak_client_concurrency": 16,
+      "request_bytes": 1024,
+      "response_bytes": 4096,
+      "sample_digest": "sha256:d23383517b1d71861c953cf4683c677f67ffca3c34f31c1aa9ed8a945cdb4425",
+      "successful": 100,
+      "throughput_requests_per_second": 285.71190451336724
+    },
+    {
+      "completed": 200,
+      "duration_seconds": 0.691291666997131,
+      "kind": "burst",
+      "lane": "agentgateway",
+      "latency": {
+        "maximum_milliseconds": 86.078292,
+        "p50_milliseconds": 54.030417,
+        "p95_milliseconds": 73.707583,
+        "p99_milliseconds": 85.252167
+      },
+      "maximum_queue_depth": 0,
+      "name": "agentgateway-burst",
+      "outcomes": [
+        {
+          "count": 200,
+          "outcome": "success"
+        }
+      ],
+      "peak_client_concurrency": 16,
+      "request_bytes": 1024,
+      "response_bytes": 4096,
+      "sample_digest": "sha256:ac2927b35574edd15928a22e0e5dd2531344d073577bf0afed09792ccd6cd36c",
+      "successful": 200,
+      "throughput_requests_per_second": 289.3134830754875
+    },
+    {
+      "completed": 4,
+      "duration_seconds": 0.12752816698048264,
+      "kind": "boundary",
+      "lane": "agentgateway",
+      "latency": {
+        "maximum_milliseconds": 126.774041,
+        "p50_milliseconds": 123.882667,
+        "p95_milliseconds": 126.774041,
+        "p99_milliseconds": 126.774041
+      },
+      "maximum_queue_depth": 0,
+      "name": "agentgateway-boundary",
+      "outcomes": [
+        {
+          "count": 4,
+          "outcome": "success"
+        }
+      ],
+      "peak_client_concurrency": 4,
+      "request_bytes": 60000,
+      "response_bytes": 500000,
+      "sample_digest": "sha256:f5dab78f9742abb5c94cc464b15e9574b85d3fd9a4a8c8c8bc5bef61a0d00066",
+      "successful": 4,
+      "throughput_requests_per_second": 31.36561980548324
+    }
+  ],
+  "correlations": [
+    {
+      "lane": "agentgateway",
+      "kind": "sustained",
+      "window_digest": "sha256:797c6d1ee5cc2f1c65e40e9e1c0c20c71d8747f6359bb4437e715e8a6053afba",
+      "requests": 100,
+      "client_samples": 100,
+      "gateway_tool_calls": 100,
+      "gateway_metric_samples": 202,
+      "runtime_span_samples": 100,
+      "runtime_metric_samples": 100,
+      "pod_resource_samples": 2,
+      "client_p99_milliseconds": 74.370167,
+      "gateway_p99_milliseconds": 50,
+      "runtime_span_p99_milliseconds": 15.968893,
+      "runtime_metric_p99_milliseconds": 25,
+      "pod_cpu_millicores_peak": 180.6,
+      "pod_rss_mebibytes_peak": 60.94
+    },
+    {
+      "lane": "agentgateway",
+      "kind": "burst",
+      "window_digest": "sha256:71728a2bc372f61c52db391db3f5c8f45610392b8a4175e427071bc2c9dca2cf",
+      "requests": 200,
+      "client_samples": 200,
+      "gateway_tool_calls": 200,
+      "gateway_metric_samples": 402,
+      "runtime_span_samples": 200,
+      "runtime_metric_samples": 200,
+      "pod_resource_samples": 2,
+      "client_p99_milliseconds": 85.252167,
+      "gateway_p99_milliseconds": 50,
+      "runtime_span_p99_milliseconds": 17.027214,
+      "runtime_metric_p99_milliseconds": 50,
+      "pod_cpu_millicores_peak": 318.7,
+      "pod_rss_mebibytes_peak": 61.23
+    },
+    {
+      "lane": "agentgateway",
+      "kind": "boundary",
+      "window_digest": "sha256:aec669371945b9cb7b6382b48b31311e03c56e170ddd52fd05ff818cdfaadc86",
+      "requests": 4,
+      "client_samples": 4,
+      "gateway_tool_calls": 4,
+      "gateway_metric_samples": 10,
+      "runtime_span_samples": 4,
+      "runtime_metric_samples": 4,
+      "pod_resource_samples": 2,
+      "client_p99_milliseconds": 126.774041,
+      "gateway_p99_milliseconds": 250,
+      "runtime_span_p99_milliseconds": 30.690417,
+      "runtime_metric_p99_milliseconds": 100,
+      "pod_cpu_millicores_peak": 2.6,
+      "pod_rss_mebibytes_peak": 62.1
+    }
+  ],
+  "passed": true
+}

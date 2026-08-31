@@ -27,6 +27,8 @@
 | [0023](0023-release-integration-journey.md) | Accepted | Hermetic and digest-pinned release journey with fail-closed sanitized evidence |
 | [0024](0024-immutable-release-supply-chain.md) | Accepted | Tag-only protected publication with keyless signatures, SBOMs, provenance, and public smoke |
 | [0025](0025-adversarial-security-evidence.md) | Accepted | Reusable adversarial contract and digest-bound evidence; see the [security verification guide](../security-verification.md) |
+| [0026](0026-digest-bound-evaluation-promotion.md) | Accepted | Digest-bound evaluation bundles, independent review, and lifecycle promotion gates |
+| [0027](0027-stateless-reliability-qualification.md) | Accepted | Stateless cross-replica reliability evidence and saturation-based capacity scaling |
 
 Architecture decisions are append-only. A later decision supersedes an
 accepted ADR instead of silently rewriting its history.

@@ -185,7 +185,16 @@ async def _exercise_mcp(endpoint: str, expected_sdk: str) -> dict[str, object]:
     async with _mcp_session(endpoint) as session:
         initialized = await session.initialize()
         names, pages = await _list_all_tools(session)
-        if names != {"always_fails", "cancellation_probe", "echo"} or pages != 2:
+        if (
+            names
+            != {
+                "always_fails",
+                "cancellation_probe",
+                "echo",
+                "reliability_probe",
+            }
+            or pages != 2
+        ):
             raise ContainerVerificationError("container returned an unexpected tool catalog")
         succeeded = await session.call_tool("echo", {"text": "container-verification"})
         if succeeded.is_error or not succeeded.content:

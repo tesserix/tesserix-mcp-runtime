@@ -28,7 +28,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | [Runtime contracts](docs/contracts.md) and [reusable conformance testkit](docs/conformance.md) | Implemented in source; pre-release |
 | Explicit application composition, in-process transport, signals, and bounded drain | Implemented in source; pre-release |
 | Typed callable authoring, schema fingerprints, compatibility classification, and handler-free metadata export | Implemented in source; pre-release |
-| MCP v2 Streamable HTTP serving, compatibility matrix, and bounded sessions | Implemented in source; pre-release |
+| MCP v2 stateless Streamable HTTP serving and compatibility matrix | Implemented in source; pre-release |
 | ADK `AgentToolView` and `McpServer` bridge | Implemented as an exact optional profile |
 | Default-deny per-tool scopes, effects, approvals, idempotency, and audit | Implemented in source; pre-release |
 | Bounded JSON, concurrency, deadlines, cancellation, and safe retries | Implemented in source; pre-release |
@@ -41,6 +41,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | [Container and GitOps deployment](docs/container-gitops.md) | Digest-pinned core and ADK images plus a fail-closed Kubernetes reference contract; product adoption tracked externally |
 | [Adversarial security verification](docs/security-verification.md) | Reusable 51-case contract and pinned real-image release gate implemented; independent review remains required before GA |
 | [Evaluation bundles and promotion gates](docs/evaluation.md) | Versioned local/HTTP runner, eight metrics, signed digest-bound reports, and experimental/internal/GA policy implemented |
+| [Stateless reliability qualification](docs/reliability.md) | Cross-replica, load, soak, dependency, retry, rollout, and capacity evidence implemented |
 | [Immutable release supply chain](docs/releasing.md) | Tag-only GitHub Release and GHCR workflow implemented; the first public candidate still requires explicit approval and protected-environment setup |
 
 The version can be inspected without starting runtime behavior:
@@ -59,9 +60,11 @@ Python SDK:
 - portable server.json and Agentic Registry manifest generation;
 - an optional bridge to the existing Tesserix ADK tool surface.
 
-It will not own semantic ranking, Registry state, gateway routes, identity
-issuance, credentials, or product tool behavior. Those remain with their
-existing authoritative systems.
+It will not own durable agent, user, tenant, conversation, workflow, or
+idempotency state, semantic ranking, Registry state, gateway routes, identity
+issuance, credentials, or product tool behavior. Those remain with PostgreSQL,
+Valkey, object storage, Temporal, the Registry, Gateway, or the existing
+authoritative product system.
 
 ## Architecture verification
 
@@ -193,20 +196,24 @@ ceilings, alternatives, rollout, and rollback.
 The runtime now serves its compositional `Application` through the official MCP
 SDK v2 Streamable HTTP server. The default listener is loopback-only and
 stateless, waits for ASGI readiness, normalizes one stable route, enforces
-finite headers, bodies, responses, schemas, tools, pages, and optional legacy
-sessions, and propagates trusted call context plus cancellation without leaking
-SDK types into core handlers.
+finite headers, bodies, responses, schemas, tools, and pages, and propagates
+trusted call context plus cancellation without leaking SDK types into core
+handlers. Every production call carries its complete verified context, and a
+`Mcp-Session-Id` is rejected so no request requires pod affinity.
 
-Stateful compatibility mode binds each opaque session to tenant, issuer, and
-subject with a finite absolute lifetime. Non-loopback binding requires explicit
-host and origin allowlists. AgentGateway remains the supported public ingress
-and may rewrite `/gateway/runtime/mcp` to the stable upstream `/mcp` path.
+The bounded stateful implementation remains only as a handshake-era protocol
+compatibility test surface; it is not an approved Tesserix deployment or
+Registry publication pattern. Non-loopback binding requires exact host and
+origin allowlists. AgentGateway remains the supported public ingress and may
+rewrite `/gateway/runtime/mcp` to the stable upstream `/mcp` path.
 
 See the [Streamable HTTP guide](docs/streamable-http.md) for composition,
 limits, gateway routing, failure responses, and verification commands.
 [ADR-0008](docs/adr/0008-streamable-http-and-bounded-sessions.md) records the
 protocol authority, session model, cancellation ordering, SDK upgrade risk,
-alternatives, rollout, and rollback.
+alternatives, rollout, and rollback. [ADR-0027](docs/adr/0027-stateless-reliability-qualification.md)
+supersedes its production session decision and records the cross-replica
+stateless invariant.
 
 ## Gateway identity
 

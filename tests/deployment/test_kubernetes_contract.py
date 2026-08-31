@@ -149,6 +149,65 @@ def test_reference_deployment_rolls_without_dropping_capacity_and_spreads_replic
     ]
 
 
+def test_reference_capacity_plan_drives_resources_replicas_and_saturation_scaling() -> None:
+    capacity = load_resource("capacity-plan.json")
+    deployment = load_resource("deployment.json")["spec"]
+    hpa = load_resource("horizontal-pod-autoscaler.json")["spec"]
+    kustomization = load_resource("kustomization.yaml")
+
+    assert capacity == {
+        "schemaVersion": 1,
+        "evidencePath": "../../../benchmarks/reliability-observations.json",
+        "stateless": True,
+        "payloadBytes": {"request": 65_536, "response": 524_288},
+        "observed": {
+            "sustainedRequestsPerSecond": 55.0,
+            "burstRequestsPerSecond": 210.0,
+            "handlerP99Milliseconds": 250.0,
+            "peakRssMebibytes": 112.0,
+        },
+        "perPod": {
+            "maximumConcurrency": 64,
+            "normalOccupancyRatio": 0.5,
+            "normalConcurrency": 32.0,
+            "memoryRequestMebibytes": 128,
+            "memoryLimitMebibytes": 256,
+            "cpuLimit": None,
+        },
+        "replicas": {
+            "burstConcurrentDemand": 52.5,
+            "calculatedMinimum": 2,
+            "availabilityFloor": 2,
+            "minimum": 2,
+            "maximum": 10,
+        },
+        "scaling": {
+            "metric": "mcp_server_saturation_ratio",
+            "target": 0.5,
+            "scaleDownStabilizationSeconds": 300,
+        },
+        "terminationGraceSeconds": 45.0,
+    }
+    assert deployment["replicas"] == capacity["replicas"]["minimum"]
+    assert deployment["template"]["spec"]["containers"][0]["resources"] == {
+        "requests": {"memory": "128Mi"},
+        "limits": {"memory": "256Mi"},
+    }
+    assert hpa["minReplicas"] == capacity["replicas"]["minimum"]
+    assert hpa["maxReplicas"] == capacity["replicas"]["maximum"]
+    assert hpa["metrics"] == [
+        {
+            "type": "Pods",
+            "pods": {
+                "metric": {"name": "mcp_server_saturation_ratio"},
+                "target": {"type": "AverageValue", "averageValue": "500m"},
+            },
+        }
+    ]
+    assert hpa["behavior"]["scaleDown"]["stabilizationWindowSeconds"] == 300
+    assert "horizontal-pod-autoscaler.json" in kustomization["resources"]
+
+
 def test_reference_package_exposes_only_a_cluster_service_with_pdb_and_identity() -> None:
     service = load_resource("service.json")
     service_account = load_resource("service-account.json")
@@ -158,6 +217,7 @@ def test_reference_package_exposes_only_a_cluster_service_with_pdb_and_identity(
 
     assert service["spec"] == {
         "type": "ClusterIP",
+        "sessionAffinity": "None",
         "selector": selector,
         "ports": [{"name": "http", "port": 8000, "targetPort": "http", "protocol": "TCP"}],
     }

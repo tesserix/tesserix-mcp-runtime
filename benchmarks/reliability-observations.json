@@ -1,0 +1,365 @@
+{
+  "capacity": {
+    "handler_p99_milliseconds": 250.0,
+    "maximum_concurrency": 64,
+    "maximum_replicas": 10,
+    "memory_limit_mebibytes": 256,
+    "memory_request_mebibytes": 128,
+    "minimum_replicas": 2,
+    "normal_occupancy_ratio": 0.5,
+    "observed_burst_requests_per_second": 210.0,
+    "observed_peak_rss_mebibytes": 112.0,
+    "observed_sustained_requests_per_second": 55.0,
+    "scaling_metric": "mcp_server_saturation_ratio",
+    "scaling_target": 0.5,
+    "termination_grace_seconds": 45.0
+  },
+  "case": "offline_reliability_harness",
+  "dependencies": [
+    {
+      "affected_calls": 10,
+      "affected_outcome": "success",
+      "circuit_open_count": 0,
+      "dependency": "registry",
+      "fail_closed_count": 0,
+      "maximum_queue_depth": 0,
+      "runtime_retries": 0,
+      "stale_cache_successes": 0,
+      "telemetry_drop_count": 0,
+      "unaffected_successes": 10
+    },
+    {
+      "affected_calls": 10,
+      "affected_outcome": "unavailable",
+      "circuit_open_count": 0,
+      "dependency": "agentgateway",
+      "fail_closed_count": 0,
+      "maximum_queue_depth": 0,
+      "runtime_retries": 0,
+      "stale_cache_successes": 0,
+      "telemetry_drop_count": 0,
+      "unaffected_successes": 10
+    },
+    {
+      "affected_calls": 10,
+      "affected_outcome": "authentication_denied",
+      "circuit_open_count": 0,
+      "dependency": "identity",
+      "fail_closed_count": 5,
+      "maximum_queue_depth": 0,
+      "runtime_retries": 0,
+      "stale_cache_successes": 5,
+      "telemetry_drop_count": 0,
+      "unaffected_successes": 10
+    },
+    {
+      "affected_calls": 10,
+      "affected_outcome": "success",
+      "circuit_open_count": 0,
+      "dependency": "telemetry",
+      "fail_closed_count": 0,
+      "maximum_queue_depth": 0,
+      "runtime_retries": 0,
+      "stale_cache_successes": 0,
+      "telemetry_drop_count": 10,
+      "unaffected_successes": 10
+    },
+    {
+      "affected_calls": 10,
+      "affected_outcome": "timeout",
+      "circuit_open_count": 1,
+      "dependency": "dns",
+      "fail_closed_count": 0,
+      "maximum_queue_depth": 0,
+      "runtime_retries": 0,
+      "stale_cache_successes": 0,
+      "telemetry_drop_count": 0,
+      "unaffected_successes": 10
+    },
+    {
+      "affected_calls": 10,
+      "affected_outcome": "unavailable",
+      "circuit_open_count": 1,
+      "dependency": "backing_api",
+      "fail_closed_count": 0,
+      "maximum_queue_depth": 0,
+      "runtime_retries": 2,
+      "stale_cache_successes": 0,
+      "telemetry_drop_count": 0,
+      "unaffected_successes": 10
+    }
+  ],
+  "evidence_scope": "local_process_without_network",
+  "fairness": {
+    "global_limit": 64,
+    "noisy_admitted": 16,
+    "noisy_overloaded": 16,
+    "noisy_started": 32,
+    "reserved_started": 8,
+    "reserved_successful": 8,
+    "tenant_limit": 16,
+    "tool_limit": 32
+  },
+  "fairness_injection": {
+    "mode": "tenant_saturation",
+    "noisy_started": 32,
+    "reserved_started": 8
+  },
+  "fault_injection": {
+    "dependency_calls": 120,
+    "dependency_scenarios": 6,
+    "mode": "deterministic"
+  },
+  "loads": [
+    {
+      "completed": 200,
+      "duration_seconds": 0.0018186249944847077,
+      "kind": "sustained",
+      "lane": "in_process",
+      "latency": {
+        "maximum_milliseconds": 0.21425,
+        "p50_milliseconds": 0.050208,
+        "p95_milliseconds": 0.20525,
+        "p99_milliseconds": 0.207875
+      },
+      "maximum_queue_depth": 0,
+      "name": "offline-sustained",
+      "outcomes": [
+        {
+          "count": 200,
+          "outcome": "success"
+        }
+      ],
+      "peak_client_concurrency": 16,
+      "request_bytes": 1024,
+      "response_bytes": 4096,
+      "sample_digest": "sha256:b1ddbf74507bb69db150aa18d02cb472e75a2e64653511301892c4042146f5bc",
+      "successful": 200,
+      "throughput_requests_per_second": 109973.1943674668
+    },
+    {
+      "completed": 200,
+      "duration_seconds": 0.0013488749973475933,
+      "kind": "burst",
+      "lane": "in_process",
+      "latency": {
+        "maximum_milliseconds": 0.262,
+        "p50_milliseconds": 0.164917,
+        "p95_milliseconds": 0.255916,
+        "p99_milliseconds": 0.260958
+      },
+      "maximum_queue_depth": 0,
+      "name": "offline-burst",
+      "outcomes": [
+        {
+          "count": 200,
+          "outcome": "success"
+        }
+      ],
+      "peak_client_concurrency": 64,
+      "request_bytes": 1024,
+      "response_bytes": 4096,
+      "sample_digest": "sha256:1349824e795f98c5d7ea7f5acf5e850fdf0593b10ff46ac297e9cdd6304c9304",
+      "successful": 200,
+      "throughput_requests_per_second": 148271.70819629458
+    },
+    {
+      "completed": 200,
+      "duration_seconds": 0.0018624160147737712,
+      "kind": "boundary",
+      "lane": "in_process",
+      "latency": {
+        "maximum_milliseconds": 0.159292,
+        "p50_milliseconds": 0.03125,
+        "p95_milliseconds": 0.035625,
+        "p99_milliseconds": 0.15825
+      },
+      "maximum_queue_depth": 0,
+      "name": "offline-boundary",
+      "outcomes": [
+        {
+          "count": 200,
+          "outcome": "success"
+        }
+      ],
+      "peak_client_concurrency": 8,
+      "request_bytes": 65536,
+      "response_bytes": 524288,
+      "sample_digest": "sha256:2a59024edb5ba3492582e6eb65eecda65fce49b0e771b64a9bdd2551fc0efd15",
+      "successful": 200,
+      "throughput_requests_per_second": 107387.39272723345
+    }
+  ],
+  "network_lanes": {
+    "agentgateway": "deferred_to_container_lane",
+    "direct_http": "deferred_to_container_lane"
+  },
+  "passed": true,
+  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "profile_digest": "sha256:20bce7eb868543ffbe9071f2a1a24ba7b38e15aa156b3e0a84234eb969d32b6b",
+  "python": "3.14.7",
+  "requests_per_load": 200,
+  "retry": {
+    "calls": 10,
+    "effects": 1,
+    "maximum_attempts": 3,
+    "owning_layer": "runtime",
+    "retries": [
+      {
+        "count": 0,
+        "layer": "client"
+      },
+      {
+        "count": 0,
+        "layer": "agentgateway"
+      },
+      {
+        "count": 0,
+        "layer": "mesh"
+      },
+      {
+        "count": 2,
+        "layer": "runtime"
+      }
+    ]
+  },
+  "retry_injection": {
+    "duplicate_deliveries": 10,
+    "mode": "deterministic",
+    "observed_effects": 1,
+    "owning_layer": "runtime"
+  },
+  "rollout_injection": {
+    "accepted_calls": 40,
+    "mode": "deterministic",
+    "scenarios": 5
+  },
+  "rollouts": [
+    {
+      "accepted_calls": 8,
+      "completed_calls": 8,
+      "drain_seconds": 4.0,
+      "interruption_seconds": 2.0,
+      "previous_capacity_preserved": true,
+      "rejected_new_calls": 2,
+      "rollback_restored": true,
+      "scenario": "sigterm"
+    },
+    {
+      "accepted_calls": 8,
+      "completed_calls": 8,
+      "drain_seconds": 4.0,
+      "interruption_seconds": 2.0,
+      "previous_capacity_preserved": true,
+      "rejected_new_calls": 2,
+      "rollback_restored": true,
+      "scenario": "pod_eviction"
+    },
+    {
+      "accepted_calls": 8,
+      "completed_calls": 8,
+      "drain_seconds": 4.0,
+      "interruption_seconds": 0.0,
+      "previous_capacity_preserved": true,
+      "rejected_new_calls": 2,
+      "rollback_restored": true,
+      "scenario": "rolling_update"
+    },
+    {
+      "accepted_calls": 8,
+      "completed_calls": 8,
+      "drain_seconds": 4.0,
+      "interruption_seconds": 0.0,
+      "previous_capacity_preserved": true,
+      "rejected_new_calls": 2,
+      "rollback_restored": true,
+      "scenario": "canary_abort"
+    },
+    {
+      "accepted_calls": 8,
+      "completed_calls": 8,
+      "drain_seconds": 4.0,
+      "interruption_seconds": 2.0,
+      "previous_capacity_preserved": true,
+      "rejected_new_calls": 2,
+      "rollback_restored": true,
+      "scenario": "rollback"
+    }
+  ],
+  "schema_version": 1,
+  "soak": {
+    "completed_calls": 600,
+    "resources": [
+      {
+        "baseline": 80.0,
+        "final": 82.0,
+        "maximum": 128.0,
+        "peak": 84.0,
+        "permitted_growth": 4.0,
+        "resource": "rss_mebibytes",
+        "samples": 4
+      },
+      {
+        "baseline": 0.0,
+        "final": 0.0,
+        "maximum": 256.0,
+        "peak": 2.0,
+        "permitted_growth": 0.0,
+        "resource": "tasks",
+        "samples": 4
+      },
+      {
+        "baseline": 0.0,
+        "final": 0.0,
+        "maximum": 64.0,
+        "peak": 2.0,
+        "permitted_growth": 0.0,
+        "resource": "connections",
+        "samples": 4
+      },
+      {
+        "baseline": 0.0,
+        "final": 0.0,
+        "maximum": 128.0,
+        "peak": 2.0,
+        "permitted_growth": 0.0,
+        "resource": "sessions",
+        "samples": 4
+      },
+      {
+        "baseline": 0.0,
+        "final": 0.0,
+        "maximum": 2048.0,
+        "peak": 2.0,
+        "permitted_growth": 0.0,
+        "resource": "telemetry_buffer",
+        "samples": 4
+      },
+      {
+        "baseline": 0.0,
+        "final": 0.0,
+        "maximum": 32.0,
+        "peak": 2.0,
+        "permitted_growth": 0.0,
+        "resource": "credential_cache",
+        "samples": 4
+      }
+    ]
+  },
+  "soak_cycles": 3,
+  "stateless_injection": {
+    "deliveries": 8,
+    "mode": "cross_replica",
+    "replicas": 2
+  },
+  "statelessness": {
+    "deliveries": 8,
+    "external_effects": 1,
+    "replica_switches": 7,
+    "replicas": 2,
+    "request_filesystem_entries": 0,
+    "request_memory_entries": 0,
+    "session_affinity_required": false,
+    "successful_calls": 8
+  }
+}

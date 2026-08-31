@@ -18,6 +18,7 @@ from importlib.metadata import distribution, version
 distribution_name = sys.argv[1]
 module_name = sys.argv[2]
 should_import = sys.argv[3] == "true"
+required_module = sys.argv[4]
 module = import_module(module_name) if should_import else None
 
 installed = distribution(distribution_name)
@@ -27,6 +28,11 @@ print(json.dumps({
     "version": package_version,
     "version_export_matches": (
         module is None or getattr(module, "__version__", package_version) == package_version
+    ),
+    "required_module_present": (
+        None
+        if not required_module
+        else installed.locate_file(f"{module_name}/{required_module}.py").is_file()
     ),
 }))
 """
@@ -75,6 +81,7 @@ def _install_and_probe(
     module_name: str,
     offline: bool,
     probe_import: bool,
+    required_module: str | None,
 ) -> dict[str, Any]:
     _run([uv, "venv", "--python", sys.executable, str(environment)], cwd=environment.parent)
     python = _python_in(environment)
@@ -95,6 +102,7 @@ def _install_and_probe(
             distribution_name,
             module_name,
             str(probe_import).lower(),
+            required_module or "",
         ],
         cwd=environment.parent,
     )
@@ -180,6 +188,9 @@ def check(
                     probe_import=(
                         install_dependencies or distribution_name == "tesserix-mcp-runtime"
                     ),
+                    required_module=(
+                        "reliability" if distribution_name == "tesserix-mcp-testkit" else None
+                    ),
                 ),
                 "sdist": _install_and_probe(
                     uv,
@@ -192,6 +203,9 @@ def check(
                     offline=offline,
                     probe_import=(
                         install_dependencies or distribution_name == "tesserix-mcp-runtime"
+                    ),
+                    required_module=(
+                        "reliability" if distribution_name == "tesserix-mcp-testkit" else None
                     ),
                 ),
             }

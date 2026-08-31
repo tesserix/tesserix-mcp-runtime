@@ -92,7 +92,7 @@ async def main() -> int:
         expected_names = (
             {"cancellation_probe", "echo"}
             if pagination_gap
-            else {"always_fails", "cancellation_probe", "echo"}
+            else {"always_fails", "cancellation_probe", "echo", "reliability_probe"}
         )
         if names != expected_names:
             raise RuntimeError("server returned an unexpected tool catalog")

@@ -61,7 +61,7 @@ The safe default is loopback-only, stateless, and finite:
 | Aggregate schema JSON | 262,144 bytes |
 | Tool catalog | 128 tools |
 | Tool page | 32 tools, at most four pages |
-| Optional sessions | 128, 1,800-second absolute lifetime |
+| Compatibility-test sessions | 128, 1,800-second absolute lifetime |
 | Startup readiness | 2 seconds |
 | Request/response stream | 300 seconds |
 
@@ -101,11 +101,12 @@ apply.
 
 ## Session modes
 
-Stateless mode rejects every `Mcp-Session-Id`. It is the recommended mode for
-the 2026-07-28 protocol and horizontally scaled runtimes.
+Stateless mode rejects every `Mcp-Session-Id`. It is required for production
+Tesserix MCPs and horizontally scaled runtimes.
 
-Set `stateless=False` only for a named handshake-era compatibility requirement.
-The runtime then:
+The `stateless=False` path remains solely for a named, single-process,
+handshake-era protocol compatibility test. It is not approved for Registry
+publication or deployment. The compatibility implementation:
 
 - reserves capacity before SDK session creation;
 - binds the opaque ID to tenant, issuer, and subject;
@@ -114,9 +115,10 @@ The runtime then:
 - releases capacity on DELETE or expiry;
 - includes concurrent pending initializations in the cap.
 
-The 2026-07-28 path remains sessionless when compatibility mode is enabled.
-State is process-local; do not route one legacy session across replicas unless
-the gateway provides session affinity to the owning instance.
+The 2026-07-28 path remains sessionless even when the compatibility path is
+under test. Never configure Gateway or Kubernetes session affinity for an MCP
+deployment. Move durable conversation, idempotency, approval, and workflow
+state to their authoritative external systems instead.
 
 ## Cancellation and drain
 
