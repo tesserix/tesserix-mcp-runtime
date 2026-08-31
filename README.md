@@ -42,6 +42,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | [Adversarial security verification](docs/security-verification.md) | Reusable 51-case contract and pinned real-image release gate implemented; independent review remains required before GA |
 | [Evaluation bundles and promotion gates](docs/evaluation.md) | Versioned local/HTTP runner, eight metrics, signed digest-bound reports, and experimental/internal/GA policy implemented |
 | [Stateless reliability qualification](docs/reliability.md) | Cross-replica, load, soak, dependency, retry, rollout, and capacity evidence implemented |
+| [Operations and recovery](docs/operations.md) | SLOs, safe dashboards, actionable alerts, incident runbooks, RTO/RPO, and cost review implemented |
 | [Incremental migration](docs/migration.md) | Deterministic surface diff and stateless migration/runbook implemented; product cutovers remain separately owned |
 | [Immutable release supply chain](docs/releasing.md) | Tag-only GitHub Release and GHCR workflow implemented; the first public candidate still requires explicit approval and protected-environment setup |
 

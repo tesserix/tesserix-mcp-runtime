@@ -30,6 +30,7 @@
 | [0026](0026-digest-bound-evaluation-promotion.md) | Accepted | Digest-bound evaluation bundles, independent review, and lifecycle promotion gates |
 | [0027](0027-stateless-reliability-qualification.md) | Accepted | Stateless cross-replica reliability evidence and saturation-based capacity scaling |
 | [0028](0028-incremental-mcp-migration.md) | Accepted | Incremental stateless migration evidence and deterministic cutover diff |
+| [0029](0029-operations-and-recovery.md) | Accepted | Stateless MCP SLOs, safe diagnosis, recovery, and cost review |
 
 Architecture decisions are append-only. A later decision supersedes an
 accepted ADR instead of silently rewriting its history.
