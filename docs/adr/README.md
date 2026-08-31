@@ -31,6 +31,7 @@
 | [0027](0027-stateless-reliability-qualification.md) | Accepted | Stateless cross-replica reliability evidence and saturation-based capacity scaling |
 | [0028](0028-incremental-mcp-migration.md) | Accepted | Incremental stateless migration evidence and deterministic cutover diff |
 | [0029](0029-operations-and-recovery.md) | Accepted | Stateless MCP SLOs, safe diagnosis, recovery, and cost review |
+| [0030](0030-polling-reconciliation-baseline.md) | Accepted | Retain polling until measured activation evidence requires an event supplement |
 
 Architecture decisions are append-only. A later decision supersedes an
 accepted ADR instead of silently rewriting its history.
