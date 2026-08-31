@@ -1,0 +1,22 @@
+{
+  "case_count": 8,
+  "dataset_digest": "sha256:3124659879eff96c76452fa0aa19a2d9aeadecf720f482f7ab3984f69ccab256",
+  "false_failures": 0,
+  "false_passes": 0,
+  "killed_metrics": [
+    "authorization_denial",
+    "availability",
+    "correctness",
+    "idempotency",
+    "latency",
+    "schema_conformance",
+    "secret_leakage",
+    "tenant_isolation"
+  ],
+  "metric_count": 8,
+  "passed": true,
+  "repetitions": 20,
+  "schema_version": 1,
+  "target_total_seconds": 5,
+  "total_duration_seconds": 0.119078
+}

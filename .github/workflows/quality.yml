@@ -59,6 +59,8 @@ jobs:
             examples/conformance-server
       - name: Run the offline test suite
         run: uv run --frozen pytest
+      - name: Run evaluation promotion gates
+        run: uv run --frozen python benchmarks/measure_evaluation.py
       - name: Run the reusable testkit suite
         working-directory: packages/tesserix-mcp-testkit
         run: |

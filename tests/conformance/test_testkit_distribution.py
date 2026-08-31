@@ -27,6 +27,10 @@ def test_testkit_is_an_opt_in_workspace_distribution() -> None:
     assert testkit["project"]["requires-python"] == ">=3.12,<3.15"
     assert testkit["project"]["license-files"] == ["LICENSE"]
     assert testkit["project"]["dependencies"] == [
+        "cryptography>=50,<51",
+        "httpx2>=2.12,<3",
+        "mcp>=2.1.1,<3",
+        "pydantic>=2.13,<3",
         "pytest-socket>=0.8,<1",
         "pytest>=9,<10",
         "tesserix-mcp-runtime>=0.0.1.dev0,<1",
@@ -48,6 +52,13 @@ def test_quality_workflow_enforces_standalone_testkit_branch_coverage() -> None:
     assert "--source=tesserix_mcp_testkit -m pytest" in workflow
     assert "coverage report \\" in workflow
     assert "--show-missing --fail-under=90" in workflow
+
+
+def test_quality_workflow_runs_the_repeatable_evaluation_promotion_gate() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "quality.yml").read_text(encoding="utf-8")
+
+    assert "Run evaluation promotion gates" in workflow
+    assert "uv run --frozen python benchmarks/measure_evaluation.py" in workflow
 
 
 def test_package_workflow_proves_offline_install_from_an_isolated_cache() -> None:

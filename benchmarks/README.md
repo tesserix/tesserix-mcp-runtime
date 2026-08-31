@@ -90,3 +90,17 @@ lanes exceed 10 seconds of pytest-reported time. The checked-in
 `conformance-observations.json` records 0.56 seconds on Python 3.14 arm64 macOS
 and both mutants killed. It is PR regression evidence, not a production
 invocation-latency claim.
+
+## Evaluation repeatability and mutation measurement
+
+`measure_evaluation.py` runs the eight-case reference bundle 20 times against a
+conforming target, then repeats every run with one defect for each evaluation
+metric:
+
+    uv run --frozen python benchmarks/measure_evaluation.py
+
+The command requires zero false failures, zero false passes, all eight metric
+mutants killed, and completion below five seconds. The checked-in
+`evaluation-observations.json` records 0.119078 seconds on Python 3.14 arm64
+macOS. It measures deterministic evaluator behavior and promotion-gate wiring;
+it is not deployed-server latency or availability evidence.
