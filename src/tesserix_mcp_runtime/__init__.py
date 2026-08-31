@@ -62,6 +62,13 @@ from tesserix_mcp_runtime.lifecycle import (
     LifecycleFailure,
     LifecycleTransitionError,
 )
+from tesserix_mcp_runtime.migration import (
+    MigrationDiff,
+    MigrationRoute,
+    MigrationSurface,
+    MigrationToolDiff,
+    compare_migration_surfaces,
+)
 from tesserix_mcp_runtime.observability import (
     RuntimeExporter,
     RuntimeLimit,
@@ -185,6 +192,10 @@ __all__ = [
     "LifecycleTransitionError",
     "MappedError",
     "MetadataPolicy",
+    "MigrationDiff",
+    "MigrationRoute",
+    "MigrationSurface",
+    "MigrationToolDiff",
     "ReadinessCheck",
     "RedactionError",
     "RedactionLimits",
@@ -258,6 +269,7 @@ __all__ = [
     "TraceContext",
     "__version__",
     "classify_schema_change",
+    "compare_migration_surfaces",
     "map_exception",
     "normalize_tool_name",
     "registry_artifact_digest",
