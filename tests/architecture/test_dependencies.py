@@ -87,7 +87,7 @@ def test_core_dependency_report_matches_frozen_resolution() -> None:
         "uvicorn>=0.52.4,<1",
     ]
     assert result["profiles"]["testkit"]["distribution_count"] == 42
-    assert "pytest==9.0.3" in result["profiles"]["testkit"]["resolved_dependencies"]
+    assert "pytest==9.1.1" in result["profiles"]["testkit"]["resolved_dependencies"]
     assert (
         "tesserix-mcp-testkit (workspace)" in result["profiles"]["testkit"]["resolved_dependencies"]
     )

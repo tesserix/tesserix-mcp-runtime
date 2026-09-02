@@ -52,7 +52,7 @@ def test_project_declares_the_hermetic_quality_policy() -> None:
     development_dependencies = dependency_groups["dev"]
     assert is_string_list(development_dependencies)
     assert set(development_dependencies) == {
-        "hypothesis==6.165.10",
+        "hypothesis==6.167.0",
         "import-linter==2.14",
         "jsonschema==4.26.0",
         "mypy==2.3.1",
@@ -60,7 +60,7 @@ def test_project_declares_the_hermetic_quality_policy() -> None:
         "pip-audit==2.10.1",
         "pyright==1.1.411",
         "pytest-asyncio>=1,<2",
-        "pytest==9.0.3",
+        "pytest==9.1.1",
         "pytest-cov==7.1.0",
         "pytest-socket==0.8.1",
         "ruff==0.16.5",
