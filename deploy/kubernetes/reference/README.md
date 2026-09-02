@@ -16,6 +16,13 @@ capacity plan:
 - a default-deny `NetworkPolicy` with bounded ingress and egress; and
 - a two-to-ten-replica `HorizontalPodAutoscaler` driven by per-pod saturation.
 
+The optional sibling overlay at `../overlays/istio-ambient` adds per-workload
+ambient enrollment, STRICT mesh mTLS, and exact AgentGateway SPIFFE-principal
+authorization. It applies to either the core or ADK image variant. Because the
+ADK runs in process, it shares the runtime pod's ServiceAccount identity; use a
+separate workload if a separately enforceable ADK identity is required. See
+[ADR-0032](../../../docs/adr/0032-istio-ambient-workload-identity.md).
+
 `capacity-plan.json` binds the 128/256 MiB resources, two-replica floor,
 ten-replica ceiling, 45-second termination grace, and 0.5 saturation target to
 the checked-in reliability observations. It is evidence input, not a
@@ -56,6 +63,9 @@ the security and availability invariants. Before merging:
    context, bounded `/tmp`, PDB, topology spread, and drain timings.
 8. Exercise a failed canary and one-revision GitOps rollback in non-production
    while the previous Registry route remains active.
+9. For ambient adoption, replace the placeholder AgentGateway SPIFFE principal
+   with its exact trust domain, namespace, and ServiceAccount; retain STRICT
+   mTLS and prove wrong-principal and plaintext requests are denied.
 
 See the [container and GitOps guide](../../../docs/container-gitops.md) for
 image evidence, dependency behavior, capacity arithmetic, rollout, rollback,
@@ -66,6 +76,10 @@ and the expand-contract procedure.
 Rendering is read-only and does not contact a cluster:
 
     kustomize build deploy/kubernetes/reference
+
+Render the optional ambient variant with:
+
+    kustomize build deploy/kubernetes/overlays/istio-ambient
 
 The CI workflow validates all six Kubernetes JSON resources against strict Kubernetes
 1.31 schemas. Product adoption must validate the fully rendered

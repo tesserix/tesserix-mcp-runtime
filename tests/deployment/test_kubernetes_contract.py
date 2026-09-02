@@ -8,12 +8,60 @@ from pydantic import TypeAdapter
 
 ROOT = Path(__file__).parents[2]
 REFERENCE = ROOT / "deploy" / "kubernetes" / "reference"
+AMBIENT = ROOT / "deploy" / "kubernetes" / "overlays" / "istio-ambient"
 INVALID_IMAGE = "registry.invalid/tesserix/mcp-server@sha256:" + ("0" * 64)
 JSON_OBJECT = TypeAdapter(dict[str, Any])
 
 
 def load_resource(name: str) -> dict[str, Any]:
     return JSON_OBJECT.validate_json((REFERENCE / name).read_bytes())
+
+
+def load_ambient_resource(name: str) -> dict[str, Any]:
+    return JSON_OBJECT.validate_json((AMBIENT / name).read_bytes())
+
+
+def test_istio_ambient_overlay_uses_workload_identity_and_strict_mtls() -> None:
+    kustomization = load_ambient_resource("kustomization.yaml")
+    patch = load_ambient_resource("deployment-patch.json")
+    peer_authentication = load_ambient_resource("peer-authentication.json")
+
+    assert kustomization["resources"] == [
+        "../../reference",
+        "peer-authentication.json",
+        "authorization-policy.json",
+    ]
+    assert kustomization["patches"] == [{"path": "deployment-patch.json"}]
+    assert patch["spec"]["template"]["metadata"]["labels"] == {"istio.io/dataplane-mode": "ambient"}
+    assert peer_authentication["apiVersion"] == "security.istio.io/v1"
+    assert peer_authentication["spec"] == {
+        "selector": {"matchLabels": {"app.kubernetes.io/name": "mcp-server-reference"}},
+        "mtls": {"mode": "STRICT"},
+    }
+
+
+def test_istio_ambient_overlay_allows_only_agentgateway_spiffe_identity() -> None:
+    authorization = load_ambient_resource("authorization-policy.json")
+
+    assert authorization["apiVersion"] == "security.istio.io/v1"
+    assert authorization["spec"] == {
+        "selector": {"matchLabels": {"app.kubernetes.io/name": "mcp-server-reference"}},
+        "action": "ALLOW",
+        "rules": [
+            {
+                "from": [
+                    {
+                        "source": {
+                            "principals": [
+                                "cluster.local/ns/agentgateway-system/sa/replace-agentgateway-service-account"
+                            ]
+                        }
+                    }
+                ],
+                "to": [{"operation": {"ports": ["8000"]}}],
+            }
+        ],
+    }
 
 
 def test_reference_deployment_is_a_non_deployable_ha_runtime() -> None:

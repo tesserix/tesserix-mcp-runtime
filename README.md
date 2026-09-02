@@ -40,6 +40,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | [Gateway activation status](docs/gateway-activation.md) | Typed contract and bounded observer implemented; producer rollout tracked externally |
 | [Tenant Gateway reconciliation](docs/tenant-gateway-reconciliation.md) | Identity-scoped eligibility, collision-safe routes, and complete page assembly implemented; producer/GitOps rollout tracked externally |
 | [Container and GitOps deployment](docs/container-gitops.md) | Digest-pinned core and ADK images plus a fail-closed Kubernetes reference contract; product adoption tracked externally |
+| [Istio ambient workload identity](docs/adr/0032-istio-ambient-workload-identity.md) | Opt-in overlay with ambient enrollment, STRICT mTLS, and exact AgentGateway SPIFFE authorization; product identities remain adoption-time values |
 | [Adversarial security verification](docs/security-verification.md) | Reusable 51-case contract and pinned real-image release gate implemented; independent review remains required before GA |
 | [Evaluation bundles and promotion gates](docs/evaluation.md) | Versioned local/HTTP runner, eight metrics, signed digest-bound reports, and experimental/internal/GA policy implemented |
 | [Stateless reliability qualification](docs/reliability.md) | Cross-replica, load, soak, dependency, retry, rollout, and capacity evidence implemented |

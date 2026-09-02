@@ -1,0 +1,17 @@
+{
+  "apiVersion": "security.istio.io/v1",
+  "kind": "PeerAuthentication",
+  "metadata": {
+    "name": "mcp-server-reference-strict-mtls"
+  },
+  "spec": {
+    "selector": {
+      "matchLabels": {
+        "app.kubernetes.io/name": "mcp-server-reference"
+      }
+    },
+    "mtls": {
+      "mode": "STRICT"
+    }
+  }
+}

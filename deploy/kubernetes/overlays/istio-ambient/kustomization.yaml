@@ -1,0 +1,1 @@
+{"apiVersion":"kustomize.config.k8s.io/v1beta1","kind":"Kustomization","namespace":"replace-in-tesserix-k8s","resources":["../../reference","peer-authentication.json","authorization-policy.json"],"patches":[{"path":"deployment-patch.json"}]}

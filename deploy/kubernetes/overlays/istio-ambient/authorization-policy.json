@@ -1,0 +1,37 @@
+{
+  "apiVersion": "security.istio.io/v1",
+  "kind": "AuthorizationPolicy",
+  "metadata": {
+    "name": "mcp-server-reference-agentgateway"
+  },
+  "spec": {
+    "selector": {
+      "matchLabels": {
+        "app.kubernetes.io/name": "mcp-server-reference"
+      }
+    },
+    "action": "ALLOW",
+    "rules": [
+      {
+        "from": [
+          {
+            "source": {
+              "principals": [
+                "cluster.local/ns/agentgateway-system/sa/replace-agentgateway-service-account"
+              ]
+            }
+          }
+        ],
+        "to": [
+          {
+            "operation": {
+              "ports": [
+                "8000"
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

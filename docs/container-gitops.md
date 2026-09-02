@@ -112,6 +112,19 @@ Render the reference contract without contacting a cluster:
 
     kustomize build deploy/kubernetes/reference
 
+For an Istio ambient cluster, adopt and render the opt-in identity overlay:
+
+    kustomize build deploy/kubernetes/overlays/istio-ambient
+
+The overlay enrolls only the MCP pods, requires STRICT mTLS, and permits port
+8000 only from the exact AgentGateway SPIFFE principal. Replace the fail-closed
+principal placeholder in the owning GitOps repository. Both core and ADK image
+variants use the same pod ServiceAccount because ADK executes in process; a
+separate mesh identity requires a separate workload. Retain the Kubernetes
+NetworkPolicy and application-level user, tenant, scope, and tool checks. The
+full boundary and request workflow are recorded in
+[ADR-0032](adr/0032-istio-ambient-workload-identity.md).
+
 Validate its Kubernetes 1.31 schemas with the same pinned image as CI:
 
     docker run --rm --volume "$PWD:/work:ro" \
