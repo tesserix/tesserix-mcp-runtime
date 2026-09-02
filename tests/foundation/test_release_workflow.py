@@ -8,6 +8,7 @@ import yaml
 
 ROOT = Path(__file__).parents[2]
 RELEASE = ROOT / ".github" / "workflows" / "release.yml"
+RELEASE_JOURNEY = ROOT / ".github" / "workflows" / "release-journey.yml"
 RELEASING = ROOT / "docs" / "releasing.md"
 README = ROOT / "README.md"
 REUSABLE_GATES = (
@@ -112,6 +113,14 @@ def test_release_reuses_every_gate_and_pins_every_external_action() -> None:
     assert "mypy --strict src tests release" in quality
     assert "pyright src tests release" in quality
     assert containers.count('- "release/**"') == 2
+
+
+def test_release_journey_loads_single_platform_images_without_provenance() -> None:
+    text = RELEASE_JOURNEY.read_text(encoding="utf-8")
+
+    assert text.count("--load") == 3
+    assert text.count("--provenance=false") == 3
+    assert "--provenance=mode=max" not in text
 
 
 def test_release_publishes_only_exact_signed_and_publicly_verified_artifacts() -> None:

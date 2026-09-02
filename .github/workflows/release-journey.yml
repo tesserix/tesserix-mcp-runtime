@@ -97,7 +97,7 @@ jobs:
             --file deploy/container/core.Dockerfile \
             --load \
             --metadata-file artifacts/core-build.json \
-            --provenance=mode=max \
+            --provenance=false \
             --tag "$CORE_IMAGE" \
             .
           core_digest="$(jq -er '."containerimage.digest" | select(test("^sha256:[0-9a-f]{64}$"))' artifacts/core-build.json)"
@@ -106,7 +106,7 @@ jobs:
             --file integration/journey/Dockerfile \
             --load \
             --metadata-file artifacts/runtime-build.json \
-            --provenance=mode=max \
+            --provenance=false \
             --tag "$JOURNEY_IMAGE" \
             .
           uv run --frozen python deploy/container/verify.py \
@@ -125,7 +125,7 @@ jobs:
             --file "$registry_dockerfile" \
             --load \
             --metadata-file artifacts/registry-build.json \
-            --provenance=mode=max \
+            --provenance=false \
             --tag "$REGISTRY_IMAGE" \
             .journey/agentic-registry
           grep -Fq ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32 \
