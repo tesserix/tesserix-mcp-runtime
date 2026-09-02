@@ -32,6 +32,7 @@
 | [0028](0028-incremental-mcp-migration.md) | Accepted | Incremental stateless migration evidence and deterministic cutover diff |
 | [0029](0029-operations-and-recovery.md) | Accepted | Stateless MCP SLOs, safe diagnosis, recovery, and cost review |
 | [0030](0030-polling-reconciliation-baseline.md) | Accepted | Retain polling until measured activation evidence requires an event supplement |
+| [0031](0031-stateless-agent-capability-discovery.md) | Accepted | Assemble tools, skills, agents, and context through bounded authority-separated discovery |
 
 Architecture decisions are append-only. A later decision supersedes an
 accepted ADR instead of silently rewriting its history.

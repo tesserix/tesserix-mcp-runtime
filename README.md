@@ -36,6 +36,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | [Registry manifests](packages/tesserix-mcp-manifest/README.md) | Compilation is opt-in; pre-release |
 | [Registry publication](docs/registry-publication.md) | Implemented as opt-in delegated tooling; pre-release |
 | [Registry-backed semantic discovery and progressive disclosure](docs/registry-discovery.md) | Implemented as an opt-in bounded client; pre-release |
+| [Stateless agent capability discovery RFC](docs/adr/0031-stateless-agent-capability-discovery.md) | Accepted integration decision across tools, skills, agents, context, ADK, Registry, Gateway, and runtime |
 | [Gateway activation status](docs/gateway-activation.md) | Typed contract and bounded observer implemented; producer rollout tracked externally |
 | [Tenant Gateway reconciliation](docs/tenant-gateway-reconciliation.md) | Identity-scoped eligibility, collision-safe routes, and complete page assembly implemented; producer/GitOps rollout tracked externally |
 | [Container and GitOps deployment](docs/container-gitops.md) | Digest-pinned core and ADK images plus a fail-closed Kubernetes reference contract; product adoption tracked externally |
