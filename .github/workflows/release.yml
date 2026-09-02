@@ -46,10 +46,6 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - name: Authenticate private dependencies
-        uses: ./.github/actions/auth-private-dependencies
-        with:
-          token: ${{ secrets.GO_PRIVATE_TOKEN }}
       - name: Resolve immutable release identity
         id: identity
         run: |
@@ -85,14 +81,12 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/quality.yml
-    secrets: inherit
 
   security:
     needs: guard
     permissions:
       contents: read
     uses: ./.github/workflows/security.yml
-    secrets: inherit
 
   compatibility:
     needs: guard
@@ -100,21 +94,22 @@ jobs:
       attestations: read
       contents: read
     uses: ./.github/workflows/compatibility.yml
-    secrets: inherit
+    secrets:
+      GO_PRIVATE_TOKEN: ${{ secrets.GO_PRIVATE_TOKEN }}
 
   containers:
     needs: guard
     permissions:
       contents: read
     uses: ./.github/workflows/containers.yml
-    secrets: inherit
 
   adversarial:
     needs: guard
     permissions:
       contents: read
     uses: ./.github/workflows/release-journey.yml
-    secrets: inherit
+    secrets:
+      GO_PRIVATE_TOKEN: ${{ secrets.GO_PRIVATE_TOKEN }}
 
   publish:
     name: Attest and stage immutable release
@@ -146,10 +141,6 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - name: Authenticate private dependencies
-        uses: ./.github/actions/auth-private-dependencies
-        with:
-          token: ${{ secrets.GO_PRIVATE_TOKEN }}
       - name: Install frozen release tools
         run: uv sync --frozen
       - name: Download gate-built Python distributions
@@ -536,10 +527,6 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - name: Authenticate private dependencies
-        uses: ./.github/actions/auth-private-dependencies
-        with:
-          token: ${{ secrets.GO_PRIVATE_TOKEN }}
       - name: Install pinned Cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with:
@@ -651,10 +638,6 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - name: Authenticate private dependencies
-        uses: ./.github/actions/auth-private-dependencies
-        with:
-          token: ${{ secrets.GO_PRIVATE_TOKEN }}
       - name: Install pinned Cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with:

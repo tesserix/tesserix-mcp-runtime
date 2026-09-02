@@ -2,6 +2,9 @@ name: Release integration journey
 
 on:
   workflow_call:
+    secrets:
+      GO_PRIVATE_TOKEN:
+        required: true
   push:
     tags:
       - "v*-rc*"
@@ -54,10 +57,6 @@ jobs:
         with:
           version: "0.12.7"
           enable-cache: true
-      - name: Authenticate private dependencies
-        uses: ./.github/actions/auth-private-dependencies
-        with:
-          token: ${{ secrets.GO_PRIVATE_TOKEN }}
       - name: Install pinned Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
         with:

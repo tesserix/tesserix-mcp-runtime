@@ -29,7 +29,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | Explicit application composition, in-process transport, signals, and bounded drain | Implemented in source; pre-release |
 | Typed callable authoring, schema fingerprints, compatibility classification, and handler-free metadata export | Implemented in source; pre-release |
 | MCP v2 stateless Streamable HTTP serving and compatibility matrix | Implemented in source; pre-release |
-| ADK `AgentToolView` and `McpServer` bridge | Implemented as an exact optional profile |
+| ADK `AgentToolView` and `McpServer` bridge | Implemented against separately installed, attested `tesserix-adk==0.53.1`; pre-release |
 | Default-deny per-tool scopes, effects, approvals, idempotency, and audit | Implemented in source; pre-release |
 | Bounded JSON, concurrency, deadlines, cancellation, and safe retries | Implemented in source; pre-release |
 | [Bounded telemetry, health, and graceful drain](docs/observability.md) | Implemented in source; pre-release |

@@ -303,7 +303,7 @@ def test_bridge_fails_only_when_the_optional_adk_release_is_missing(
 
     monkeypatch.setattr(adk, "distribution_version", missing)
 
-    with pytest.raises(adk.ADKBridgeDependencyError, match=r"runtime\[adk\]"):
+    with pytest.raises(adk.ADKBridgeDependencyError, match=r"tesserix-adk==0\.53\.1"):
         adk.ADKStreamableHTTPBridge(object(), exports=())
 
 

@@ -60,6 +60,30 @@ def _triggers_pull_request(workflow: Mapping[str, object]) -> bool:
     return isinstance(triggers, dict) and "pull_request" in triggers
 
 
+def _contains_secret_reference(value: object) -> bool:
+    if isinstance(value, str):
+        return "secrets." in value
+    if isinstance(value, dict):
+        return any(_contains_secret_reference(item) for item in value.values())
+    if isinstance(value, list):
+        return any(_contains_secret_reference(item) for item in value)
+    return False
+
+
+def _pull_request_secrets_are_guarded(workflow: Mapping[str, object]) -> bool:
+    jobs = workflow.get("jobs")
+    if not isinstance(jobs, dict):
+        return False
+    for raw_job in jobs.values():
+        if not isinstance(raw_job, dict):
+            return False
+        if not _contains_secret_reference(raw_job):
+            continue
+        if raw_job.get("if") != "github.event_name != 'pull_request'":
+            return False
+    return True
+
+
 def _write_permissions(
     filename: str,
     workflow: Mapping[str, object],
@@ -124,7 +148,7 @@ def _untrusted_pull_requests(
             return False
         if not _triggers_pull_request(workflow):
             continue
-        if "secrets." in document or re.search(r"^\s*secrets:\s*", document, re.MULTILINE):
+        if "secrets." in document and not _pull_request_secrets_are_guarded(workflow):
             return False
         if document.count("actions/checkout@") != document.count("persist-credentials: false"):
             return False

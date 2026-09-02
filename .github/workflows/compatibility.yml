@@ -2,6 +2,9 @@ name: Compatibility
 
 on:
   workflow_call:
+    secrets:
+      GO_PRIVATE_TOKEN:
+        required: true
   pull_request:
   push:
     branches:
@@ -27,6 +30,7 @@ env:
 jobs:
   compatibility:
     name: MCP SDK matrix
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -52,10 +56,6 @@ jobs:
         with:
           version: "0.12.7"
           enable-cache: true
-      - name: Authenticate private dependencies
-        uses: ./.github/actions/auth-private-dependencies
-        with:
-          token: ${{ secrets.GO_PRIVATE_TOKEN }}
       - name: Install pinned Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
         with:
@@ -219,9 +219,11 @@ jobs:
 
   adk-compatibility:
     name: Attested ADK bridge
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
+      ADK_BUNDLE: sha256.eec6afc695518971f44723e520cf43f0997110d013ce4733f8d6d30ec96b8bdb.jsonl
       ADK_RELEASE: v0.53.1
       ADK_WHEEL: tesserix_adk-0.53.1-py3-none-any.whl
       ADK_SHA256: eec6afc695518971f44723e520cf43f0997110d013ce4733f8d6d30ec96b8bdb
@@ -240,10 +242,6 @@ jobs:
         with:
           version: "0.12.7"
           enable-cache: true
-      - name: Authenticate private dependencies
-        uses: ./.github/actions/auth-private-dependencies
-        with:
-          token: ${{ secrets.GO_PRIVATE_TOKEN }}
       - name: Require review for a newly dispatched ADK release
         if: github.event_name == 'repository_dispatch'
         env:
@@ -257,15 +255,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GO_PRIVATE_TOKEN }}
         run: |
-          verified_dir=$(mktemp -d)
+          verified_dir="$PWD/.compatibility/adk-release"
+          mkdir -p "$verified_dir"
           gh release download "$ADK_RELEASE" \
             --repo tesserix/agent-development-kit \
             --pattern "$ADK_WHEEL" \
+            --pattern "$ADK_BUNDLE" \
             --dir "$verified_dir"
           printf '%s  %s\n' "$ADK_SHA256" "$verified_dir/$ADK_WHEEL" \
             | sha256sum --check --strict
           gh attestation verify "$verified_dir/$ADK_WHEEL" \
-            --repo tesserix/agent-development-kit
+            --repo tesserix/agent-development-kit \
+            --bundle "$verified_dir/$ADK_BUNDLE"
       - name: Prove the core environment remains ADK-free
         run: |
           uv lock --check
@@ -273,5 +274,7 @@ jobs:
           uv run --frozen python -c "from importlib.util import find_spec; assert find_spec('tesserix_adk') is None"
       - name: Exercise the exact optional ADK bridge
         run: >-
-          uv run --isolated --frozen --extra adk --extra testkit pytest -q -o addopts=''
+          uv run --isolated --frozen
+          --with "$PWD/.compatibility/adk-release/$ADK_WHEEL"
+          --extra testkit pytest -q -o addopts=''
           compatibility/adk/test_bridge.py

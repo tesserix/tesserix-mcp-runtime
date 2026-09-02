@@ -127,6 +127,7 @@ def test_release_publishes_only_exact_signed_and_publicly_verified_artifacts() -
     text = RELEASE.read_text(encoding="utf-8")
 
     assert set(re.findall(r"secrets\.([A-Z0-9_]+)", text)) == {"GO_PRIVATE_TOKEN"}
+    assert text.count("GO_PRIVATE_TOKEN: ${{ secrets.GO_PRIVATE_TOKEN }}") == 2
     assert ":latest" not in text
     assert "PUBLISH_TO_PYPI" not in text
     assert "--push" not in text

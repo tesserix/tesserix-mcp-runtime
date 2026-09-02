@@ -50,10 +50,11 @@ def test_core_dependency_report_matches_frozen_resolution() -> None:
     assert result["profiles"]["core"]["wheel_bytes"] is None
     policy = json.loads(REPORT.read_text(encoding="utf-8"))
     assert policy["profiles"]["core"]["max_wheel_bytes"] == 131_072
-    assert result["profiles"]["adk"]["declared_dependencies"][-2].startswith(
-        "tesserix-adk @ https://github.com/tesserix/agent-development-kit/releases/"
+    assert (
+        result["profiles"]["adk"]["declared_dependencies"]
+        == result["profiles"]["core"]["declared_dependencies"]
     )
-    assert result["profiles"]["adk"]["distribution_count"] == 35
+    assert result["profiles"]["adk"]["distribution_count"] == 34
     assert result["profiles"]["otel"]["distribution_count"] == 36
     assert result["profiles"]["otel"]["declared_dependencies"][-2:] == [
         "opentelemetry-sdk>=1.42.1,<2",
@@ -92,21 +93,19 @@ def test_core_dependency_report_matches_frozen_resolution() -> None:
     )
 
 
-def test_adk_is_forbidden_outside_its_explicit_dependency_profile(tmp_path: Path) -> None:
+def test_adk_profile_does_not_allow_or_resolve_private_adk() -> None:
     policy = json.loads(REPORT.read_text(encoding="utf-8"))
-    policy["profiles"]["adk"]["allowed_forbidden_dependencies"] = []
-    drifted_report = tmp_path / "dependency-report.json"
-    drifted_report.write_text(json.dumps(policy), encoding="utf-8")
+    adk_profile = policy["profiles"]["adk"]
 
-    completed = run_checker(drifted_report)
-
-    assert completed.returncode == 1
-    result = json.loads(completed.stdout)
-    assert {
-        "dependency": "tesserix-adk",
-        "profile": "adk",
-        "reason": "forbidden dependency resolved",
-    } in result["violations"]
+    assert adk_profile["allowed_forbidden_dependencies"] == []
+    assert all(
+        not dependency.startswith("tesserix-adk")
+        for dependency in adk_profile["declared_dependencies"]
+    )
+    assert all(
+        not dependency.startswith("tesserix-adk")
+        for dependency in adk_profile["resolved_dependencies"]
+    )
 
 
 def test_dependency_report_rejects_a_forbidden_resolved_package(

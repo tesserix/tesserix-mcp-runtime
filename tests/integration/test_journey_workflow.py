@@ -38,6 +38,7 @@ def test_release_journey_workflow_is_pinned_read_only_and_sanitized() -> None:
     assert "retention-days: 7" in workflow
     assert "docker push" not in workflow
     assert "--push" not in workflow
-    assert "secrets." not in workflow
+    assert workflow.count("secrets.GO_PRIVATE_TOKEN") == 1
+    assert "token: ${{ secrets.GO_PRIVATE_TOKEN }}" in workflow
     assert "kubectl" not in workflow
     assert "kubeconfig" not in workflow.lower()
