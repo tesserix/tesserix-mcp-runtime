@@ -104,9 +104,9 @@ jobs:
             --provenance=false \
             --tag "$CORE_IMAGE" \
             .
-          core_digest="$(jq -er '."containerimage.digest" | select(test("^sha256:[0-9a-f]{64}$"))' artifacts/core-build.json)"
           docker buildx build \
-            --build-arg "CORE_IMAGE=${CORE_IMAGE}@${core_digest}" \
+            --builder default \
+            --build-arg "CORE_IMAGE=${CORE_IMAGE}" \
             --file integration/journey/Dockerfile \
             --load \
             --metadata-file artifacts/runtime-build.json \

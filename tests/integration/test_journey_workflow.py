@@ -29,6 +29,9 @@ def test_release_journey_workflow_is_pinned_read_only_and_sanitized() -> None:
     assert "c57ab918abd5b05ca7e7d0f275875dd1330a695074f309dc9eab1b49efafcd4b" in workflow
     assert "python -m integration.journey.run" in workflow
     assert "uv build --wheel --out-dir artifacts/security-package" in workflow
+    assert '--build-arg "CORE_IMAGE=${CORE_IMAGE}"' in workflow
+    assert '--build-arg "CORE_IMAGE=${CORE_IMAGE}@${core_digest}"' not in workflow
+    assert "--builder default" in workflow
     assert '--package-digest "$package_digest"' in workflow
     assert '--source-revision "$GITHUB_SHA"' in workflow
     assert "security-evidence.json" in workflow
