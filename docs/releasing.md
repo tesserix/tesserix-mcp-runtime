@@ -37,15 +37,16 @@ prevent self-review: enabled where the organization plan supports it
 ```
 
 The `release` environment protects GHCR publication, artifact attestations,
-and draft/final GitHub Release mutation. The `pypi` environment is reserved for
+and final GitHub Release creation. The `pypi` environment is reserved for
 future PyPI trusted publishing and is not referenced by the current workflow.
 Creating it does not grant authority or enable publishing.
 
 Protect `v*` tags from update and deletion. Never delete or move a published tag.
 Require the release workflow's public-smoke job before an operator declares the
 release complete. Repository-wide Actions defaults remain read-only; only
-the protected publish job receives `packages: write`, `contents: write`,
-`attestations: write`, `artifact-metadata: write`, and `id-token: write`.
+the protected publish job receives `packages: write`, `attestations: write`,
+`artifact-metadata: write`, and `id-token: write`; its contents permission stays
+read-only. Only the protected finalizer receives `contents: write`.
 
 ## Release-candidate procedure
 
@@ -88,8 +89,10 @@ they pass, the protected job:
 - creates GitHub provenance and SBOM attestations, Cosign keyless signatures,
   and Cosign SBOM attestations;
 - scans archives and retained evidence for secret shapes;
-- creates a draft release, verifies the draft, publishes it, then downloads
-  assets anonymously and pulls both images without registry credentials.
+- retains one immutable release-candidate artifact, verifies it in a read-only
+  job, creates the public release from those same bytes in the protected
+  finalizer, then downloads assets anonymously and pulls both images without
+  registry credentials.
 
 The release manifest records the tag, PEP 440 version, source SHA, workflow
 ref, artifact SHA-256 values, sizes, and image digest references. `SHA256SUMS`
@@ -207,8 +210,8 @@ primary channel. Until then, the GitHub Release fallback remains authoritative.
 |---|---|---|
 | Any reusable gate | Nothing published | Fix through a PR; keep or delete the unpublished local tag according to tag policy |
 | Image push or attestation | A versioned GHCR object may exist; no public release | Treat the version as burned, preserve evidence, and use a superseding version |
-| Draft creation or staged smoke | Draft may exist; it is not a completed release | Do not replace assets; inspect the draft and publish a superseding version |
-| Finalization | Verified draft remains recoverable | Re-run only the failed finalization job after confirming the draft asset hashes |
+| Candidate retention or staged smoke | Immutable images and retained candidate evidence may exist; no GitHub Release | Preserve evidence and publish a superseding version |
+| Finalization | Verified candidate evidence remains recoverable | Re-run only the failed finalization job if no release exists and the candidate artifact hashes still match |
 | Anonymous public smoke | Public release is incomplete | Open an incident, mark it affected, retain evidence, and publish a superseding version |
 | Future PyPI/GitHub divergence | One channel may contain immutable bytes | Stop finalization, compare digests, follow the index incident procedure, and never rebuild the same version |
 

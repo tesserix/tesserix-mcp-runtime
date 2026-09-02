@@ -16,7 +16,6 @@ _ALLOWED_WRITES = {
     ("manifest-schema-update.yml", "update", "pull-requests"),
     ("release.yml", "publish", "artifact-metadata"),
     ("release.yml", "publish", "attestations"),
-    ("release.yml", "publish", "contents"),
     ("release.yml", "publish", "id-token"),
     ("release.yml", "publish", "packages"),
     ("release.yml", "finalize", "contents"),

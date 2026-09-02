@@ -65,7 +65,7 @@ def test_release_is_tag_only_and_privilege_is_scoped_to_protected_jobs() -> None
     assert jobs["publish"]["permissions"] == {
         "artifact-metadata": "write",
         "attestations": "write",
-        "contents": "write",
+        "contents": "read",
         "id-token": "write",
         "packages": "write",
     }
@@ -94,6 +94,7 @@ def test_release_is_tag_only_and_privilege_is_scoped_to_protected_jobs() -> None
         "containers",
         "adversarial",
     ]
+    assert jobs["finalize"]["needs"] == ["guard", "publish", "smoke"]
 
 
 def test_release_reuses_every_gate_and_pins_every_external_action() -> None:
@@ -138,10 +139,10 @@ def test_release_publishes_only_exact_signed_and_publicly_verified_artifacts() -
     assert "cosign attest --yes" in text
     assert text.count("uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6") == 6
     assert "gh release create" in text
-    assert "--draft" in text
+    assert "--draft" not in text
     assert "--verify-tag" in text
-    assert "gh release edit" in text
-    assert "--draft=false" in text
+    assert "gh release edit" not in text
+    assert text.count("name: release-candidate-${{ needs.guard.outputs.tag }}") == 3
     assert "ghcr.io/${{ github.repository }}:${{ needs.guard.outputs.oci_tag }}-core" in text
     assert "ghcr.io/${{ github.repository }}:${{ needs.guard.outputs.oci_tag }}-adk" in text
     assert "scan_journey_surfaces" in text
