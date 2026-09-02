@@ -1772,45 +1772,6 @@ wheels = [
 ]
 
 [[package]]
-name = "tesserix-adk"
-version = "0.53.1"
-source = { url = "https://github.com/tesserix/agent-development-kit/releases/download/v0.53.1/tesserix_adk-0.53.1-py3-none-any.whl" }
-dependencies = [
-    { name = "httpx" },
-    { name = "opentelemetry-api" },
-    { name = "pydantic" },
-    { name = "typing-extensions" },
-]
-wheels = [
-    { url = "https://github.com/tesserix/agent-development-kit/releases/download/v0.53.1/tesserix_adk-0.53.1-py3-none-any.whl", hash = "sha256:eec6afc695518971f44723e520cf43f0997110d013ce4733f8d6d30ec96b8bdb" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "a2a-sdk", extras = ["http-server"], marker = "extra == 'a2a'", specifier = ">=1.1.2" },
-    { name = "a2a-sdk", extras = ["http-server"], marker = "extra == 'all'", specifier = ">=1.1.2" },
-    { name = "google-adk", extras = ["a2a"], marker = "extra == 'all'", specifier = ">=2.8,<3" },
-    { name = "google-adk", extras = ["a2a"], marker = "extra == 'google-adk'", specifier = ">=2.8,<3" },
-    { name = "graphiti-core", marker = "extra == 'all'", specifier = ">=0.14,<1" },
-    { name = "graphiti-core", marker = "extra == 'graphiti'", specifier = ">=0.14,<1" },
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "jsonschema", marker = "extra == 'all'", specifier = ">=4.23" },
-    { name = "jsonschema", marker = "extra == 'mcp'", specifier = ">=4.23" },
-    { name = "mcp", marker = "extra == 'all'", specifier = ">=1.9" },
-    { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.9" },
-    { name = "opentelemetry-api", specifier = ">=1.27" },
-    { name = "psycopg", extras = ["binary", "pool"], marker = "extra == 'all'", specifier = ">=3.2" },
-    { name = "psycopg", extras = ["binary", "pool"], marker = "extra == 'postgres'", specifier = ">=3.2" },
-    { name = "pydantic", specifier = ">=2.9" },
-    { name = "redis", marker = "extra == 'all'", specifier = ">=5.2" },
-    { name = "redis", marker = "extra == 'redis'", specifier = ">=5.2" },
-    { name = "temporalio", marker = "extra == 'all'", specifier = ">=1.9" },
-    { name = "temporalio", marker = "extra == 'temporal'", specifier = ">=1.9" },
-    { name = "typing-extensions", specifier = ">=4.12" },
-]
-provides-extras = ["a2a", "all", "google-adk", "graphiti", "mcp", "postgres", "redis", "temporal"]
-
-[[package]]
 name = "tesserix-mcp-manifest"
 source = { editable = "packages/tesserix-mcp-manifest" }
 dependencies = [
@@ -1852,9 +1813,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-adk = [
-    { name = "tesserix-adk" },
-]
 manifest = [
     { name = "tesserix-mcp-manifest" },
 ]
@@ -1901,7 +1859,6 @@ requires-dist = [
     { name = "opentelemetry-api", specifier = ">=1.42.1,<2" },
     { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.42.1,<2" },
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.13,<3" },
-    { name = "tesserix-adk", marker = "extra == 'adk'", url = "https://github.com/tesserix/agent-development-kit/releases/download/v0.53.1/tesserix_adk-0.53.1-py3-none-any.whl" },
     { name = "tesserix-mcp-manifest", marker = "extra == 'manifest'", editable = "packages/tesserix-mcp-manifest" },
     { name = "tesserix-mcp-publisher", marker = "extra == 'publisher'", editable = "packages/tesserix-mcp-publisher" },
     { name = "tesserix-mcp-testkit", marker = "extra == 'testkit'", editable = "packages/tesserix-mcp-testkit" },

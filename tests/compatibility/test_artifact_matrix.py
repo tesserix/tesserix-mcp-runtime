@@ -109,5 +109,8 @@ def test_compatibility_workflow_runs_pinned_artifact_and_devai_evidence() -> Non
     assert "retention-days: 7" in workflow
     assert "docker push" not in workflow
     assert "--push" not in workflow
-    assert "secrets." not in workflow
+    assert workflow.count("secrets.GO_PRIVATE_TOKEN") == 2
+    assert "token: ${{ secrets.GO_PRIVATE_TOKEN }}" in workflow
+    assert "GH_TOKEN: ${{ secrets.GO_PRIVATE_TOKEN }}" in workflow
+    assert workflow.count("if: github.event_name != 'pull_request'") == 2
     assert "kubectl" not in workflow

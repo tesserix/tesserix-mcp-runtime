@@ -53,7 +53,7 @@ def _load_factory() -> _ADKMcpServerConfigFactory:
         installed = distribution_version(ADK_DISTRIBUTION)
     except PackageNotFoundError as error:
         raise ADKBridgeDependencyError(
-            "install tesserix-mcp-runtime[adk] to use the Registry ADK adapter"
+            f"install {ADK_DISTRIBUTION}=={ADK_RELEASE} to use the Registry ADK adapter"
         ) from error
     if installed != ADK_RELEASE:
         raise ADKBridgeDependencyError(

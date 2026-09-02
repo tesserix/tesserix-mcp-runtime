@@ -90,7 +90,7 @@ def test_registry_adk_adapter_reports_a_missing_optional_dependency(
 
     monkeypatch.setattr(registry_adk, "distribution_version", missing)
 
-    with pytest.raises(registry_adk.ADKBridgeDependencyError, match=r"\[adk\]"):
+    with pytest.raises(registry_adk.ADKBridgeDependencyError, match=r"tesserix-adk==0\.53\.1"):
         registry_adk.to_adk_mcp_server_config(_projection())
 
 

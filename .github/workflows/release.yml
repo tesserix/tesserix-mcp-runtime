@@ -94,6 +94,8 @@ jobs:
       attestations: read
       contents: read
     uses: ./.github/workflows/compatibility.yml
+    secrets:
+      GO_PRIVATE_TOKEN: ${{ secrets.GO_PRIVATE_TOKEN }}
 
   containers:
     needs: guard
@@ -106,6 +108,8 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/release-journey.yml
+    secrets:
+      GO_PRIVATE_TOKEN: ${{ secrets.GO_PRIVATE_TOKEN }}
 
   publish:
     name: Attest and stage immutable release

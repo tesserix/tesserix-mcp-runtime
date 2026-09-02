@@ -135,11 +135,10 @@ safely. A cache is never an authorization source.
 
 ## ADK ownership
 
-Install the exact optional profile before converting a projection:
-
-```console
-uv sync --extra adk
-```
+Install the separately downloaded and attestation-verified
+`tesserix-adk==0.53.1` wheel before converting a projection. The public runtime
+metadata intentionally does not resolve the private ADK distribution; use the
+verification and installation procedure in the [ADK bridge guide](adk-bridge.md).
 
 The adapter constructs ADK 0.53.1's existing `McpServerConfig` with the trusted
 Gateway endpoint, exact reviewed allowlist, denylist, prefix, and budgets. ADK
@@ -156,7 +155,8 @@ The checked-in compatibility contract is:
 
 - Python `>=3.12,<3.15`, including maintained Python 3.14 runtimes;
 - `mcp>=2.1.1,<3` and `mcp-types>=2.1.1,<3`; and
-- optional `tesserix-adk==0.53.1` from the hash-pinned release wheel.
+- separately installed `tesserix-adk==0.53.1` from the hash-pinned, attested
+  private release wheel.
 
 This repository has no dependency, lock entry, or authoritative catalog
 evidence for an MCP SDK release called `1.34`; do not publish an image or

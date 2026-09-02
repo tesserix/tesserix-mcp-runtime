@@ -123,7 +123,7 @@ def _load_adk() -> _ADKBindings:
         installed = distribution_version(ADK_DISTRIBUTION)
     except PackageNotFoundError as error:
         raise ADKBridgeDependencyError(
-            "install tesserix-mcp-runtime[adk] to use the ADK bridge"
+            f"install {ADK_DISTRIBUTION}=={ADK_RELEASE} to use the ADK bridge"
         ) from error
     if installed != ADK_RELEASE:
         raise ADKBridgeDependencyError(

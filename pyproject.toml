@@ -27,9 +27,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-adk = [
-  "tesserix-adk @ https://github.com/tesserix/agent-development-kit/releases/download/v0.53.1/tesserix_adk-0.53.1-py3-none-any.whl#sha256=eec6afc695518971f44723e520cf43f0997110d013ce4733f8d6d30ec96b8bdb",
-]
+adk = []
 otel = [
   "opentelemetry-sdk>=1.42.1,<2",
 ]

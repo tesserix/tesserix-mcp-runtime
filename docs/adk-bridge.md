@@ -8,14 +8,34 @@ its bounded response envelope.
 
 ## Install the reviewed release
 
-The repository pins ADK 0.53.1 to its attested GitHub release wheel because the
-package is not yet published through the trusted PyPI path:
+The bridge is tested against exactly `tesserix-adk==0.53.1`. The ADK package is
+private and is therefore deliberately absent from this public package's
+dependency metadata and lock file. An authorized application must download and
+verify the attested wheel, then install it alongside the runtime:
 
-    uv sync --frozen --extra adk
+```console
+mkdir -p .compatibility/adk-release
+gh release download v0.53.1 \
+  --repo tesserix/agent-development-kit \
+  --pattern tesserix_adk-0.53.1-py3-none-any.whl \
+  --pattern sha256.eec6afc695518971f44723e520cf43f0997110d013ce4733f8d6d30ec96b8bdb.jsonl \
+  --dir .compatibility/adk-release
+printf '%s  %s\n' \
+  eec6afc695518971f44723e520cf43f0997110d013ce4733f8d6d30ec96b8bdb \
+  .compatibility/adk-release/tesserix_adk-0.53.1-py3-none-any.whl \
+  | sha256sum --check --strict
+gh attestation verify \
+  .compatibility/adk-release/tesserix_adk-0.53.1-py3-none-any.whl \
+  --repo tesserix/agent-development-kit \
+  --bundle .compatibility/adk-release/sha256.eec6afc695518971f44723e520cf43f0997110d013ce4733f8d6d30ec96b8bdb.jsonl
+uv sync --frozen
+uv pip install --python .venv/bin/python \
+  .compatibility/adk-release/tesserix_adk-0.53.1-py3-none-any.whl
+```
 
 Core installation does not resolve or import ADK. Importing
-`tesserix_mcp_runtime.adapters.adk` is safe without the extra; constructing
-`ADKStreamableHTTPBridge` then explains that the extra is required.
+`tesserix_mcp_runtime.adapters.adk` is safe without ADK; constructing
+`ADKStreamableHTTPBridge` then explains which exact ADK version is required.
 
 ## Compose an existing tool view
 
@@ -95,7 +115,9 @@ for exact platform manifests and dependency measurements.
 The default tests remain ADK-free. Run the exact release behavior lane
 separately:
 
-    uv run --isolated --frozen --extra adk pytest -q -o addopts='' \
+    uv run --isolated --frozen \
+      --with .compatibility/adk-release/tesserix_adk-0.53.1-py3-none-any.whl \
+      --extra testkit pytest -q -o addopts='' \
       compatibility/adk/test_bridge.py
 
 ADK releases should dispatch the `adk-release` repository event with

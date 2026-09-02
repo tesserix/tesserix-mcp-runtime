@@ -2,6 +2,9 @@ name: Release integration journey
 
 on:
   workflow_call:
+    secrets:
+      GO_PRIVATE_TOKEN:
+        required: true
   push:
     tags:
       - "v*-rc*"
@@ -44,6 +47,7 @@ jobs:
           ref: 6921474591b6c59e89025370c310c7f85859246f
           path: .journey/agentic-registry
           persist-credentials: false
+          token: ${{ secrets.GO_PRIVATE_TOKEN }}
       - name: Install Python 3.14
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:

@@ -6,15 +6,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[2]
 SIZE_REPORT = ROOT / "architecture" / "adk-bridge-size-report.json"
-ADK_WHEEL = (
-    "tesserix-adk @ "
-    "https://github.com/tesserix/agent-development-kit/releases/download/v0.53.1/"
-    "tesserix_adk-0.53.1-py3-none-any.whl"
-    "#sha256=eec6afc695518971f44723e520cf43f0997110d013ce4733f8d6d30ec96b8bdb"
-)
 
 
-def test_adk_bridge_is_an_exact_optional_release_dependency() -> None:
+def test_public_metadata_keeps_the_private_adk_release_external() -> None:
     document = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     project = document["project"]
 
@@ -28,13 +22,22 @@ def test_adk_bridge_is_an_exact_optional_release_dependency() -> None:
         "uvicorn>=0.52.4,<1",
     ]
     assert project["optional-dependencies"] == {
-        "adk": [ADK_WHEEL],
+        "adk": [],
         "manifest": ["tesserix-mcp-manifest>=0.0.1.dev0,<1"],
         "otel": ["opentelemetry-sdk>=1.42.1,<2"],
         "publisher": ["tesserix-mcp-publisher>=0.0.1.dev0,<1"],
         "testkit": ["tesserix-mcp-testkit>=0.0.1.dev0,<1"],
     }
     assert document["tool"]["hatch"]["metadata"] == {"allow-direct-references": True}
+    assert "agent-development-kit" not in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+
+def test_adk_workflow_verifies_the_downloaded_release_offline() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "compatibility.yml").read_text(encoding="utf-8")
+
+    assert '--pattern "$ADK_BUNDLE"' in workflow
+    assert '--bundle "$verified_dir/$ADK_BUNDLE"' in workflow
+    assert '--with "$PWD/.compatibility/adk-release/$ADK_WHEEL"' in workflow
 
 
 def test_adk_bridge_size_evidence_compares_opt_in_and_core_profiles() -> None:

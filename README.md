@@ -29,13 +29,14 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | Explicit application composition, in-process transport, signals, and bounded drain | Implemented in source; pre-release |
 | Typed callable authoring, schema fingerprints, compatibility classification, and handler-free metadata export | Implemented in source; pre-release |
 | MCP v2 stateless Streamable HTTP serving and compatibility matrix | Implemented in source; pre-release |
-| ADK `AgentToolView` and `McpServer` bridge | Implemented as an exact optional profile |
+| ADK `AgentToolView` and `McpServer` bridge | Implemented against separately installed, attested `tesserix-adk==0.53.1`; pre-release |
 | Default-deny per-tool scopes, effects, approvals, idempotency, and audit | Implemented in source; pre-release |
 | Bounded JSON, concurrency, deadlines, cancellation, and safe retries | Implemented in source; pre-release |
 | [Bounded telemetry, health, and graceful drain](docs/observability.md) | Implemented in source; pre-release |
 | [Registry manifests](packages/tesserix-mcp-manifest/README.md) | Compilation is opt-in; pre-release |
 | [Registry publication](docs/registry-publication.md) | Implemented as opt-in delegated tooling; pre-release |
 | [Registry-backed semantic discovery and progressive disclosure](docs/registry-discovery.md) | Implemented as an opt-in bounded client; pre-release |
+| [Stateless agent capability discovery RFC](docs/adr/0031-stateless-agent-capability-discovery.md) | Accepted integration decision across tools, skills, agents, context, ADK, Registry, Gateway, and runtime |
 | [Gateway activation status](docs/gateway-activation.md) | Typed contract and bounded observer implemented; producer rollout tracked externally |
 | [Tenant Gateway reconciliation](docs/tenant-gateway-reconciliation.md) | Identity-scoped eligibility, collision-safe routes, and complete page assembly implemented; producer/GitOps rollout tracked externally |
 | [Container and GitOps deployment](docs/container-gitops.md) | Digest-pinned core and ADK images plus a fail-closed Kubernetes reference contract; product adoption tracked externally |
