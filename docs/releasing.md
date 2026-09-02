@@ -85,7 +85,8 @@ they pass, the protected job:
   component except explicitly reported pip-owned build tooling, proves pip is
   absent, retains every high/critical vulnerability, rejects every finding
   with an available fixed version, reports inherited unfixed risk, and
-  exercises a real MCP initialize/list/call/error flow from both images;
+  exercises modern stateless discover/list/call/error and legacy compatibility
+  flows from both images;
 - creates GitHub provenance and SBOM attestations, Cosign keyless signatures,
   and Cosign SBOM attestations;
 - scans archives and retained evidence for secret shapes;

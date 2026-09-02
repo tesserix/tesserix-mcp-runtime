@@ -38,7 +38,7 @@ and publish-commit-to-active p99 no greater than 120 seconds:
 | --- | ---: |
 | Registry poll and verified snapshot pickup | 30 seconds |
 | Backend, policy, and probe-route acceptance | 20 seconds |
-| Authenticated MCP initialize and `tools/list` probe | 30 seconds |
+| Authenticated modern discovery and bounded operation probe | 30 seconds |
 | Public-route acceptance and status feedback | 20 seconds |
 | Status propagation and scheduling margin | 20 seconds |
 
@@ -84,7 +84,7 @@ mismatch. No component may overwrite a single generic status string.
 | --- | --- | --- |
 | `Published` | Registry | Signed immutable version and both digests are committed |
 | `DeploymentReady` | Gateway reconciler | Backend, required policy, and mesh-only probe route are accepted for this generation |
-| `ProbeReady` | Protocol prober | Authenticated MCP initialize and bounded `tools/list` succeeded for this generation |
+| `ProbeReady` | Protocol prober | Authenticated `server/discover` and a bounded self-contained operation succeeded for this generation |
 | `Healthy` | Protocol prober | Current probe evidence is successful and within its freshness window |
 | `RouteReady` | Gateway reconciler | Public route and references are accepted for this generation |
 | `Failed` | Registry | Activation ended terminally before first public activation |
@@ -130,7 +130,9 @@ for an `active` wait.
    probe-route `Accepted=True` plus `ResolvedRefs=True`, then reports
    `DeploymentReady`.
 4. The immediate prober authenticates like an ordinary machine client through
-   the mesh-only listener, performs MCP initialize and bounded `tools/list`, and
+   the mesh-only listener, performs modern `server/discover` and a bounded
+   self-contained operation (or the legacy handshake only for an explicitly
+   declared compatibility revision), and
    reports `ProbeReady` and `Healthy`.
 5. Registry export adds the public route. The reconciler reports `RouteReady`
    only after public acceptance, resolved references, and policy acceptance.

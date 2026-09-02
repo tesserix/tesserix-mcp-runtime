@@ -66,7 +66,7 @@ The nine phases are:
 | `draft` | No committed Registry version |
 | `published` | Immutable version exists; stage deployment pending |
 | `deployed` | Backend/policy/probe route accepted; protocol probe pending |
-| `probed` | Authenticated initialize and `tools/list` passed; public route pending |
+| `probed` | Authenticated modern discovery and bounded operation passed; public route pending |
 | `active` | Exact deployment, probe, health, policy, and public route accepted |
 | `degraded` | A previously active version lost readiness; inspect last-known-good handling |
 | `deprecated` | Observable retirement window; not a current active-wait success |
