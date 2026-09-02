@@ -437,14 +437,31 @@ jobs:
             release-assets/adk-provenance.sigstore.json
           cp "${{ steps.adk_sbom.outputs.bundle-path }}" \
             release-assets/adk-github-sbom.sigstore.json
-      - name: Make the repository-linked GHCR package public
+      - name: Verify anonymous GHCR pull before staging
         env:
-          GH_TOKEN: ${{ github.token }}
+          ADK_REF: ${{ steps.references.outputs.adk_ref }}
+          CORE_REF: ${{ steps.references.outputs.core_ref }}
         run: |
-          package_name=${GITHUB_REPOSITORY#*/}
-          gh api --method PATCH \
-            "/orgs/${GITHUB_REPOSITORY_OWNER}/packages/container/${package_name}" \
-            -f visibility=public
+          token_url="https://ghcr.io/token?service=ghcr.io&scope=repository:${GITHUB_REPOSITORY}:pull"
+          anonymous_token=$(curl --fail --silent --show-error \
+            --retry 5 --retry-all-errors --retry-delay 2 "$token_url" \
+            | jq -er '.token')
+          for reference in "$CORE_REF" "$ADK_REF"; do
+            repository=${reference#ghcr.io/}
+            repository=${repository%%:*}
+            tagged_reference=${reference%@*}
+            tag=${tagged_reference##*:}
+            expected_digest=${reference##*@}
+            headers=$(curl --fail --silent --show-error --head \
+              --retry 5 --retry-all-errors --retry-delay 2 \
+              --header "Authorization: Bearer ${anonymous_token}" \
+              --header 'Accept: application/vnd.oci.image.index.v1+json' \
+              "https://ghcr.io/v2/${repository}/manifests/${tag}")
+            observed_digest=$(awk \
+              'tolower($1) == "docker-content-digest:" {gsub("\\r", "", $2); print $2}' \
+              <<<"$headers")
+            test "$observed_digest" = "$expected_digest"
+          done
       - name: Assemble immutable release evidence
         env:
           ADK_REF: ${{ steps.references.outputs.adk_ref }}
