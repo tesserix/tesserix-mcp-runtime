@@ -168,3 +168,7 @@ jobs:
             /work/deploy/kubernetes/reference/service-account.json \
             /work/deploy/kubernetes/reference/pod-disruption-budget.json \
             /work/deploy/kubernetes/reference/network-policy.json
+      - name: Render the Istio ambient identity overlay
+        run: |
+          kubectl kustomize deploy/kubernetes/overlays/istio-ambient \
+            > /tmp/tesserix-mcp-istio-ambient.yaml
