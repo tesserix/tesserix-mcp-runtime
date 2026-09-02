@@ -47,6 +47,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | [Adversarial security verification](docs/security-verification.md) | Reusable 51-case contract and pinned real-image release gate implemented; independent review remains required before GA |
 | [Evaluation bundles and promotion gates](docs/evaluation.md) | Versioned local/HTTP runner, eight metrics, signed digest-bound reports, and experimental/internal/GA policy implemented |
 | [Stateless reliability qualification](docs/reliability.md) | Cross-replica, load, soak, dependency, retry, rollout, and capacity evidence implemented |
+| [Stateless MCP production contract](docs/stateless-mcp.md) | Protocol `2026-07-28`, product acceptance, and source reconciliation documented and tested |
 | [Operations and recovery](docs/operations.md) | SLOs, safe dashboards, actionable alerts, incident runbooks, RTO/RPO, and cost review implemented |
 | [Gateway reconciliation decision](docs/reconciliation-decision.md) | Measured polling baseline retained; event path has explicit evidence and recovery gates |
 | [Incremental migration](docs/migration.md) | Deterministic surface diff and stateless migration/runbook implemented; product cutovers remain separately owned |

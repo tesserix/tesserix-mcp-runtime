@@ -64,6 +64,8 @@ from tesserix_mcp_runtime.adapters.streamable_http import (
 )
 from tesserix_mcp_runtime.redaction import SecretRedactor, SecretValue
 
+_ROUTING_HEADER_MISMATCH = -32020
+
 
 def manifest(name: str) -> ToolManifest:
     return ToolManifest(
@@ -2630,6 +2632,83 @@ def test_unsupported_protocol_revision_fails_with_standard_error() -> None:
         assert status == 400
         assert jsonrpc_code(body) == UNSUPPORTED_PROTOCOL_VERSION
         assert b"2.1.1" not in body
+        await transport.stop()
+
+    asyncio.run(exercise())
+
+
+def test_modern_protocol_rejects_removed_get_and_undeclared_subscriptions() -> None:
+    async def exercise() -> None:
+        listener = LifespanListener()
+        transport = StreamableHTTPTransport(
+            config=StreamableHTTPConfig(),
+            limits=StreamableHTTPLimits(),
+            context_provider=StaticContextProvider(),
+            telemetry=RecordingProtocolTelemetry(),
+            listener=listener,
+        )
+        await transport.start(FakeEndpoint((manifest("examples.echo"),)))
+        assert listener.app is not None
+
+        get_status, _, _ = await call_asgi(
+            listener.app,
+            method="GET",
+            headers=modern_headers("server/discover"),
+        )
+        subscription_status, _, subscription_body = await call_asgi(
+            listener.app,
+            headers=modern_headers("subscriptions/listen"),
+            body=modern_request(
+                "subscriptions/listen",
+                params={"notifications": {"tools/list_changed": True}},
+            ),
+        )
+
+        assert get_status == 405
+        assert subscription_status == 404
+        assert jsonrpc_code(subscription_body) == METHOD_NOT_FOUND
+        await transport.stop()
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize(
+    ("headers", "body"),
+    [
+        (
+            modern_headers("server/discover", protocol_version="2026-07-28"),
+            modern_request("server/discover", protocol_version="2025-11-25"),
+        ),
+        (
+            modern_headers("tools/list"),
+            modern_request("server/discover"),
+        ),
+    ],
+)
+def test_modern_protocol_rejects_routing_header_payload_mismatches(
+    headers: list[tuple[bytes, bytes]],
+    body: bytes,
+) -> None:
+    async def exercise() -> None:
+        listener = LifespanListener()
+        transport = StreamableHTTPTransport(
+            config=StreamableHTTPConfig(),
+            limits=StreamableHTTPLimits(),
+            context_provider=StaticContextProvider(),
+            telemetry=RecordingProtocolTelemetry(),
+            listener=listener,
+        )
+        await transport.start(FakeEndpoint((manifest("examples.echo"),)))
+        assert listener.app is not None
+
+        status, _, response = await call_asgi(
+            listener.app,
+            headers=headers,
+            body=body,
+        )
+
+        assert status == 400
+        assert jsonrpc_code(response) == _ROUTING_HEADER_MISMATCH
         await transport.stop()
 
     asyncio.run(exercise())

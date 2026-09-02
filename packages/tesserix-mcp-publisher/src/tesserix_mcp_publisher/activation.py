@@ -104,7 +104,8 @@ _SUMMARIES = {
         "Digest-bound backend and probe route are accepted; authenticated probe is pending."
     ),
     ActivationPhase.PROBED: (
-        "Authenticated MCP initialize and tools/list succeeded; public route promotion is pending."
+        "Authenticated MCP discovery and bounded operation succeeded; "
+        "public route promotion is pending."
     ),
     ActivationPhase.ACTIVE: (
         "Digest-bound deployment, probe, health, and public route are accepted."

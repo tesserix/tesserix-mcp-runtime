@@ -102,7 +102,7 @@ The runner performs these phases in order:
    resource kinds, and translate its selected remote endpoint to the isolated
    Docker service address;
 6. start the digest-pinned Gateway with an equivalent standalone route, wait
-   for an authenticated MCP initialize/list probe, and only then mark the
+   for an authenticated modern discover/operation probe, and only then mark the
    exact Registry digest active;
 7. invoke read, write, approval-required, deterministic failure, slow, and
    secret-canary tools through Gateway while asserting tenant, subject, scopes,
