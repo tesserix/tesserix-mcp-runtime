@@ -153,6 +153,9 @@ def test_release_publishes_only_exact_signed_and_publicly_verified_artifacts() -
     assert "gh attestation verify" in text
     assert "cosign verify-attestation" in text
     assert "--predicate-type https://cyclonedx.org/bom" in text
+    assert "visibility=public" not in text
+    assert "scope=repository:${GITHUB_REPOSITORY}:pull" in text
+    assert "docker-content-digest" in text
 
 
 def test_release_sboms_prove_artifacts_lock_and_base_image_contents() -> None:
