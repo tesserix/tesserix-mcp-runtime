@@ -19,7 +19,7 @@ _WORKSPACE_PACKAGES = (
     "tesserix-mcp-runtime",
     "tesserix-mcp-testkit",
 )
-_REQUIRED_LOCKED_PACKAGES = frozenset({"mcp", "tesserix-adk"})
+_REQUIRED_LOCKED_PACKAGES = frozenset({"mcp"})
 _REMOVABLE_BASE_PACKAGES = frozenset({"pip"})
 _IMAGE_REFERENCE = re.compile(
     r"ghcr\.io/[a-z0-9_.-]+/[a-z0-9_.-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}\Z"

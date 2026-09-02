@@ -58,7 +58,6 @@ def test_python_sbom_binds_release_version_and_proves_locked_dependencies(
             "components": [
                 *({"type": "library", "name": name} for name in WORKSPACE_PACKAGES),
                 _component("mcp", "2.1.1"),
-                _component("tesserix-adk", "0.53.1"),
             ],
         },
     )
@@ -69,9 +68,6 @@ def test_python_sbom_binds_release_version_and_proves_locked_dependencies(
 name = "mcp"
 version = "2.1.1"
 
-[[package]]
-name = "tesserix-adk"
-version = "0.53.1"
 """,
         encoding="utf-8",
     )
@@ -95,7 +91,8 @@ version = "0.53.1"
     }
     assert bound["metadata"]["component"]["version"] == "0.1.0rc1"
     assert report["workspace_packages"] == list(WORKSPACE_PACKAGES)
-    assert report["locked_dependency_components"] == 2
+    assert report["locked_dependency_components"] == 1
+    assert all(component["name"] != "tesserix-adk" for component in bound["components"])
 
 
 def test_python_sbom_rejects_dependency_version_absent_from_lock(tmp_path: Path) -> None:
@@ -119,13 +116,11 @@ def test_python_sbom_rejects_dependency_version_absent_from_lock(tmp_path: Path)
             "components": [
                 *({"type": "library", "name": name} for name in WORKSPACE_PACKAGES),
                 _component("mcp", "9.9.9"),
-                _component("tesserix-adk", "0.53.1"),
             ],
         },
     )
     uv_lock.write_text(
-        'version = 1\n[[package]]\nname = "mcp"\nversion = "2.1.1"\n'
-        '[[package]]\nname = "tesserix-adk"\nversion = "0.53.1"\n',
+        'version = 1\n[[package]]\nname = "mcp"\nversion = "2.1.1"\n',
         encoding="utf-8",
     )
 
