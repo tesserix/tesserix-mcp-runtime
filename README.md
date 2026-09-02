@@ -3,7 +3,10 @@
 Reusable, policy-aware hosting for Model Context Protocol servers on the
 Tesserix platform.
 
-The repository is in its pre-release runtime phase. The checked-in package
+The repository is in its pre-release runtime phase. The published and verified
+release candidate is
+[`v0.1.0-rc.6`](https://github.com/tesserix/tesserix-mcp-runtime/releases/tag/v0.1.0-rc.6).
+The checked-in package
 provides typed contracts, an explicit application composition root,
 deterministic bounded lifecycle, stable safe errors, a validated tool catalog,
 typed-callable schema generation, handler-free manifest snapshots,
@@ -24,7 +27,7 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 
 | Capability | Status |
 | --- | --- |
-| Importable typed package and VCS-derived version command | Implemented in source; pre-release |
+| Importable typed package and VCS-derived version command | `v0.1.0-rc.6` published and independently installed from its GitHub Release wheel; pre-release |
 | [Runtime contracts](docs/contracts.md) and [reusable conformance testkit](docs/conformance.md) | Implemented in source; pre-release |
 | Explicit application composition, in-process transport, signals, and bounded drain | Implemented in source; pre-release |
 | Typed callable authoring, schema fingerprints, compatibility classification, and handler-free metadata export | Implemented in source; pre-release |
@@ -47,7 +50,24 @@ in [ADR-0001](docs/adr/0001-runtime-ownership-and-envelope.md).
 | [Operations and recovery](docs/operations.md) | SLOs, safe dashboards, actionable alerts, incident runbooks, RTO/RPO, and cost review implemented |
 | [Gateway reconciliation decision](docs/reconciliation-decision.md) | Measured polling baseline retained; event path has explicit evidence and recovery gates |
 | [Incremental migration](docs/migration.md) | Deterministic surface diff and stateless migration/runbook implemented; product cutovers remain separately owned |
-| [Immutable release supply chain](docs/releasing.md) | Tag-only GitHub Release and GHCR workflow implemented; the first public candidate still requires explicit approval and protected-environment setup |
+| [Immutable release supply chain](docs/releasing.md) | `v0.1.0-rc.6` published through the protected tag-only GitHub Release and GHCR workflow; anonymous asset and image verification passed |
+
+## Install the published release candidate
+
+The runtime is published as an immutable GitHub Release asset. It is not yet
+published on PyPI, so install the exact wheel URL rather than resolving the
+project name from the default package index:
+
+    uv venv
+    uv pip install --python .venv/bin/python \
+      https://github.com/tesserix/tesserix-mcp-runtime/releases/download/v0.1.0-rc.6/tesserix_mcp_runtime-0.1.0rc6-py3-none-any.whl
+    .venv/bin/python -c "import tesserix_mcp_runtime; print(tesserix_mcp_runtime.__name__)"
+
+The release contains checksums, provenance attestations, SBOM attestations,
+scan evidence, and digest-pinned core and ADK container references. Use the
+[`v0.1.0-rc.6` release page](https://github.com/tesserix/tesserix-mcp-runtime/releases/tag/v0.1.0-rc.6)
+as the canonical download and verification entry point. This remains a release
+candidate rather than a stable or GA package.
 
 The version can be inspected without starting runtime behavior:
 
