@@ -1,0 +1,20 @@
+name: Authenticate private dependencies
+description: Configure uv to read pinned Tesserix private release artifacts.
+
+inputs:
+  token:
+    description: GitHub token with read access to Tesserix private repositories.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Authenticate uv to GitHub
+      shell: bash
+      env:
+        PRIVATE_REPOSITORY_TOKEN: ${{ inputs.token }}
+      run: |
+        test -n "$PRIVATE_REPOSITORY_TOKEN"
+        uv auth login github.com \
+          --username x-access-token \
+          --password "$PRIVATE_REPOSITORY_TOKEN"

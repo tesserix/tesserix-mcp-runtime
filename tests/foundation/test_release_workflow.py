@@ -126,7 +126,7 @@ def test_release_journey_loads_single_platform_images_without_provenance() -> No
 def test_release_publishes_only_exact_signed_and_publicly_verified_artifacts() -> None:
     text = RELEASE.read_text(encoding="utf-8")
 
-    assert "secrets." not in text
+    assert set(re.findall(r"secrets\.([A-Z0-9_]+)", text)) == {"GO_PRIVATE_TOKEN"}
     assert ":latest" not in text
     assert "PUBLISH_TO_PYPI" not in text
     assert "--push" not in text

@@ -42,6 +42,7 @@ jobs:
           ref: 850379a833bb5740c82eb2a16cac452ff93695f0
           path: .compatibility/devai
           persist-credentials: false
+          token: ${{ secrets.GO_PRIVATE_TOKEN }}
       - name: Install Python 3.14
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -51,6 +52,10 @@ jobs:
         with:
           version: "0.12.7"
           enable-cache: true
+      - name: Authenticate private dependencies
+        uses: ./.github/actions/auth-private-dependencies
+        with:
+          token: ${{ secrets.GO_PRIVATE_TOKEN }}
       - name: Install pinned Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
         with:
@@ -235,6 +240,10 @@ jobs:
         with:
           version: "0.12.7"
           enable-cache: true
+      - name: Authenticate private dependencies
+        uses: ./.github/actions/auth-private-dependencies
+        with:
+          token: ${{ secrets.GO_PRIVATE_TOKEN }}
       - name: Require review for a newly dispatched ADK release
         if: github.event_name == 'repository_dispatch'
         env:
@@ -246,7 +255,7 @@ jobs:
           fi
       - name: Verify the exact ADK release attestation
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GO_PRIVATE_TOKEN }}
         run: |
           verified_dir=$(mktemp -d)
           gh release download "$ADK_RELEASE" \

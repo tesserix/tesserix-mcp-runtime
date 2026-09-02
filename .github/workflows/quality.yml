@@ -31,6 +31,10 @@ jobs:
         with:
           version: "0.12.7"
           enable-cache: true
+      - name: Authenticate private dependencies
+        uses: ./.github/actions/auth-private-dependencies
+        with:
+          token: ${{ secrets.GO_PRIVATE_TOKEN }}
       - name: Verify the frozen environment
         run: |
           uv lock --check
@@ -121,6 +125,10 @@ jobs:
         with:
           version: "0.12.7"
           enable-cache: true
+      - name: Authenticate private dependencies
+        uses: ./.github/actions/auth-private-dependencies
+        with:
+          token: ${{ secrets.GO_PRIVATE_TOKEN }}
       - name: Build and validate distributions
         run: |
           uv sync --frozen
