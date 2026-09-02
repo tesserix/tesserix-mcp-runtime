@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 IMPORT_CHECK = """
 import json
@@ -88,7 +88,9 @@ def _install_and_probe(
     install = [uv, "pip", "install", "--python", str(python)]
     if offline:
         install.append("--offline")
-    if not install_dependencies:
+    if install_dependencies:
+        install.extend(("--find-links", str(artifact.parent)))
+    else:
         install.append("--no-deps")
     install.extend(str(companion) for companion in companions)
     install.append(str(artifact))
@@ -106,7 +108,7 @@ def _install_and_probe(
         ],
         cwd=environment.parent,
     )
-    result = json.loads(completed.stdout)
+    result = cast(dict[str, Any], json.loads(completed.stdout))
     if result.get("typed") is not True or result.get("version_export_matches") is not True:
         raise SmokeInstallError(f"{artifact.name}: installed metadata probe failed: {result}")
     result["dependencies_installed"] = install_dependencies
